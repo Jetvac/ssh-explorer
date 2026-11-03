@@ -292,8 +292,8 @@ public sealed class SessionView : UserControl, IAsyncDisposable
 {
     public ServerSession Session { get; }
     readonly MainWindow main; readonly Grid host = new(); readonly TextBlock state = Ui.Text("Подключение…");
-    readonly StackPanel side = new(); readonly ContentControl screen = new();
-    readonly ContentControl addressHost = new(), commandHost = new(), fileStatusHost = new();
+    readonly StackPanel side = new(); readonly ContentControl screen = new() { Focusable = false, IsTabStop = false };
+    readonly ContentControl addressHost = new() { Focusable = false, IsTabStop = false }, commandHost = new() { Focusable = false, IsTabStop = false }, fileStatusHost = new() { Focusable = false, IsTabStop = false };
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using SSHExplorer.App;
 using SSHExplorer.App.ViewModels;
 using SSHExplorer.Core;
@@ -54,9 +55,47 @@ internal static class UiComponentTests
             root.Items.Add(child); root.IsExpanded = true; typeof(FileBrowserView).GetMethod("UpdateCurrentTree", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(browser, null); Layout(host);
             var rootHeader = (Border)root.Template.FindName("HeaderChrome", root); var childHeader = (Border)child.Template.FindName("HeaderChrome", child);
             Check(Math.Abs(rootHeader.ActualWidth - childHeader.ActualWidth) < 1 && Ui.GetIsCurrentFolder(root), "nested tree headers keep full selection width and current folder independent of table focus");
+            CheckSessionPresentationHosts(host, profile, store, Check);
             return checks;
         }
         finally { session.DisposeAsync().AsTask().GetAwaiter().GetResult(); if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+    static void CheckSessionPresentationHosts(Window host, ServerProfile profile, AppStore store, Action<bool, string> check)
+    {
+        // Real SessionView instances, without SSH/authentication. These four
+        // wrappers must not become fallback focus targets when Back disables.
+        var session = new ServerSession(profile, store); var view = new SessionView(session, null!, null);
+        try
+        {
+            var wrappers = new[] { "screen", "addressHost", "commandHost", "fileStatusHost" }.Select(name => (ContentControl)Field(view, name)).ToArray();
+            var back = Ui.IconButton(Ui.BackGlyph, () => { }, "Назад"); var path = new TextBox { Text = "/fixture", MinWidth = 220 }; var command = Ui.IconButton(Ui.ViewGlyph, () => { }, "Просмотреть");
+            wrappers[1].Content = Ui.Row(back, path); wrappers[2].Content = command; wrappers[3].Content = Ui.Text("Состояние"); wrappers[0].Content = new TextBox { Text = "Рабочая область" };
+            host.Content = view; Layout(host);
+            check(wrappers.All(wrapper => !wrapper.Focusable && !wrapper.IsTabStop && !wrapper.Focus()), "real SessionView presentation hosts reject direct focus and are excluded from tab order");
+            check(back.Focusable && back.IsTabStop && command.Focusable && command.IsTabStop && path.Focusable && path.IsTabStop, "nonfocusable presentation wrappers preserve interactive buttons and path textbox tab stops");
+            host.Activate(); Keyboard.Focus(back); PumpInput();
+            if (back.IsKeyboardFocused)
+            {
+                back.IsEnabled = false; PumpInput(); Layout(host);
+                check(wrappers.All(wrapper => !wrapper.IsKeyboardFocused) && !wrappers.Any(wrapper => ReferenceEquals(Keyboard.FocusedElement, wrapper)), "disabling the focused Back button cannot move keyboard focus onto an entire presentation row");
+                Keyboard.Focus(path); PumpInput();
+                check(path.IsKeyboardFocused && wrappers[1].IsKeyboardFocusWithin && !wrappers[1].IsKeyboardFocused, "path textbox still receives real focus inside the nonfocusable address host");
+            }
+            else Console.WriteLine("NOT RUN Back-disable focus migration: the CI desktop did not grant keyboard focus; host/tab-stop contracts were checked");
+        }
+        finally
+        {
+            // SessionView awaits on its UI context; keep that dispatcher alive
+            // rather than blocking its disposal continuation with GetResult.
+            var disposal = view.DisposeAsync().AsTask(); var deadline = System.Diagnostics.Stopwatch.StartNew();
+            while (!disposal.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(10)) PumpInput();
+            if (!disposal.IsCompleted) throw new TimeoutException("SessionView test disposal did not finish.");
+            disposal.GetAwaiter().GetResult();
+        }
+    }
+    static void PumpInput()
+    {
+        var frame = new DispatcherFrame(); Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => frame.Continue = false); Dispatcher.PushFrame(frame);
     }
     static object Field(object target, string name) => target.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(target)!;
     static void Layout(Window host) { host.UpdateLayout(); if (host.Content is FrameworkElement root) { root.Measure(new Size(host.ActualWidth, host.ActualHeight)); root.Arrange(new Rect(root.DesiredSize)); root.UpdateLayout(); } }
