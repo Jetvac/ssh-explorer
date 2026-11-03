@@ -10,11 +10,17 @@
 
 ## Подтверждённые проверки
 
-На рабочем компьютере выполнены Release build с **0 warnings / 0 errors** и **85/85** проверок `--no-windows`; [лог](test-results/beta2-profiles-headless.log). Не вызывались `Show`/`ShowDialog`, CUA или физический ввод. В набор входят реальные Windows DPAPI, реальные ошибки доступа и sharing violation в изолированном каталоге, транзакции секрета после входа, сохранение прежнего корректного секрета, пустая passphrase, безопасное чтение клона schema1, настоящие непоказанные WPF-контролы и обработчики изменения текста. Искусственно вызванный Loaded в проверке позднего чтения — компонентная проверка порядка обработки, не доказательство живого окна.
+Прежние [85/85](test-results/beta2-profiles-headless.log) и [92/92](test-results/beta2-profiles-published-baseline.log) сохраняются как исторические журналы. **Утверждение, что эти прогоны гарантированно выполнялись без окон и без обращения к обычному хранилищу, отозвано.** WPF ставит `Application.OnStartup` в Dispatcher уже из конструктора, даже без `Application.Run`. Старый runner создавал обычный `new App()`; последующий pump мог запустить настоящий startup, создать лишний MainWindow и заменить назначенный тестом store. Этот дефект изоляции обнаружен по лишнему MainWindow в CI. Исторические результаты не служат доказательством чистого headless-прогона.
+
+Исправленный runner использует только внутренний `new App(startDesktop:false)`. Он явно обрабатывает queued startup до создания первого Window и проверяет наблюдение callback, нулевой счётчик desktop startup, неизменность назначенного изолированного store и отсутствие окон. В конце headless-набора проверяются нулевые desktop startups, отсутствие видимых окон и native HWND. Обычный публичный конструктор приложения и пользовательские команды не меняют режим работы; внутренний режим теста подавляет только автоматический production startup.
+
+После проверки защитного кода выполнены свежая Release-сборка в `.tools/profile-beta2-isolated` (**0 warnings / 0 errors**) и новый изолированный `--no-windows --baseline-core` прогон: **94/94 PASS**. Это 92 прежние проверки, повторённые с исправленной изоляцией, и две проверки startup/final HWND. [Новый журнал](test-results/beta2-profiles-isolated-headless.log) содержит начальные и конечные `SAFETY` записи: queued callback обработан, desktop startup = 0, исходный изолированный store не заменён, visible windows = 0 и native HWND = 0. [Метаданные и SHA256](test-results/beta2-profiles-isolated-headless.meta.json). Только этот новый прогон подтверждает отсутствие окон в профильном наборе.
+
+В набор входят реальные Windows DPAPI, реальные ошибки доступа и sharing violation в изолированном каталоге, транзакции секрета после входа, сохранение прежнего корректного секрета, пустая passphrase, чтение клона schema1, настоящие непоказанные WPF-контролы и обработчики изменения текста. Искусственно вызванный Loaded в проверке позднего чтения — компонентная проверка порядка обработки, не доказательство живого окна.
 
 Клон beta.1 создаётся из отдельного schema1 fixture store в `.tools`, включая настройки, доверенный ключ и DPAPI reference. Исходные fixture bytes остаются неизменными. Это проверка совместимости формата; пользовательское хранилище не читается и не меняется.
 
-Дополнительно выполнен `--no-windows --baseline-core <опубликованный-beta.1>/SSHExplorer.Core.dll`: **92/92 PASS**, включая прежние 85 и 7 проверок опубликованной библиотеки; [лог](test-results/beta2-profiles-published-baseline.log). Это не отдельные 92 пользовательских маршрута. В отдельный collectible AssemblyLoadContext загружен точный Core из опубликованного portable beta.1:
+Дополнительный `--no-windows --baseline-core <опубликованный-beta.1>/SSHExplorer.Core.dll` проверяет точную библиотеку опубликованной beta.1. Счётчики assertions не означают столько же пользовательских маршрутов. В отдельный collectible AssemblyLoadContext загружается точный Core из portable beta.1:
 
 * InformationalVersion: `0.2.0-beta.1+eda137a734e8fc259eb97fca300b2072d11232a8`.
 * SHA256 Core: `d9da19f09a2a6277930fc9d3c46aa6b4444393a83b40331c971b16a298693fca`.
@@ -36,9 +42,9 @@
 
 ```powershell
 # Только непоказанные проверки на рабочем хосте.
-.tools/profile-beta2/SSHExplorer.ProfileTests.exe --no-windows
+.tools/profile-beta2-isolated/SSHExplorer.ProfileTests.exe --no-windows
 # Дополнительная Core-only совместимость с точной опубликованной beta.1.
-.tools/profile-beta2/SSHExplorer.ProfileTests.exe --no-windows --baseline-core <published-beta.1>/SSHExplorer.Core.dll
+.tools/profile-beta2-isolated/SSHExplorer.ProfileTests.exe --no-windows --baseline-core <published-beta.1>/SSHExplorer.Core.dll
 # Только в CI после запуска общего headless fixture.
 SSHExplorer.ProfileTests.exe --ordinary-only --ordinary-fixture <ignored-fixture-directory>/fixture.json
 ```

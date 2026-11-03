@@ -1,0 +1,24 @@
+{
+  "Utc": "2026-11-03T13:32:16.4189905Z",
+  "BaseCommit": "4ab9a1a44e138091098d5d9ba1b04109cc6db21b",
+  "WorkingTree": "dirty; startup isolation fix",
+  "WindowsBuild": "10.0.26200.0",
+  "Scope": "Headless resources8+MVVM18, motion17, connection13; startup callback deliberately consumed; desktop starts0/windows0/store unopened",
+  "Binaries": [
+    {
+      "File": "SSHExplorer.dll",
+      "SHA256": "2e7dd5990b42d4464a4404a6287d1ed8747a57ce1a90f0f92ffbc38d8b0e85db",
+      "Version": "0.2.0-beta.2+4ab9a1a44e138091098d5d9ba1b04109cc6db21b"
+    },
+    {
+      "File": "SSHExplorer.UiTests.dll",
+      "SHA256": "fa698cec14213c5df3e55d32b8cc7564db6dcbf19c33b9dc8f4ecf54b33758b2",
+      "Version": "0.2.0-beta.2+4ab9a1a44e138091098d5d9ba1b04109cc6db21b"
+    },
+    {
+      "File": "SSHExplorer.Core.dll",
+      "SHA256": "481297bfa1b29fd08ffcb344c05aac6e42b65a23d17db6d9ac5d842f0acc306e",
+      "Version": "0.2.0-beta.2+4ab9a1a44e138091098d5d9ba1b04109cc6db21b"
+    }
+  ]
+}

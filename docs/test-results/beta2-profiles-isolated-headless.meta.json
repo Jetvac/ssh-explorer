@@ -1,0 +1,36 @@
+{
+  "utc": "2026-11-03T13:35:18.4660499Z",
+  "sourceCommit": "4ab9a1a44e138091098d5d9ba1b04109cc6db21b",
+  "workingTreeDirty": true,
+  "mode": "--no-windows --baseline-core",
+  "passed": 94,
+  "exitCode": 0,
+  "startupCallbackObserved": true,
+  "desktopStartupCount": 0,
+  "startupWindows": 0,
+  "startupStoreIdentityUnchanged": true,
+  "finalVisibleWindows": 0,
+  "finalNativeWindowHandles": 0,
+  "buildOutput": ".tools/profile-beta2-isolated",
+  "buildWarnings": 0,
+  "buildErrors": 0,
+  "artifacts": {
+    "SSHExplorer.ProfileTests.exe": {
+      "sha256": "9fef9fb826c371be6390c1df68609305ee9721494f2277f32adb7ea1f8adf9af",
+      "productVersion": "0.2.0-beta.2+4ab9a1a44e138091098d5d9ba1b04109cc6db21b"
+    },
+    "SSHExplorer.Core.dll": {
+      "sha256": "481297bfa1b29fd08ffcb344c05aac6e42b65a23d17db6d9ac5d842f0acc306e",
+      "productVersion": "0.2.0-beta.2+4ab9a1a44e138091098d5d9ba1b04109cc6db21b"
+    },
+    "SSHExplorer.dll": {
+      "sha256": "7e6b06a1af90a7140c44a1cb1d820edaceea1786936ac84bc3976a5cc975f1dc",
+      "productVersion": "0.2.0-beta.2+4ab9a1a44e138091098d5d9ba1b04109cc6db21b"
+    },
+    "SSHExplorer.ProfileTests.dll": {
+      "sha256": "d29e9be8b66a095fbf3b9aa8a5c29c22cd970d0d18484c81220ac84e6e24875f",
+      "productVersion": "0.2.0-beta.2+4ab9a1a44e138091098d5d9ba1b04109cc6db21b"
+    }
+  },
+  "logSha256": "9dca5f55e1dbe2abe84aa20063cfc1608b233bf01f6b6a7851b380f700e82b5f"
+}

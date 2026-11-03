@@ -1,0 +1,99 @@
+PASS queued startup is consumed with zero desktop starts, no windows and unchanged isolated store identity
+SAFETY startupCallbackObserved=true; desktopStartupCount=0; startupWindows=0; startupStoreIdentityUnchanged=true
+PASS offline DNS and Cyrillic display name save without network access
+PASS valid host accepted: 127.0.0.1
+PASS valid host accepted: 2001:db8::1
+PASS valid host accepted: [2001:db8::1]
+PASS valid host accepted: localhost
+PASS valid host accepted: пример.рф
+PASS invalid host stays inline: empty
+PASS invalid host stays inline: https://example.com
+PASS invalid host stays inline: host:22
+PASS invalid host stays inline: 999.1.1.1
+PASS invalid host stays inline: [broken
+PASS invalid host stays inline: name/path
+PASS invalid host stays inline: bad host
+PASS empty name stays inline
+PASS empty username stays inline
+PASS invalid port is rejected without clamp: 0
+PASS invalid port is rejected without clamp: 65536
+PASS invalid port is rejected without clamp: abc
+PASS invalid port is rejected without clamp: -1
+PASS invalid port is rejected without clamp: 999999999999
+PASS invalid timeout is rejected without clamp: 2
+PASS invalid timeout is rejected without clamp: 121
+PASS invalid timeout is rejected without clamp: -1
+PASS invalid timeout is rejected without clamp: abc
+PASS invalid timeout is rejected without clamp: 999999999999
+PASS relative initial path is rejected inline
+PASS missing key file is rejected without connecting
+PASS existing key path with empty passphrase can be saved offline
+PASS password-save opt-in requires a password
+PASS explicit password-save opt-in accepts entered secret
+PASS transaction commits one in-memory profile
+PASS profile and DPAPI secret survive restart
+PASS settings, backup and encrypted files never contain plaintext secret
+PASS real Windows sharing violation rejects atomic settings commit
+PASS failed edit preserves existing in-memory profile and original secret
+PASS failed settings replacement leaves exact original JSON bytes
+PASS failed settings commit removes only its staged encrypted secret
+PASS failed profile deletion preserves in-memory and persisted profile
+PASS disabling secret persistence removes the saved encrypted secret
+PASS edit preserves stable profile ID after restart
+PASS successful deletion survives restart
+PASS legacy profile-ID DPAPI file remains readable
+PASS legacy profile migrates to transactional secret reference
+PASS real settings write error is reported inline
+PASS failed save retains all input and creates no partial profile
+PASS same form input saves successfully after storage is repaired
+PASS real denied secret-file write creates no partial profile
+PASS secret storage failure preserves input and re-enables save
+PASS rapid double-save performs exactly one persistence operation
+PASS original save completes after duplicate click is ignored
+PASS actual masked control preserves Unicode, quotes and surrounding whitespace
+PASS reveal preserves exact value without editing or network work
+PASS editing revealed control synchronizes exact secret back to masked control
+PASS clearing secret control clears both presentations
+PASS new profile has explicit connect default and separate Save action without showing a window
+PASS save-and-connect returns the exact in-memory credential
+PASS without opt-in save-and-connect writes no secret file
+PASS profile submission diagnostic text contains no secret
+PASS new opted-in profile defers secret persistence until authenticated
+PASS successful authentication commits exact DPAPI secret transactionally
+PASS existing saved secret is available without manual re-entry
+PASS unverified replacement credentials never overwrite a good saved secret
+PASS failed post-auth settings commit preserves old good secret
+PASS post-auth failure removes its unreferenced secret file
+PASS separate Save with blank field preserves existing protected secret
+PASS late authenticated result cannot update a changed authentication identity
+PASS late success cannot recreate a deleted profile
+PASS separate Save has no connection side effect or credential result
+PASS untouched password field requests normal credential prompt instead of invented empty password
+PASS removed saved-secret file is an inline recoverable error instead of an async handler crash
+PASS same form recovers by entering a replacement secret after missing-file error
+PASS explicit empty key passphrase remains an in-memory credential distinct from missing secret
+PASS empty authenticated passphrase survives DPAPI restart without becoming null
+PASS schema1 beta.1 fixture clone retains profile ID and settings
+PASS schema1 cloned DPAPI secret and trusted key remain readable
+PASS beta.2 save and restart keep cloned protected secret reference
+PASS clone compatibility checks never alter original isolated beta.1 fixture bytes
+PASS pre-cancelled credentials and interactive prompts return without opening windows
+PASS pre-cancelled trust and profile prompts create no stale windows
+PASS delayed secret load cannot overwrite manually edited actual profile control (unshown component)
+PASS late password load is discarded after authentication method changes (unshown component)
+PASS unshown real MainWindow realizes persisted profiles through actual binding
+PASS saved-row selection returns without recursive TabControl refresh
+PASS repeated actual RefreshHome preserves selection and read-only source binding
+PASS genuine tab switching keeps selected profile without routed child-selection feedback
+PASS published beta.1 Core loads in a separate assembly context without its application
+BASELINE Core informational version: 0.2.0-beta.1+eda137a734e8fc259eb97fca300b2072d11232a8
+BASELINE Core SHA256: d9da19f09a2a6277930fc9d3c46aa6b4444393a83b40331c971b16a298693fca
+PASS legacy store creation invokes Core persistence and trust APIs without loading App or constructing windows
+PASS exact published beta.1 Core store clone retains profile ID, bookmarks and settings
+PASS exact published beta.1 Core DPAPI secret and persisted host trust remain readable
+PASS beta.2 edit and restart preserve exact published beta.1 credential reference
+PASS exact published beta.1 source store bytes stay unchanged while its clone is edited
+PASS published beta.1 Core and sibling DLL bytes are unchanged after Core-only loading
+PASS isolated headless run ends with zero desktop starts and no visible window or native window handle
+SAFETY finalDesktopStartupCount=0; visibleWindows=0; nativeWindowHandles=0
+RESULT: 94 profile validation, persistence and unshown WPF component checks passed

@@ -5,10 +5,21 @@ namespace SSHExplorer.App;
 
 public partial class App : Application
 {
+    readonly bool startDesktop = true;
+    public App() { }
+    // WPF queues Application.OnStartup from its constructor, even when a component
+    // runner only pumps Dispatcher and never calls Application.Run. Test resources
+    // must not implicitly start the desktop or read the ordinary settings directory.
+    internal App(bool startDesktop) => this.startDesktop = startDesktop;
+    internal bool StartupCallbackObserved { get; private set; }
+    internal int DesktopStartupCount { get; private set; }
     public static AppStore Store { get; private set; } = null!;
     public static TransferQueue Transfers { get; } = new();
     protected override async void OnStartup(StartupEventArgs e)
     {
+        StartupCallbackObserved = true;
+        if (!startDesktop) return;
+        DesktopStartupCount++;
         base.OnStartup(e);
         EventManager.RegisterClassHandler(typeof(Window), Window.LoadedEvent, new RoutedEventHandler((sender, _) => Theme.ApplyWindowFrame((Window)sender)));
         DispatcherUnhandledException += (_, args) =>
@@ -37,7 +48,7 @@ public partial class App : Application
     }
     protected override void OnExit(ExitEventArgs e)
     {
-        LocalDiagnostics.RecordSynchronous("app.exit", e.ApplicationExitCode.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (startDesktop) LocalDiagnostics.RecordSynchronous("app.exit", e.ApplicationExitCode.ToString(System.Globalization.CultureInfo.InvariantCulture));
         base.OnExit(e);
     }
 }

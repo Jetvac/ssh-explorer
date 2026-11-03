@@ -14,7 +14,7 @@ internal static class ConnectionTests
         App? app = null;
         try
         {
-            app = new App(); app.InitializeComponent();
+            app = TestApplication.Create();
             typeof(App).GetProperty(nameof(App.Store))!.SetValue(null, new AppStore(directory));
             int count = 0;
             void Check(bool ok, string text) { if (!ok) throw new Exception(text); ++count; Console.WriteLine("PASS " + text); }

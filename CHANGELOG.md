@@ -11,6 +11,7 @@
 - Общий [motion policy](docs/MOTION_SPEC.md): hover-подложка, flyout, рабочая поверхность; interruption заменяет clocks, disabled/HC устанавливают final state. Команды не ждут анимацию, HWND терминала не перемещается.
 - Мониторинг и передачи обновляют существующие строки без полного сброса коллекции. Drag/hover cleanup согласован с Esc, закрытием вкладки и завершением операции. Native virtual files протокол сохранён.
 - Headless, real-network и CI STA проверки обычных Add/Trust/Connect с новым тестовым процессом для saved-secret reuse. Это не физический ввод или запуск опубликованного EXE. Live UI, DPI/HC/Explorer/video и clean Windows остаются открыты: [приёмка](ACCEPTANCE.md).
+- Исправлена изоляция тестового WPF Application: queued OnStartup больше не открывает лишний desktop и обычный store в component runner. Старые утверждения профильных прогонов «без окон» отозваны; новый isolated повтор — 94 assertions с контролем нулевых startup/visible/HWND. Startup настоящего packaged EXE проверяется отдельным CI-only процессом.
 - Версионная portable-папка beta.2, clean source commit, включённые .NET/WebView2 и SHA-256. Python/Paramiko нужны только стенду разработки/CI, не пользователю приложения.
 
 ## 0.2.0-beta.1 — 2026-11-03

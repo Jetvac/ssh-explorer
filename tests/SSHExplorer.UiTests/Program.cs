@@ -15,7 +15,7 @@ internal static class Program
         { Console.Error.WriteLine("Window checks require CI; use --resources-only, --motion-only or --connection-only for headless checks."); return 2; }
         try
         {
-            var app = new App(); app.InitializeComponent(); app.ShutdownMode = ShutdownMode.OnExplicitShutdown; Theme.Apply("Light");
+            var app = TestApplication.Create(); Theme.Apply("Light");
             var list = new ListBox { Width = 800, Height = 500, ItemsSource = Enumerable.Range(0, 10_000).Select(i => "item-" + i).ToList() };
             var factory = new FrameworkElementFactory(typeof(VirtualizingWrapPanel)); factory.SetValue(VirtualizingWrapPanel.ItemWidthProperty, 100d); factory.SetValue(VirtualizingWrapPanel.ItemHeightProperty, 80d); list.ItemsPanel = new ItemsPanelTemplate(factory); list.SetValue(ScrollViewer.CanContentScrollProperty, true);
             var host = new Window { Content = list, Width = 820, Height = 550, ShowInTaskbar = false, Left = -10_000, Top = -10_000 }; host.Show();

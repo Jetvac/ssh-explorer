@@ -1,6 +1,6 @@
 # Реализация и проверка Windows UI
 
-В beta.2 добавлены independent DataGridCell template без внутренних focus borders, fixed status message, полноширинные tree headers/current-folder marker, замороженные заполненные vector ImageSource иконки, anchored flyout и явные command glyphs. Все восемь видов наследуют общий item state. Монитор и очередь передач обновляют существующие строки, drop feedback очищается при завершении/уходе/Esc/закрытии. Общая реализация переходов и headless clock evidence — [MOTION_SPEC](MOTION_SPEC.md); текущая матрица — [UI_PARITY](UI_PARITY.md). Живые screenshots и результаты ниже относятся к прежним состояниям; desktop beta.2 не запускался по указанию пользователя.
+В beta.2 добавлены independent DataGridCell template без внутренних focus borders, fixed status message, полноширинные tree headers/current-folder marker, замороженные заполненные vector ImageSource иконки, anchored flyout и явные command glyphs. Все восемь видов наследуют общий item state. Монитор и очередь передач обновляют существующие строки, drop feedback очищается при завершении/уходе/Esc/закрытии. Общая реализация переходов — [MOTION_SPEC](MOTION_SPEC.md), матрица — [UI_PARITY](UI_PARITY.md). Живые screenshots ниже исторические; прежняя ошибка побочного запуска desktop в профильных тестах и её исправление описаны в [PROFILE_FLOW_BETA2](PROFILE_FLOW_BETA2.md).
 
 Дата: 03.11.2026. Все экраны используют реальные данные из изолированного Linux SSH/SFTP-стенда; показанные пути и процессы не являются демонстрационными записями приложения.
 

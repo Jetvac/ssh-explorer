@@ -39,9 +39,9 @@ SSHExplorer.UiTests.exe --motion-only
 
 03.11.2026, Windows 11 x64 build 26200, SDK 10.0.403, рабочее дерево поверх beta.1 `eda137a734e8fc259eb97fca300b2072d11232a8`, Release 0 warnings/errors:
 
-- **PASS:** 8 resource/contract и 18 MVVM assertions — [лог](test-results/ui-beta2-headless.log).
-- **PASS:** 17 clock/contract assertions — [лог](test-results/ui-beta2-motion.log).
-- Точный SHA-256 test/app DLL и исходная версия этой промежуточной сборки — [build metadata](test-results/ui-beta2-headless-build.json). Это dev-сборка рабочего дерева; идентификатор чистого release фиксируется отдельно при упаковке.
+- **PASS:** 8 resource/contract и 18 MVVM assertions — [isolated repeat](test-results/beta2-resources-isolated.log).
+- **PASS:** 17 clock/contract assertions — [isolated repeat](test-results/beta2-motion-isolated.log).
+- SHA-256 новой промежуточной test/app DLL — [build metadata](test-results/beta2-isolated-test-build.json). В повторе deliberately consumed WPF startup callback не запускает desktop, не открывает обычный Store и не создаёт Window. Исправление общей ошибки изоляции профильного runner — [PROFILE_FLOW_BETA2](PROFILE_FLOW_BETA2.md). Clean release идентифицируется отдельно при упаковке.
 
 `MotionTests` использует настоящие DoubleAnimation/AnimationClock и внутренний test-policy hook. SeekAlignedToLastTick переводит реальные clocks в середину диапазона, не требует tick/render Window и не имитирует движение скриншотом. Проверены replacement, обратное направление, конечные base values, отключение во время эффекта, Unloaded, смена темы и callback Closed. Проверка объекта/Focusable/IsHitTestVisible/LayoutTransform не выдаётся за реальный ввод клавиатурой. Ни Window, ни Popup не открывался; системные настройки анимации не менялись.
 

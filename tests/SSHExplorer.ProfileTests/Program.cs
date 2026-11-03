@@ -29,9 +29,17 @@ internal static class Program
         try
         {
             _root=Path.Combine(Environment.CurrentDirectory,".tools","profile-regression",Guid.NewGuid().ToString("N"));Directory.CreateDirectory(_root);
-            _app=new App();_app.InitializeComponent();_app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            _app=new App(startDesktop:false);_app.InitializeComponent();_app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
-            SetStore(NewStore("startup"));Theme.Apply("Light");
+            var startupStore=NewStore("startup");SetStore(startupStore);
+            // Application's constructor queues OnStartup even without Application.Run.
+            // Consume it before constructing any Window, with desktop startup suppressed.
+            var startupFrame=new DispatcherFrame();
+            _app.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,()=>startupFrame.Continue=false);
+            Dispatcher.PushFrame(startupFrame);
+            Check(_app.StartupCallbackObserved&&_app.DesktopStartupCount==0&&ReferenceEquals(App.Store,startupStore)&&_app.Windows.Count==0,"queued startup is consumed with zero desktop starts, no windows and unchanged isolated store identity");
+            Console.WriteLine("SAFETY startupCallbackObserved=true; desktopStartupCount=0; startupWindows=0; startupStoreIdentityUnchanged=true");
+            Theme.Apply("Light");
             var windowStyle=new Style(typeof(Window),(Style)_app.Resources[typeof(Window)]);
             windowStyle.Setters.Add(new Setter(Window.ShowActivatedProperty,false));windowStyle.Setters.Add(new Setter(Window.WindowStateProperty,WindowState.Minimized));_app.Resources[typeof(Window)]=windowStyle;
             bool noWindows=args.Contains("--no-windows",StringComparer.Ordinal);
@@ -54,6 +62,11 @@ internal static class Program
             if(baselineIndex>=0){if(!noWindows||baselineIndex+1>=args.Length)throw new ArgumentException("--baseline-core requires --no-windows and published beta.1 Core path");PublishedBaselineCompatibility(args[baselineIndex+1]);}
             int ordinaryIndex=Array.IndexOf(args,"--ordinary-fixture");
             if(ordinaryIndex>=0){if(noWindows||ordinaryIndex+1>=args.Length)throw new ArgumentException("--ordinary-fixture requires CI dialog mode and fixture.json");OrdinaryPasswordScenario(args[ordinaryIndex+1]);}
+            if(noWindows)
+            {
+                Check(_app.DesktopStartupCount==0&&_app.Windows.Cast<Window>().All(window=>!window.IsVisible&&new System.Windows.Interop.WindowInteropHelper(window).Handle==IntPtr.Zero),"isolated headless run ends with zero desktop starts and no visible window or native window handle");
+                Console.WriteLine("SAFETY finalDesktopStartupCount=0; visibleWindows=0; nativeWindowHandles=0");
+            }
             _owner.Close();_app.Shutdown();Console.WriteLine($"RESULT: {_passed} profile validation, persistence and {(noWindows?"unshown WPF component":"STA dialog")} checks passed");return 0;
         }
         catch(Exception ex){Console.WriteLine(ex);return 1;}

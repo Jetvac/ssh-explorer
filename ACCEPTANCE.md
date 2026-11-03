@@ -2,6 +2,8 @@
 
 03.11.2026. База — `v0.2.0-beta.1` / `eda137a734e8fc259eb97fca300b2072d11232a8`. **P0 парольного crash открыт.** Новая beta — промежуточный выпуск, не пользовательское принятие. Действует «Продолжайте код и CI, окна позже».
 
+Исправлена ошибка изоляции: WPF вызывает OnStartup из очереди конструктора Application даже без Run. У старых профильных прогонов отозвана отметка «без окон». Новый внутренний test constructor подавляет desktop startup; queued callback намеренно выполняется с проверкой desktop starts=0, windows/HWND=0 и неизменного isolated Store. Это не опция обычного EXE. [Подробности](docs/PROFILE_FLOW_BETA2.md).
+
 ## Beta.2: фактические уровни доказательства
 
 | Сценарий | Статус | Доказательство и предел |
@@ -10,16 +12,17 @@
 | Два последних Windows Application Error | **PASS** | Версия в событиях 0.1.0.0, `0xC00000FD`; [метаданные](docs/test-results/beta2-os-crash-provenance.json). Это происхождение событий, не диагноз beta.1 |
 | Auth callbacks и transport lifecycle | **PASS** | 13 component + 26 loopback network assertions; password/key MFA, OTP cancel, reject trust, wrong→correct password, timeout, exec/SFTP/PTY/export. [AUTH_NETWORK](docs/AUTH_NETWORK.md) |
 | Linux OpenSSH и существующие операции | **PASS** | 5 auth assertions (password, encrypted Ed25519, auxiliary channels); 54 существующих assertions = 36 component + 18 Linux integration. [Лог](docs/test-results/beta2-core-linux-regression.log). Нет установки компонентов на сервер |
-| Пароль, RAM handoff, atomic DPAPI, opt-out/stale results | **PASS** | 85 headless component assertions, включая реальные DPAPI и отказы хранения; [лог](docs/test-results/beta2-profiles-headless.log). Непоказанные контролы не равны живому вводу |
-| Совместимость опубликованного Core beta.1 | **PASS** | 92 headless assertions = прежние 85 + 7 baseline. Старый Core создаёт isolated store, beta.2 изменяет копию, original bytes/DLL неизменны. [Отчёт](docs/PROFILE_FLOW_BETA2.md), [лог](docs/test-results/beta2-profiles-published-baseline.log) |
+| Пароль, RAM handoff, atomic DPAPI, opt-out/stale results | **PASS** | Повторены в новом наборе **94 isolated component assertions**: прежние 85 + 7 baseline + 2 startup/isolation guard. Реальные DPAPI/отказы хранения; [лог](docs/test-results/beta2-profiles-isolated-headless.log). Непоказанные контролы не равны живому вводу |
+| Совместимость опубликованного Core beta.1 | **PASS** | 7 baseline assertions входят в те же 94, повторно не суммируются. Старый Core создаёт isolated store, beta.2 изменяет копию, original bytes/DLL неизменны. [Отчёт](docs/PROFILE_FLOW_BETA2.md), [метаданные](docs/test-results/beta2-profiles-isolated-headless.meta.json) |
 | Add→PasswordBox→Trust→SFTP, fresh test process | **NOT RUN** до CI | Обычные команды без injected credentials/trust. STA control events + real network не равны физическому вводу или опубликованному EXE |
 | Modal cancellation и owner close | **NOT RUN** до CI | Реальные Credentials/Trust/Interactive/Profile диалоги; host окна запрещены |
-| Motion interruption/disable/unload/theme | **PASS** | [17 actual WPF clock assertions](docs/test-results/ui-beta2-motion.log), без Window/Popup. [Контракт](docs/MOTION_SPEC.md). OS toggle, HC и визуальное качество отдельно |
-| Стили, иконки, binding/state | **PASS** | 8 resource + 18 MVVM assertions; [лог](docs/test-results/ui-beta2-headless.log). Resource load не доказывает живой HC |
+| Motion interruption/disable/unload/theme | **PASS** | [17 actual WPF clock assertions, isolated repeat](docs/test-results/beta2-motion-isolated.log), без Window/Popup. [Контракт](docs/MOTION_SPEC.md). OS toggle, HC и визуальное качество отдельно |
+| Стили, иконки, binding/state | **PASS** | 8 resource + 18 MVVM assertions, [isolated repeat](docs/test-results/beta2-resources-isolated.log). Resource load не доказывает живой HC |
 | Layout, row/focus/tree, восемь видов | **NOT RUN** до CI | Подготовлены реальные WPF component tests; сопоставимые screenshots и все DPI открыты |
-| Dedup/cancel, durable private diagnostics, stable transfer rows | **PASS** | [13 headless assertions](docs/test-results/beta2-connection-headless.log) в совокупности; без сброса всего списка при update |
+| Dedup/cancel, durable private diagnostics, stable transfer rows | **PASS** | [13 isolated headless assertions](docs/test-results/beta2-connection-isolated.log) в совокупности; без сброса всего списка при update |
 | Native COM ABI новой сборки | **NOT RUN** до CI | Протокол сохранён, изменена очистка UI drop/hover. >2 ГБ прогон beta.1 остаётся историческим доказательством своего уровня |
 | Новый ZIP: версия, commit, внутренние хеши | **NOT RUN** до CI/публикации | Скачанный опубликованный ZIP подлежит статической проверке до финального отчёта. EXE на host не запускается |
+| Настоящий packaged EXE startup/normal close | **NOT RUN** до CI | [Отдельный probe](docs/PORTABLE_STARTUP_TEST.md): fresh --settings-dir, exact build/PID, нормальный exit. Не password input, не повторный вход и не чистая Windows |
 | Live password input, published EXE restart, screenshots, video | **BLOCKED** | Указание пользователя об окнах; компоненты не подменяют эти строки |
 | Explorer gestures, 100/125/150/200% DPI, HC, системное motion off | **BLOCKED** | Нет разрешённого desktop-прогона новой сборки; старые screenshots исторические |
 | Чистая Windows, offline terminal, multi-monitor | **NOT RUN** | Отдельная среда не предоставлена. CI runner не объявляется пользовательским desktop |

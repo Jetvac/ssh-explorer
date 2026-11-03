@@ -14,7 +14,7 @@ internal static class ThemeResourceTests
     {
         try
         {
-            var app = new App(); app.InitializeComponent();
+            var app = TestApplication.Create();
             foreach (var mode in new[] { "Light", "Dark", "System" })
             {
                 Theme.Apply(mode);

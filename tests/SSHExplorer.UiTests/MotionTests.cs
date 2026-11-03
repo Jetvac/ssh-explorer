@@ -11,7 +11,7 @@ internal static class MotionTests
         App? app = null;
         try
         {
-            app = new App(); app.InitializeComponent(); Theme.Apply("Light"); UiMotion.SetTestPolicy(true);
+            app = TestApplication.Create(); Theme.Apply("Light"); UiMotion.SetTestPolicy(true);
             var count = 0;
             void Check(bool condition, string description) { if (!condition) throw new Exception(description); count++; Console.WriteLine("PASS " + description); }
             Check((TimeSpan)app.FindResource("MotionFast") == TimeSpan.FromMilliseconds(83) && (TimeSpan)app.FindResource("MotionSurface") == TimeSpan.FromMilliseconds(167) && (TimeSpan)app.FindResource("MotionSlow") == TimeSpan.FromMilliseconds(250), "real motion resources use project durations 83/167/250 ms");
