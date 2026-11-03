@@ -10,7 +10,7 @@ public sealed class SecretEntry:UserControl
 {
     private readonly PasswordBox masked=new();
     private readonly TextBox visible=new(){Visibility=Visibility.Collapsed};
-    private readonly ToggleButton reveal=new(){Content="Показать",MinWidth=78,Margin=new Thickness(8,0,0,0)};
+    private readonly ToggleButton reveal=new(){Content=Ui.Icon("\uE890",16,false),ToolTip="Показать пароль"};
     private bool syncing;
     public event EventHandler? ValueChanged;
     public int EditRevision {get;private set;}
@@ -28,6 +28,7 @@ public sealed class SecretEntry:UserControl
     public SecretEntry(string accessibleName="Пароль")
     {
         Focusable=false;var grid=new Grid();grid.ColumnDefinitions.Add(new());grid.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+        reveal.SetResourceReference(StyleProperty,"SecretRevealButtonStyle");
         masked.MinHeight=visible.MinHeight=34;grid.Children.Add(masked);grid.Children.Add(visible);Grid.SetColumn(reveal,1);grid.Children.Add(reveal);Content=grid;
         AutomationProperties.SetName(masked,accessibleName);AutomationProperties.SetName(visible,accessibleName+" — показан");AutomationProperties.SetName(reveal,"Показать пароль");
         masked.PasswordChanged+=(_,_)=>
@@ -43,7 +44,7 @@ public sealed class SecretEntry:UserControl
     private void SetRevealed(bool value)
     {
         masked.Visibility=value?Visibility.Collapsed:Visibility.Visible;visible.Visibility=value?Visibility.Visible:Visibility.Collapsed;
-        reveal.Content=value?"Скрыть":"Показать";AutomationProperties.SetName(reveal,value?"Скрыть пароль":"Показать пароль");
+        reveal.ToolTip=value?"Скрыть пароль":"Показать пароль";AutomationProperties.SetName(reveal,value?"Скрыть пароль":"Показать пароль");
         if(!syncing&&IsLoaded&&Window.GetWindow(this)?.IsVisible==true)FocusInput();
     }
     public void FocusInput(){if(IsRevealed){visible.Focus();visible.SelectAll();}else masked.Focus();}

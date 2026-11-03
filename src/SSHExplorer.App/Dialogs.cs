@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Data;
+using System.Globalization;
 using Microsoft.Win32;
 using SSHExplorer.Core;
 
@@ -20,8 +22,10 @@ public static class Dialogs
     }
     static TextBox Field(Panel p, string label, string value)
     {
-        var l = Ui.Text(label); l.Margin = new Thickness(0, 9, 0, 5); p.Children.Add(l);
-        var t = new TextBox { Text = value }; System.Windows.Automation.AutomationProperties.SetName(t, label); p.Children.Add(t); return t;
+        var l = Ui.Text(label,12);l.TextWrapping=TextWrapping.Wrap;l.SetResourceReference(TextBlock.ForegroundProperty,"Muted"); l.Margin = new Thickness(0, 9, 0, 5); p.Children.Add(l);
+        var t = new TextBox { Text = value }; System.Windows.Automation.AutomationProperties.SetName(t, label); p.Children.Add(t);
+        var error=Ui.Text("",12);error.SetResourceReference(FrameworkElement.StyleProperty,"ValidationMessageStyle");error.SetBinding(TextBlock.TextProperty,new Binding{Source=t,Path=new PropertyPath(Ui.ValidationMessageProperty)});error.SetBinding(UIElement.VisibilityProperty,new Binding{Source=t,Path=new PropertyPath(Ui.ValidationMessageProperty),Converter=new NonEmptyTextVisibilityConverter()});p.Children.Add(error);
+        t.TextChanged+=(_,_)=>Ui.SetValidationMessage(t,"");return t;
     }
     public static ServerProfile? Profile(ServerProfile? old = null)
     {
@@ -44,9 +48,9 @@ public static class Dialogs
         p.Children.Add(Ui.Text(profile.Authentication == AuthenticationKind.PrivateKey ? "Passphrase приватного ключа (может быть пустой)" : "Пароль", 14));
         var password = new SecretEntry(profile.Authentication==AuthenticationKind.PrivateKey?"Парольная фраза приватного ключа":"Пароль SSH") { Password = saved ?? "", Margin = new Thickness(0, 10, 0, 12) }; p.Children.Add(password);
         var info = Ui.Text("Секрет передаётся только после проверки ключа сервера.\n"+(profile.SaveSecret?"Защищённая копия обновится только после успешного подключения.":"Секрет не сохраняется. Эту настройку можно изменить в профиле."), 12); info.TextWrapping = TextWrapping.Wrap; info.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(info);
-        var ok = Ui.Button("Подключиться", () => w.DialogResult = true); ok.IsDefault = true;
+        var ok = Ui.Button("Подключиться", () => w.DialogResult = true); ok.IsDefault = true;ok.SetResourceReference(FrameworkElement.StyleProperty,"PrimaryButtonStyle");
         var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true;
-        var row = Ui.Actions(ok, cancel); row.HorizontalAlignment = HorizontalAlignment.Right; row.Margin = new Thickness(0, 18, 0, 0); p.Children.Add(row); w.Content = p; w.Loaded += (_, _) => password.FocusInput();
+        w.Content = Ui.DialogSurface(p,cancel,ok); w.Loaded += (_, _) => password.FocusInput();
         try{return ModalRunner.Show(w,Owner(owner),ct)?new SessionCredentials(password.Password):null;}
         finally{password.Clear();}
     }
@@ -56,23 +60,27 @@ public static class Dialogs
         var w = Window("Проверка ключа сервера", 660,owner); var p = new StackPanel { Margin = new Thickness(24) };
         p.Children.Add(Ui.DialogHeading(key.Changed?"Ключ сервера изменён — вход заблокирован":"Доверять этому серверу?"));
         var explanation = Ui.Text("Сравните отпечаток с данными администратора сервера до входа. Это ключ сервера, а не ваш приватный ключ."); explanation.TextWrapping = TextWrapping.Wrap; explanation.Margin = new Thickness(0, 12, 0, 18); p.Children.Add(explanation);
-        p.Children.Add(Ui.Text($"Адрес: {key.Host}:{key.Port}\nАлгоритм: {key.Algorithm}"));
+        var endpoint=Ui.Text($"Адрес: {key.Host}:{key.Port}\nАлгоритм: {key.Algorithm}");endpoint.TextWrapping=TextWrapping.Wrap;p.Children.Add(endpoint);
         var fp = new TextBox { Text = key.Fingerprint, IsReadOnly = true, FontFamily = new FontFamily("Consolas"), Margin = new Thickness(0, 14, 0, 18) };System.Windows.Automation.AutomationProperties.SetName(fp,"SHA256-отпечаток ключа сервера");p.Children.Add(fp);
         var result = TrustDecision.Reject;
         var cancel=Ui.Button("Отмена",()=>w.DialogResult=false);cancel.IsCancel=true;
         if(key.Changed)
         {
-            var old=Ui.Text("Ранее: "+key.PreviousFingerprint+"\nПроверьте новый ключ у администратора. Замена доверия доступна отдельным действием в настройках.");old.TextWrapping=TextWrapping.Wrap;p.Children.Add(old);p.Children.Add(cancel);
+            var old=Ui.Text("Ранее: "+key.PreviousFingerprint+"\nПроверьте новый ключ у администратора. Замена доверия доступна отдельным действием в настройках.");old.TextWrapping=TextWrapping.Wrap;p.Children.Add(old);w.Content=Ui.DialogSurface(p,cancel);
         }
-        else p.Children.Add(Ui.Actions(Ui.Button("Доверить и сохранить", () => { result = TrustDecision.Permanent; w.DialogResult = true; }), Ui.Button("Только эта сессия", () => { result = TrustDecision.Session; w.DialogResult = true; }), cancel));
-        w.Content = p;return ModalRunner.Show(w,Owner(owner),ct)?result:TrustDecision.Reject;
+        else
+        {
+            var permanent=Ui.Button("Доверить и сохранить",()=>{result=TrustDecision.Permanent;w.DialogResult=true;});permanent.SetResourceReference(FrameworkElement.StyleProperty,"PrimaryButtonStyle");
+            w.Content=Ui.DialogSurface(p,cancel,Ui.Button("Только эта сессия",()=>{result=TrustDecision.Session;w.DialogResult=true;}),permanent);
+        }
+        return ModalRunner.Show(w,Owner(owner),ct)?result:TrustDecision.Reject;
     }
     public static string? Interactive(InteractivePrompt prompt,Window? owner=null,CancellationToken ct=default)
     {
         if(ct.IsCancellationRequested)return null;
         var w = Window("Дополнительная проверка SSH", 520,owner); var p = new StackPanel { Margin = new Thickness(24) }; var text = Ui.Text(prompt.Instruction + "\n" + prompt.Prompt); text.TextWrapping = TextWrapping.Wrap; p.Children.Add(text);
         Control input = prompt.Echo ? new TextBox() : new SecretEntry("Ответ на дополнительный запрос SSH"); input.Margin = new Thickness(0, 12, 0, 16); p.Children.Add(input);
-        var ok = Ui.Button("Продолжить", () => w.DialogResult = true); ok.IsDefault = true; var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true; p.Children.Add(Ui.Actions(ok, cancel)); w.Content = p; w.Loaded += (_, _) =>{if(input is SecretEntry secret)secret.FocusInput();else input.Focus();};
+        var ok = Ui.Button("Продолжить", () => w.DialogResult = true); ok.IsDefault = true;ok.SetResourceReference(FrameworkElement.StyleProperty,"PrimaryButtonStyle"); var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true;w.Content = Ui.DialogSurface(p,cancel,ok); w.Loaded += (_, _) =>{if(input is SecretEntry secret)secret.FocusInput();else input.Focus();};
         try{return ModalRunner.Show(w,Owner(owner),ct)?input is SecretEntry secret?secret.Password:((TextBox)input).Text:null;}
         finally{if(input is SecretEntry secret)secret.Clear();else ((TextBox)input).Clear();}
     }
@@ -83,10 +91,10 @@ public static class Dialogs
         var w = Window("Конфликт имён", 620); var p = new StackPanel { Margin = new Thickness(24) }; p.Children.Add(Ui.DialogHeading("Назначение уже существует"));
         var t = Ui.Text($"Источник: {c.Source}\n{(c.SourceIsDirectory ? "Папка" : Ui.Size(c.SourceLength))}\n\nНазначение: {c.Destination}\n{(c.DestinationIsDirectory ? "Папка" : Ui.Size(c.DestinationLength))}" + (string.IsNullOrEmpty(c.Reason) ? "" : "\n\n" + c.Reason)); t.TextWrapping = TextWrapping.Wrap; t.Margin = new Thickness(0, 16, 0, 18); p.Children.Add(t);
         var result = ConflictDecision.Cancel;
-        var applyAll = new CheckBox { Content = "Применить к аналогичным конфликтам этой передачи", IsEnabled = c.JobId is not null, Margin = new Thickness(0, 0, 0, 12) }; p.Children.Add(applyAll);
-        foreach (var (label, decision) in new[] { ("Заменить / объединить папки", ConflictDecision.Replace), ("Пропустить", ConflictDecision.Skip), ("Сохранить оба", ConflictDecision.KeepBoth), ("Отменить передачу", ConflictDecision.Cancel) })
+        var applyAll = new CheckBox { Content = new TextBlock{Text="Применить к аналогичным конфликтам этой передачи",TextWrapping=TextWrapping.Wrap}, IsEnabled = c.JobId is not null, Margin = new Thickness(0, 0, 0, 12) };System.Windows.Automation.AutomationProperties.SetName(applyAll,"Применить к аналогичным конфликтам этой передачи"); p.Children.Add(applyAll);
+        foreach (var (label, decision) in new[] { ("Заменить / объединить папки", ConflictDecision.Replace), ("Пропустить", ConflictDecision.Skip), ("Сохранить оба", ConflictDecision.KeepBoth) })
         { var b = Ui.Button(label, () => { result = decision; w.DialogResult = true; }); b.HorizontalContentAlignment = HorizontalAlignment.Left; p.Children.Add(b); }
-        w.Content = p; w.ShowDialog(); if (applyAll.IsChecked == true && result != ConflictDecision.Cancel && c.JobId is not null) { if (conflictPolicies.Count > 128) conflictPolicies.Clear(); conflictPolicies[key] = result; } return result;
+        var cancel=Ui.Button("Отменить передачу",()=>w.DialogResult=false);cancel.IsCancel=true;w.Content = Ui.DialogSurface(p,cancel); w.ShowDialog(); if (applyAll.IsChecked == true && result != ConflictDecision.Cancel && c.JobId is not null) { if (conflictPolicies.Count > 128) conflictPolicies.Clear(); conflictPolicies[key] = result; } return result;
     }
     public static void Settings()
     {
@@ -94,7 +102,7 @@ public static class Dialogs
         p.Children.Add(Ui.DialogHeading("Параметры")); p.Children.Add(Ui.Text("Тема приложения"));
         var version=Ui.Text($"SSH Explorer {BuildInfo.DisplayVersion}\nСборка: {BuildInfo.Commit}",12);version.TextWrapping=TextWrapping.Wrap;p.Children.Add(version);
         p.Children.Add(Ui.AsyncButton("Скопировать путь к диагностике",()=>{Clipboard.SetText(System.IO.Path.Combine(App.Store.DirectoryPath,"Logs"));return Task.CompletedTask;}));
-        var themes = new ComboBox { ItemsSource = new[] { "Как в Windows", "Светлая", "Тёмная" }, SelectedIndex = s.Theme == "Light" ? 1 : s.Theme == "Dark" ? 2 : 0, Margin = new Thickness(0, 10, 0, 10) }; p.Children.Add(themes);
+        var themes = new ComboBox { ItemsSource = new[] { "Как в Windows", "Светлая", "Тёмная" }, SelectedIndex = s.Theme == "Light" ? 1 : s.Theme == "Dark" ? 2 : 0, Margin = new Thickness(0, 10, 0, 10) };System.Windows.Automation.AutomationProperties.SetName(themes,"Тема приложения"); p.Children.Add(themes);
         var poll = Field(p, "Обновление диспетчера задач, секунд (1–60)", s.PollIntervalSeconds.ToString());
         var font = Field(p, "Размер шрифта терминала (8–36)", s.TerminalFontSize.ToString());
         var maxBytes = Field(p, "Лимит изображения для предпросмотра, МБ (1–200)", (s.PreviewMaxBytes / 1024 / 1024).ToString());
@@ -105,7 +113,21 @@ public static class Dialogs
         p.Children.Add(Ui.AsyncButton("Очистить локальные копии для Windows…", ClearTransferCache));
         var path = Ui.Text("Настройки и защищённые секреты: " + App.Store.DirectoryPath, 12); path.TextWrapping = TextWrapping.Wrap; path.Margin = new Thickness(0, 14, 0, 14); path.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(path);
         p.Children.Add(Ui.Text("F5 в файловом менеджере очищает кэш миниатюр текущей вкладки.", 12));
-        p.Children.Add(Ui.AsyncButton("Сохранить", async () => { s.PollIntervalSeconds = Math.Clamp(int.Parse(poll.Text), 1, 60); s.TerminalFontSize = Math.Clamp(int.Parse(font.Text), 8, 36); s.PreviewMaxBytes = Math.Clamp(long.Parse(maxBytes.Text), 1, 200) * 1024 * 1024; s.PreviewMaxPixels = Math.Clamp(long.Parse(pixels.Text), 1, 100) * 1_000_000; s.PreviewParallelism = Math.Clamp(int.Parse(parallel.Text), 1, 4); s.PreviewCacheBytes = Math.Clamp(long.Parse(cache.Text), 16, 1024) * 1024 * 1024; s.Theme = themes.SelectedIndex == 1 ? "Light" : themes.SelectedIndex == 2 ? "Dark" : "System"; Theme.Apply(s.Theme); await App.Store.SaveAsync(); w.DialogResult = true; })); w.Content = new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; w.ShowDialog();
+        var save=Ui.AsyncButton("Сохранить",async()=>
+        {
+            var ranges=new[]{(poll,1L,60L),(font,8L,36L),(maxBytes,1L,200L),(pixels,1L,100L),(parallel,1L,4L),(cache,16L,1024L)};
+            var values=new List<long>();TextBox? firstError=null;
+            foreach(var (field,min,max) in ranges)
+            {
+                if(!long.TryParse(field.Text,NumberStyles.Integer,CultureInfo.CurrentCulture,out var value)||value<min||value>max)
+                {Ui.SetValidationMessage(field,$"Введите целое число от {min} до {max}.");firstError??=field;}
+                else {Ui.SetValidationMessage(field,"");values.Add(value);}
+            }
+            if(firstError is not null){firstError.Focus();firstError.SelectAll();firstError.BringIntoView();return;}
+            s.PollIntervalSeconds=(int)values[0];s.TerminalFontSize=(int)values[1];s.PreviewMaxBytes=values[2]*1024*1024;s.PreviewMaxPixels=values[3]*1_000_000;s.PreviewParallelism=(int)values[4];s.PreviewCacheBytes=values[5]*1024*1024;
+            s.Theme=themes.SelectedIndex==1?"Light":themes.SelectedIndex==2?"Dark":"System";Theme.Apply(s.Theme);await App.Store.SaveAsync();w.DialogResult=true;
+        });
+        save.IsDefault=true;save.SetResourceReference(FrameworkElement.StyleProperty,"PrimaryButtonStyle");var cancel=Ui.Button("Отмена",()=>w.DialogResult=false);cancel.IsCancel=true;w.Content=Ui.DialogSurface(p,cancel,save);w.ShowDialog();
     }
     static void TrustManagement()
     {

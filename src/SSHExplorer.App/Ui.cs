@@ -13,6 +13,15 @@ namespace SSHExplorer.App;
 
 public static class Ui
 {
+    public static readonly DependencyProperty HasValidationErrorProperty = DependencyProperty.RegisterAttached("HasValidationError", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits));
+    public static void SetHasValidationError(DependencyObject target, bool value) => target.SetValue(HasValidationErrorProperty, value);
+    public static bool GetHasValidationError(DependencyObject target) => (bool)target.GetValue(HasValidationErrorProperty);
+    public static readonly DependencyProperty ValidationMessageProperty = DependencyProperty.RegisterAttached("ValidationMessage", typeof(string), typeof(Ui), new PropertyMetadata("", (target,args)=>
+    {
+        var message=args.NewValue as string??"";target.SetCurrentValue(HasValidationErrorProperty,!string.IsNullOrWhiteSpace(message));AutomationProperties.SetHelpText(target,message);
+    }));
+    public static void SetValidationMessage(DependencyObject target,string value)=>target.SetValue(ValidationMessageProperty,value);
+    public static string GetValidationMessage(DependencyObject target)=>(string)target.GetValue(ValidationMessageProperty);
     public const string AddGlyph = "\uE710", BackGlyph = "\uE72B", ForwardGlyph = "\uE72A", UpGlyph = "\uE74A", RefreshGlyph = "\uE72C", HomeGlyph = "\uE80F", FolderGlyph = "\uE8B7", CutGlyph = "\uE8C6", CopyGlyph = "\uE8C8", PasteGlyph = "\uE77F", RenameGlyph = "\uE8AC", DeleteGlyph = "\uE74D", UploadGlyph = "\uE898", DownloadGlyph = "\uE896", SortGlyph = "\uE8CB", ViewGlyph = "\uE8A9", MoreGlyph = "\uE712", SettingsGlyph = "\uE713", CloseGlyph = "\uE711", SearchGlyph = "\uE721", FileGlyph = "\uE8A5", TerminalGlyph = "\uE756", PinGlyph = "\uE718", PropertiesGlyph = "\uE946", UndoGlyph = "\uE7A7", NewTabGlyph = "\uE8A7";
     public static readonly DependencyProperty IsCurrentFolderProperty = DependencyProperty.RegisterAttached("IsCurrentFolder", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(false));
     public static void SetIsCurrentFolder(DependencyObject target, bool value) => target.SetValue(IsCurrentFolderProperty, value);
@@ -131,7 +140,13 @@ public static class Ui
         if (size == 18) block.SetResourceReference(TextBlock.FontSizeProperty, "IconSize"); return block;
     }
     public static StackPanel Row(params UIElement[] items) { var p = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var x in items) p.Children.Add(x); return p; }
-    public static WrapPanel Actions(params UIElement[] items) { var p = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; foreach (var item in items) p.Children.Add(item); return p; }
+    public static DialogActionPanel Actions(params UIElement[] items) { var p = new DialogActionPanel(); foreach (var item in items) p.Children.Add(item); return p; }
+    public static DockPanel DialogSurface(FrameworkElement body, params UIElement[] actions)
+    {
+        var root=new DockPanel();root.SetResourceReference(Panel.BackgroundProperty,"Paper");
+        var footer=new Border{Child=Actions(actions)};footer.SetResourceReference(FrameworkElement.StyleProperty,"DialogFooterStyle");DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
+        root.Children.Add(new ScrollViewer{Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});return root;
+    }
     public static TextBlock DialogHeading(string text) { var heading = Text(text, 18, true); heading.SetResourceReference(FrameworkElement.StyleProperty, "DialogTitleStyle"); return heading; }
     public static MenuItem Menu(string text, Action action, string shortcut = "", string? glyph = null) { var m = new MenuItem { Header = text, InputGestureText = shortcut }; if (glyph is not null) m.Icon = Icon(glyph, 16, false); m.Click += (_, _) => action(); return m; }
     public static MenuItem AsyncMenu(string text, Func<Task> action, string shortcut = "", string? glyph = null) => Menu(text, async () => await Guard(action), shortcut, glyph);
@@ -163,6 +178,12 @@ public sealed class NonEmptyTextVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is string text && !string.IsNullOrWhiteSpace(text) ? Visibility.Visible : Visibility.Collapsed;
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
+public sealed class NonEmptyTextBooleanConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is string text && !string.IsNullOrWhiteSpace(text);
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)=>throw new NotSupportedException();
 }
 
 public sealed class TreeIndentConverter : IValueConverter

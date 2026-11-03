@@ -16,7 +16,7 @@ namespace SSHExplorer.App;
 
 public sealed partial class MainWindow : Window
 {
-    readonly TabControl tabs = new() { Padding = new Thickness(0, 0, 278, 0), Tag = "WindowTabs" };
+    readonly TabControl tabs = new() { Padding = new Thickness(0, 0, 318, 0), Tag = "WindowTabs" };
     readonly TabItem home = new();
     readonly DataGrid servers = new();
     readonly TextBox search = new() { MinWidth = 300, ToolTip = "Поиск сохранённых серверов" };
@@ -26,11 +26,13 @@ public sealed partial class MainWindow : Window
     readonly HomeViewModel viewModel = new();
     readonly Dictionary<string, WeakReference<TabItem>> tabDragTokens = [];
     readonly Dictionary<TabItem, DispatcherTimer> tabHoverTimers = [];
-    bool closing, refreshingHome, profileEditorOpen;
+    readonly HashSet<TabItem> closingTabs = [];
+    bool closing, refreshingHome, profileEditorOpen, tabRevealScheduled;
     readonly CancellationTokenSource windowLifetime = new();
     readonly ConnectionAttemptRegistry connectionAttempts;
     readonly HashSet<Guid> requireCredentials = [];
     Button? openServerButton;
+    Button? allTabsButton;
     TransfersWindow? transferWindow;
     public MainWindow()
     {
@@ -46,11 +48,13 @@ public sealed partial class MainWindow : Window
         WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 44, GlassFrameThickness = new Thickness(0, 44, 0, 0), ResizeBorderThickness = SystemParameters.WindowResizeBorderThickness, CornerRadius = new CornerRadius(8), UseAeroCaptionButtons = true });
         var root = new Grid();
         openServerButton = Ui.IconButton(Ui.AddGlyph, AddMenu, "Открыть сервер");
-        var actions = Ui.Row(openServerButton, Ui.IconButton("\uE8AB", ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
+        allTabsButton = Ui.FlyoutButton("\uE70D", "", CreateTabListMenu, "Все вкладки (Ctrl+Shift+A)"); allTabsButton.Name = "AllTabsButton";
+        var actions = Ui.Row(allTabsButton, openServerButton, Ui.IconButton("\uE8AB", ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
         actions.VerticalAlignment = VerticalAlignment.Top; actions.HorizontalAlignment = HorizontalAlignment.Right; actions.Margin = new Thickness(0, 4, 146, 0); WindowChrome.SetIsHitTestVisibleInChrome(actions, true); root.Children.Add(tabs); root.Children.Add(actions); Content = root;
-        home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
-        tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); if (tabs.SelectedItem is TabItem item) (item.Header as FrameworkElement)?.BringIntoView(); RefreshHome(); };
-        tabs.PreviewDragOver += (_, e) => { if (e.Data.GetDataPresent("SSHExplorer.Tab")) { e.Effects = DragDropEffects.Move; e.Handled = true; } };
+        home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); SessionTabInfo.SetTitle(home, "Главная"); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
+        tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); RevealSelectedTab(); RefreshHome(); };
+        tabs.SizeChanged+=(_,_)=>RevealSelectedTab();
+        tabs.PreviewDragOver += (_, e) => { if (DraggedTab(e.Data) is not null) { e.Effects = DragDropEffects.Move; e.Handled = true; } };
         tabs.AllowDrop = true;
         PreviewKeyDown += OnKey;
         Closing += OnClosing;
@@ -63,8 +67,13 @@ public sealed partial class MainWindow : Window
         var location = new Border { CornerRadius = new CornerRadius(5), Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(0, 0, 12, 0), Child = Ui.Row(Ui.Icon(Ui.HomeGlyph, 17), Ui.Text("Главная")) }; location.SetResourceReference(Border.BackgroundProperty, "Surface"); navigation.Children.Add(location);
         search.MinWidth = 0; search.SetBinding(TextBox.TextProperty, new Binding(nameof(HomeViewModel.SearchQuery)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
         var searchHost = new Grid(); searchHost.Children.Add(search); var searchHint = Ui.Text("Поиск серверов", 14); searchHint.Margin = new Thickness(10, 0, 6, 0); searchHint.IsHitTestVisible = false; searchHint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(searchHint); search.TextChanged += (_, _) => searchHint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; Grid.SetColumn(searchHost, 1); navigation.Children.Add(searchHost); DockPanel.SetDock(navigation, Dock.Top); p.Children.Add(navigation);
-        var commands = new WrapPanel(); commands.Children.Add(Ui.AsyncCommandButton(Ui.AddGlyph, "Добавить сервер", AddProfile)); commands.Children.Add(Ui.Line());
-        foreach (var button in new[] { Ui.AsyncCommandButton("\uE768", "Подключиться", ConnectSelected), Ui.AsyncCommandButton(Ui.RenameGlyph, "Изменить", EditSelected), Ui.AsyncCommandButton(Ui.DeleteGlyph, "Удалить профиль", RemoveSelected) }) { button.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); commands.Children.Add(button); }
+        var commands = new ResponsiveCommandBar { Name = "HomeCommandBar" };
+        commands.Add("add", Ui.AsyncCommandButton(Ui.AddGlyph, "Добавить сервер", AddProfile), () => Ui.AsyncMenu("Добавить сервер", AddProfile, glyph: Ui.AddGlyph), 100);
+        foreach (var (key,glyph,label,action,priority) in new (string,string,string,Func<Task>,int)[] { ("connect","\uE768","Подключиться",ConnectSelected,80), ("edit",Ui.RenameGlyph,"Изменить",EditSelected,50), ("remove",Ui.DeleteGlyph,"Удалить профиль",RemoveSelected,10) })
+        {
+            var button = Ui.AsyncCommandButton(glyph,label,action); button.SetBinding(IsEnabledProperty,new Binding(nameof(HomeViewModel.HasSelectedProfile)));
+            commands.Add(key,button,()=>Ui.AsyncMenu(label,action,glyph:glyph),priority);
+        }
         commands.Margin = new Thickness(10, 4, 10, 5); var commandBorder = new Border { Child = commands, BorderThickness = new Thickness(0, 0, 0, 1) }; commandBorder.SetResourceReference(StyleProperty, "CommandBarStyle"); DockPanel.SetDock(commandBorder, Dock.Top); p.Children.Add(commandBorder);
         homeStatus.Margin = new Thickness(16, 6, 16, 6); homeStatus.FontSize = 12; homeStatus.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); homeStatus.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.StatusText))); var homeFooter = new Border { Child = homeStatus }; homeFooter.SetResourceReference(StyleProperty, "StatusBarStyle"); homeStatus.Margin = new Thickness(0); DockPanel.SetDock(homeFooter, Dock.Bottom); p.Children.Add(homeFooter);
         servers.SetResourceReference(StyleProperty, "HomeTableStyle");
@@ -218,11 +227,15 @@ public sealed partial class MainWindow : Window
     }
     void AddSessionTab(ServerProfile profile, ServerSession session, SessionView view)
     {
-        var tab = new TabItem { Content = view, ToolTip = profile.Username + "@" + profile.Endpoint };
+        var tab = new TabItem { Content = view };
         tab.SetResourceReference(StyleProperty, "SessionTabItemStyle");
         var number = sessionNumbers.GetValueOrDefault(profile.Id) + 1; sessionNumbers[profile.Id] = number; var title = profile.Name + (number > 1 ? $" ({number})" : "");
-        var close = Ui.Button("", async () => await CloseTab(tab), "Закрыть сессию"); close.Content = Ui.Icon(Ui.CloseGlyph, 11, false); close.SetResourceReference(StyleProperty, "TabCloseButtonStyle"); WindowChrome.SetIsHitTestVisibleInChrome(close, true);
-        var label = Ui.Text(title); label.TextTrimming = TextTrimming.CharacterEllipsis; label.MaxWidth = 155; var header = Ui.Row(Ui.Icon("\uE968", 16), label, close); header.ToolTip = tab.ToolTip; tab.ClearValue(ToolTipProperty); tab.Header = header; WindowChrome.SetIsHitTestVisibleInChrome(header, true);
+        SessionTabInfo.SetTitle(tab,title); SessionTabInfo.SetDescription(tab,profile.Username+"@"+profile.Endpoint);
+        System.Windows.Automation.AutomationProperties.SetName(tab,title); System.Windows.Automation.AutomationProperties.SetHelpText(tab,SessionTabInfo.GetDescription(tab));
+        var close = Ui.Button("", async () => await CloseTab(tab), "Закрыть «"+title+"» (Ctrl+F4)"); close.Name="SessionTabCloseButton"; close.Content = Ui.Icon(Ui.CloseGlyph, 11, false); close.SetResourceReference(StyleProperty, "TabCloseButtonStyle"); WindowChrome.SetIsHitTestVisibleInChrome(close, true);
+        var label = Ui.Text(title); label.TextTrimming = TextTrimming.CharacterEllipsis; label.MinWidth=0;
+        var header = new Grid { ToolTip=title+"\n"+SessionTabInfo.GetDescription(tab) }; header.ColumnDefinitions.Add(new(){Width=GridLength.Auto}); header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+        header.Children.Add(Ui.Icon("\uE968",16)); Grid.SetColumn(label,1); header.Children.Add(label); Grid.SetColumn(close,2); header.Children.Add(close); tab.Header=header; WindowChrome.SetIsHitTestVisibleInChrome(header,true);
         Point? start = null;
         header.PreviewMouseLeftButtonDown += (_, e) => start = e.GetPosition(header);
         header.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && start is Point a && (e.GetPosition(header) - a).Length > 12 && !close.IsMouseOver) { start = null; try { DragDrop.DoDragDrop(header, TabDragData(tab), DragDropEffects.Move); } finally { CancelDragFeedback(); } } };
@@ -234,7 +247,7 @@ public sealed partial class MainWindow : Window
             if (DraggedTab(e.Data) is TabItem source && source != home && source != tab) { var dest = tabs.Items.IndexOf(tab); tabs.Items.Remove(source); tabs.Items.Insert(dest, source); tabs.SelectedItem = source; e.Handled = true; }
             else if (IsFileDrag(e.Data) && sessions.GetValueOrDefault(tab) is { CanReceiveFileDrop: true } target) { tabs.SelectedItem = tab; e.Handled = true; await Ui.Guard(() => target.ReceiveTabDropAsync(e.Data, e.KeyStates)); }
         };
-        header.DragEnter += (_, e) => { if (IsFileDrag(e.Data) && sessions.GetValueOrDefault(tab)?.CanReceiveFileDrop == true) hover.Start(); };
+        header.DragEnter += (_, e) => { if (DraggedTab(e.Data) is null && IsFileDrag(e.Data) && sessions.GetValueOrDefault(tab)?.CanReceiveFileDrop == true) hover.Start(); };
         header.DragLeave += (_, _) => hover.Stop();
         header.DragOver += (_, e) => { if (IsFileDrag(e.Data)) { e.Effects = sessions.GetValueOrDefault(tab)?.TabDropEffect(e.Data, e.KeyStates) ?? DragDropEffects.None; e.Handled = true; } };
         sessions[tab] = view; tabs.Items.Add(tab); tabs.SelectedItem = tab;
@@ -248,7 +261,7 @@ public sealed partial class MainWindow : Window
     TabItem? DraggedTab(IDataObject data)
     {
         if (!data.GetDataPresent("SSHExplorer.Tab", false) || data.GetData("SSHExplorer.Tab", false) is not MemoryStream { Length: 32 } stream) return null;
-        return tabDragTokens.TryGetValue(Encoding.UTF8.GetString(stream.ToArray()), out var reference) && reference.TryGetTarget(out var tab) ? tab : null;
+        return tabDragTokens.TryGetValue(Encoding.UTF8.GetString(stream.ToArray()), out var reference) && reference.TryGetTarget(out var tab) && tabs.Items.Contains(tab) ? tab : null;
     }
     public async Task Reconnect(SessionView previous, string? path)
     {
@@ -256,11 +269,42 @@ public sealed partial class MainWindow : Window
         if (pair.Key is null) return;
         await OpenServerCore(previous.Session.Profile, path, null, null, replacement: pair.Key, previous: previous);
     }
+    internal ContextMenu CreateTabListMenu()
+    {
+        var menu=new ContextMenu();
+        foreach(var tab in tabs.Items.OfType<TabItem>())
+        {
+            var title=SessionTabInfo.GetTitle(tab); var description=SessionTabInfo.GetDescription(tab);
+            var item=Ui.Menu(title,()=>{tabs.SelectedItem=tab;tab.Focus();},glyph:tab==home?Ui.HomeGlyph:Ui.NewTabGlyph);
+            item.IsCheckable=true;item.IsChecked=ReferenceEquals(tabs.SelectedItem,tab);item.ToolTip=title+(description.Length>0?"\n"+description:"");
+            var text=Ui.Text(title);text.MaxWidth=400;text.TextWrapping=TextWrapping.Wrap;
+            if(description.Length>0){var stack=new StackPanel();stack.Children.Add(text);var endpoint=Ui.Text(description,12);endpoint.MaxWidth=400;endpoint.TextWrapping=TextWrapping.Wrap;endpoint.SetResourceReference(TextBlock.ForegroundProperty,"Muted");stack.Children.Add(endpoint);item.Header=stack;}else item.Header=text;
+            System.Windows.Automation.AutomationProperties.SetName(item,title);System.Windows.Automation.AutomationProperties.SetHelpText(item,description);menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        var close=Ui.AsyncMenu("Закрыть текущую вкладку",()=>tabs.SelectedItem is TabItem tab?CloseTab(tab):Task.CompletedTask,"Ctrl+F4",Ui.CloseGlyph);close.IsEnabled=tabs.SelectedItem!=home;menu.Items.Add(close);
+        return menu;
+    }
+    void RevealSelectedTab()
+    {
+        if(tabRevealScheduled||closing)return;tabRevealScheduled=true;
+        // Add/resize can select a header before its first measure. Use the next
+        // layout turn, not a timer or a second selection, to reveal its close target.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,()=>{tabRevealScheduled=false;if(!closing&&tabs.SelectedItem is TabItem tab)(tab.Header as FrameworkElement)?.BringIntoView();});
+    }
+    internal Task CloseSessionTabAsync(TabItem tab)=>CloseTab(tab);
     async Task CloseTab(TabItem tab)
     {
-        if (!sessions.TryGetValue(tab, out var view)) return;
-        if (App.Transfers.HasActive(view.Session.Id) && !Ui.Confirm("В этой сессии выполняется передача. Прервать передачу и закрыть сессию?")) return;
-        CancelDragFeedback(); App.Transfers.CancelSession(view.Session.Id); if (tabHoverTimers.Remove(tab, out var timer)) timer.Stop(); await view.DisposeAsync(); sessions.Remove(tab); tabs.Items.Remove(tab); RefreshHome();
+        if (!sessions.TryGetValue(tab, out var view) || !closingTabs.Add(tab)) return;
+        try
+        {
+            if (App.Transfers.HasActive(view.Session.Id) && !Ui.Confirm("В этой сессии выполняется передача. Прервать передачу и закрыть сессию?")) return;
+            CancelDragFeedback(); App.Transfers.CancelSession(view.Session.Id); if (tabHoverTimers.Remove(tab, out var timer)) timer.Stop(); await view.DisposeAsync();
+            // Choose the right neighbour, then the left. Closing a background tab never changes the active one.
+            var index=tabs.Items.IndexOf(tab); var next=ReferenceEquals(tabs.SelectedItem,tab)?tabs.Items.OfType<TabItem>().ElementAtOrDefault(index+1)??tabs.Items.OfType<TabItem>().ElementAtOrDefault(Math.Max(0,index-1)):null;
+            sessions.Remove(tab); if(next is not null){tabs.SelectedItem=next;next.Focus();} tabs.Items.Remove(tab); RefreshHome();
+        }
+        finally { closingTabs.Remove(tab); }
     }
     async void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -281,9 +325,16 @@ public sealed partial class MainWindow : Window
     void OnKey(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape) CancelDragFeedback();
+        if (Keyboard.Modifiers == (ModifierKeys.Control|ModifierKeys.Shift) && e.Key==Key.A && !IsInputEditing(Keyboard.FocusedElement as DependencyObject)) { e.Handled=true;Ui.OpenFlyout(allTabsButton!,CreateTabListMenu());return; }
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && e.Key == Key.Tab) { e.Handled = true; var delta = (Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? -1 : 1; tabs.SelectedIndex = (tabs.SelectedIndex + delta + tabs.Items.Count) % tabs.Items.Count; }
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && e.Key == Key.F4 && tabs.SelectedItem is TabItem tab && tab != home) { e.Handled = true; _ = Ui.Guard(() => CloseTab(tab)); }
         if (!e.Handled && tabs.SelectedItem is TabItem current && sessions.TryGetValue(current, out var session)) session.RouteFileKey(e);
+    }
+    static bool IsInputEditing(DependencyObject? element)
+    {
+        for(var current=element;current is not null;current=current is Visual?VisualTreeHelper.GetParent(current):LogicalTreeHelper.GetParent(current))
+            if(current is System.Windows.Controls.Primitives.TextBoxBase or PasswordBox or TerminalView)return true;
+        return false;
     }
     internal void CancelDragFeedback()
     {
