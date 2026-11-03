@@ -13,10 +13,13 @@ $after=Join-Path $root 'artifacts/ui-beta4-after'
 $before=Join-Path $root 'artifacts/ui-beta4-before'
 New-Item -ItemType Directory -Force -Path $after,$before | Out-Null
 & $sdk run --project tests/SSHExplorer.UiTests/SSHExplorer.UiTests.csproj -c Release --no-build -- --monitor-ui-only --render-dir $after 2>&1 | Tee-Object -FilePath artifacts/ui-beta4-after.log
-if($LASTEXITCODE){throw 'Current composition layout/render checks failed.'}
+$monitorExit=$LASTEXITCODE
 $interactions=Join-Path $root 'artifacts/ui-beta4-interactions'
 & $sdk run --project tests/SSHExplorer.UiTests/SSHExplorer.UiTests.csproj -c Release --no-build -- --file-interactions-ui --render-dir $interactions 2>&1 | Tee-Object -FilePath artifacts/ui-beta4-interactions.log
-if($LASTEXITCODE){throw 'Actual file interaction checks failed.'}
+$interactionExit=$LASTEXITCODE
+# These scopes run in separate processes. Collect both actual-window reports
+# before failing, so a monitor regression cannot hide file/form/tab evidence.
+if($monitorExit -or $interactionExit){throw "Current UI checks failed (monitor=$monitorExit; files/forms/tabs=$interactionExit). See both reports; no comparison package was produced."}
 
 # The comparison uses the already-published immutable beta.3 package, not a
 # recompiled approximation. The exact same offline fixture and client size are

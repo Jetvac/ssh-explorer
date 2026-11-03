@@ -59,6 +59,7 @@ internal static class FileInteractionTests
             typeof(MainWindow).GetMethod("AddSessionTab",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(main,[profile,session,view]);main.Show();view.SetActive(false);view.ShowSection("files");Layout(main);
             var table=(DataGrid)Field(files,"table");var tiles=(ListBox)Field(files,"tiles");var address=(TextBox)Field(files,"address");
             var original=model.Entries.Single(row=>row.Name=="document-005.txt");table.SelectedItem=original;table.ScrollIntoView(original);Layout(main);
+            evidence.Capture((FrameworkElement)main.Content,"files-interaction-initial",new{theme="Light",fixtureOnly=true,phase="before interaction assertions",operationBoundary="controlled list/create/rename; no live SFTP"});
             var originalPresenter=Descendants<FileNamePresenter>(table).Single(presenter=>ReferenceEquals(presenter.DataContext,original));
             originalPresenter.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left){RoutedEvent=Mouse.PreviewMouseDownEvent});Pump();
             Assert(Field(files,"lassoOwner") is null&&Field(files,"dragStart") is Point,"an actual item-origin mouse-down remains a file-drag candidate and does not begin blank-space lasso");

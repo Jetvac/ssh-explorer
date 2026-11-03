@@ -69,7 +69,14 @@ internal static class MonitorUiTests
             Assert(label.TextAlignment==TextAlignment.Right&&surface.Padding.Left==surface.Padding.Right&&surface.Padding.Right>0,"metric value is right aligned inside fixed symmetric cell padding");
             Assert(surface.Background is SolidColorBrush {Color.A:0},"selected process heat surface yields to the whole-row selection cue");
             table.SelectedItem=null;Layout(main);accentProbe.Enabled=true;Theme.Apply("Dark");Layout(main);
-            Assert(surface.Background is SolidColorBrush palette&&palette.Color.R==AccentProbe.ProbeColor.R&&palette.Color.G==AccentProbe.ProbeColor.G&&palette.Color.B==AccentProbe.ProbeColor.B,"theme event repaints the existing metric surface with a changed resource palette without a new sample");
+            bool paletteMatches=surface.Background is SolidColorBrush palette&&palette.Color.R==AccentProbe.ProbeColor.R&&palette.Color.G==AccentProbe.ProbeColor.G&&palette.Color.B==AccentProbe.ProbeColor.B;
+            if(!paletteMatches)
+            {
+                var diagnostic=new{theme="Dark",fixtureOnly=true,failureObservedBeforeCaptureSettle=true,surfaceIsLoaded=surface.IsLoaded,surfaceIsVisible=surface.IsVisible,surfaceHasPresentationSource=PresentationSource.FromVisual(surface)is not null,surfaceDataContextType=surface.DataContext?.GetType().Name,surfacePid=(surface.DataContext as ProcessItemViewModel)?.Pid,surfaceBrush=surface.Background is SolidColorBrush brush?brush.Color.ToString():surface.Background?.GetType().Name,paletteRevision=monitor.PaletteRevision,rowIsLoaded=row.IsLoaded,rowIsVisible=row.IsVisible,rowIsSelected=row.IsSelected,tableSelectedPid=(table.SelectedItem as ProcessItemViewModel)?.Pid,expectedProbeColor=AccentProbe.ProbeColor.ToString()};
+                Console.WriteLine("DIAGNOSTIC theme surface "+System.Text.Json.JsonSerializer.Serialize(diagnostic));
+                evidence.Capture((FrameworkElement)main.Content,"processes-theme-failure",diagnostic);
+            }
+            Assert(paletteMatches,"theme event repaints the existing metric surface with a changed resource palette without a new sample");
             accentProbe.Enabled=false;Theme.Apply("Light");table.SelectedItem=selected;Layout(main);
             var nameCell=Descendants<DataGridCell>(row).First(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.Name));
             Assert(Descendants<TextBlock>(nameCell).Any(t=>t.TextTrimming==TextTrimming.CharacterEllipsis&&Equals(t.ToolTip,selected.Name)&&AutomationProperties.GetName(t)==selected.Name),"long process name is ellipsized with full tooltip and automation name");
