@@ -109,6 +109,12 @@ internal static class ThemeResourceTests
         }
         var popup=Part<Popup>(combo,"PART_Popup");_=Part<TextBox>(combo,"PART_EditableTextBox");_=Part<Border>(combo,"FieldChrome");
         if(popup.IsOpen||PresentationSource.FromVisual(combo)is not null)throw new Exception("Headless input materialization unexpectedly acquired a presentation source.");
+        foreach(double width in new[]{240d,480d})
+        {
+            combo.Measure(new Size(width,60));combo.Arrange(new Rect(0,0,width,60));combo.UpdateLayout();var arrow=Part<System.Windows.Shapes.Path>(combo,"DropDownChevron");var comboToggle=Part<ToggleButton>(combo,"DropDownToggle");
+            var bounds=arrow.TransformToAncestor(combo).TransformBounds(new Rect(arrow.RenderSize));
+            if(arrow.ActualWidth<=0||Math.Abs(combo.ActualWidth-bounds.Right-13)>1||Math.Abs(comboToggle.ActualWidth-combo.ActualWidth)>1)throw new Exception("Unshown applied ComboBox template put its arrow outside the reserved right edge or shrank its hit target.");
+        }
         combo.IsEditable=true;if(Part<TextBox>(combo,"PART_EditableTextBox").Visibility!=Visibility.Visible)throw new Exception("Editable input template did not expose its standard edit part.");
         check.IsChecked=true;if(Part<System.Windows.Shapes.Path>(check,"CheckGlyph").Visibility!=Visibility.Visible)throw new Exception("Applied checkbox did not render its checked state.");
         check.IsChecked=null;if(Part<Border>(check,"IndeterminateGlyph").Visibility!=Visibility.Visible)throw new Exception("Applied checkbox did not render its indeterminate state.");

@@ -31,6 +31,9 @@ internal static class FormTabTests
             bool focusReturn=name.Focus();Pump();dialog.UpdateLayout();bool focusObserved=name.IsKeyboardFocusWithin;
             var nameChrome=Part<Border>(name,"FieldChrome");var passwordChrome=Part<Border>(masked,"FieldChrome");var comboChrome=Part<Border>(combo,"FieldChrome");
             assert(nameChrome.ActualHeight>30&&passwordChrome.ActualHeight>30&&comboChrome.ActualHeight>30&&nameChrome.CornerRadius==passwordChrome.CornerRadius&&comboChrome.CornerRadius==nameChrome.CornerRadius,"actual text/password/combo templates use measured consistent field chrome");
+            var chevron=Part<System.Windows.Shapes.Path>(combo,"DropDownChevron");var selection=Part<ContentPresenter>(combo,"SelectionPresenter");var toggle=Part<ToggleButton>(combo,"DropDownToggle");
+            var arrowBounds=chevron.TransformToAncestor(combo).TransformBounds(new Rect(chevron.RenderSize));var selectionBounds=selection.TransformToAncestor(combo).TransformBounds(new Rect(selection.RenderSize));
+            assert(chevron.ActualWidth>0&&Math.Abs(combo.ActualWidth-arrowBounds.Right-13)<=2&&selectionBounds.Right<=arrowBounds.Left-8&&Math.Abs(toggle.ActualWidth-comboChrome.ActualWidth)<=1&&Math.Abs(toggle.ActualHeight-comboChrome.ActualHeight)<=1,"actual closed ComboBox keeps its chevron at the right edge, reserves selection space and fills the whole field with its hit target");
             if(focusObserved)assert(Part<Border>(name,"FocusUnderline").Visibility==Visibility.Visible,"focused real profile field exposes its applied focus underline");
             else Console.WriteLine("NOT RUN actual profile focus underline: CI did not grant keyboard focus; no product focus state forced");
             Descendants<Button>(dialog).Single(button=>Equals(button.Content,"Сохранить и подключиться")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();dialog.UpdateLayout();

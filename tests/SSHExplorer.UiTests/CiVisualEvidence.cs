@@ -108,6 +108,7 @@ internal sealed class CiVisualEvidence
             var user=Descendants<TextBox>(dialog).Single(input=>AutomationProperties.GetName(input)=="Пользователь Linux");
             name.Text="Лаборатория · тестовый сервер";host.Text="lab.example.invalid";user.Text="fixture";name.Focus();Pump();dialog.UpdateLayout();
             Capture((FrameworkElement)dialog.Content,"profile-filled",new{theme="Light",fixtureOnly=true,syntheticFields=true,authentication="Password",secretProvided=false});
+            assert?.Invoke(dialog.Model.FirstInvalidField is null&&dialog.Model.Status.Length==0,"correcting all ordinary profile fields clears the obsolete validation summary without submitting or saving");
             if(includeNarrowValidation)
             {
                 name.Clear();host.Clear();user.Clear();

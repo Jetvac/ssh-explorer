@@ -55,7 +55,7 @@ internal static class FileInteractionTests
             var operations=new Operations();var files=new FileBrowserView(session,main,operations);var model=(FileBrowserViewModel)files.DataContext;
             // Tree expansion is not part of this operations fixture. It must not call a live transport.
             ((TreeView)Field(files,"tree")).Items.Clear();Complete(files.InitializeAsync("/srv/fixture",CancellationToken.None));
-            var monitor=new MonitorView(new MonitorViewModel());var view=new SessionView(session,main,files,monitor);view.SetActive(false);
+            var monitor=new MonitorView(new MonitorViewModel());var view=new SessionView(session,main,files,monitor);((SessionViewModel)Field(view,"viewModel")).StatusText="Данные стенда · без подключения";view.SetActive(false);
             typeof(MainWindow).GetMethod("AddSessionTab",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(main,[profile,session,view]);main.Show();view.SetActive(false);view.ShowSection("files");Layout(main);
             var table=(DataGrid)Field(files,"table");var tiles=(ListBox)Field(files,"tiles");var address=(TextBox)Field(files,"address");
             var original=model.Entries.Single(row=>row.Name=="document-005.txt");table.SelectedItem=original;table.ScrollIntoView(original);Layout(main);
