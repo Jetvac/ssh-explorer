@@ -1,0 +1,12 @@
+FAULT FIXTURE: loopback 22226 -> 22222, 50ms delay per forwarded chunk; primary server untouched
+NETWORK CUT: after 524288 bytes of 4194304; state Failed; original SHA256 unchanged
+PASS REAL NETWORK: mid-upload transport cut preserves correct destination and local source
+PASS REAL NETWORK: restoring proxy does not replay failed upload or overwrite
+EXPLICIT RETRY: 4194304 bytes, 1 confirmed conflict; old job remained Failed
+PASS REAL NETWORK: explicit retry in fresh trusted session asks conflict and completes
+CANCEL: delayed exec stopped locally in 388ms
+PASS REAL NETWORK: delayed exec respects cancellation without replay
+CLOSE: pending request cancelled, 0 proxy connections, 404ms
+PASS REAL NETWORK: close cancels outstanding request and releases all owned transports
+PASS REAL NETWORK: dedicated test-tree cleanup; independent direct server remains usable
+RESULT: 6 passed, 0 failed

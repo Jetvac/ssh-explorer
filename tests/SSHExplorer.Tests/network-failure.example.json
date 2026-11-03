@@ -1,0 +1,11 @@
+{
+  "Host": "127.0.0.1",
+  "Port": 22222,
+  "ProxyPort": 22226,
+  "DelayMilliseconds": 50,
+  "Username": "sshx-test",
+  "Authentication": "Password",
+  "PrivateKeyPath": "",
+  "SecretFile": ".tools/fixture-password.txt",
+  "ExpectedHostFingerprint": "REPLACE_WITH_INDEPENDENT_FIXTURE_SHA256_FINGERPRINT"
+}

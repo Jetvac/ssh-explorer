@@ -1,0 +1,8 @@
+{
+  "WindowsCfHdropToRealSftp": true,
+  "RealSftpToWindowsCfHdrop": true,
+  "RealPreparedLocalFile": true,
+  "OpaqueTokenWithoutObjectSerialization": true,
+  "ActualExplorerKeyboardOrDragTest": false,
+  "Passed": true
+}

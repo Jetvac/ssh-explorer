@@ -1,0 +1,13 @@
+{
+  "Host": "127.0.0.1",
+  "Port": 22222,
+  "Username": "sshx-test",
+  "Authentication": "Password",
+  "PrivateKeyPath": "",
+  "SecretFile": ".tools/fixture-password.txt",
+  "ExpectedHostFingerprint": "REPLACE_WITH_INDEPENDENT_FIXTURE_SHA256_FINGERPRINT",
+  "RemoteParent": "~",
+  "LargeFileBytes": 0,
+  "RunDirectoryLoad": false,
+  "RunMonitoring": true
+}

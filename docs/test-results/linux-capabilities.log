@@ -1,0 +1,4 @@
+PASS REAL SSH: capability-only connection uses independent host fingerprint
+CAPABILITIES: python/python2/python3/htop missing; existing top available; no setup commands executed
+PASS REAL Linux: Python and htop absent; installed top detected
+RESULT: 2 passed, 0 failed

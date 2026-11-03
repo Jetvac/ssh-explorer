@@ -1,0 +1,10 @@
+{
+  "Bytes": 2148532224,
+  "SHA256": "F9C8466CDAC8F598A9DBBE999B62B47C2745C7B7368CD6BFCEE1B636368A9071",
+  "UploadAndDownloadHashMatched": true,
+  "RssObservedMinMiB": 78,
+  "RssObservedMaxMiB": 114,
+  "TypicalRssMiB": 111,
+  "Log": "linux-large-file.log",
+  "LocalLargeTestDataRemovedAfterVerification": true
+}

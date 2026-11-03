@@ -1,0 +1,47 @@
+PASS reject host key blocks real authentication
+PASS wrong password preserves authentication error
+PASS changed host key blocks real SSH handshake
+PASS READLINK retains relative target
+PASS READLINK retains broken relative target
+PASS explicit follow resolves existing target
+PASS explicit broken-link follow fails clearly
+PASS rename moves link itself
+PASS undo restores link itself
+PASS remote copy keeps relative symlink exact
+PASS remote copy keeps broken link exact
+PASS remote copy keeps cycle without traversing
+PASS replacement replaces symlink name
+PASS replacement never overwrites symlink target
+PASS properties preserve sticky mode bit
+PASS recursive delete leaves symlink target intact
+PASS no own transfer temporaries remain
+17 real core symlink checks passed
+PASS encrypted Ed25519 key authenticates SSH and SFTP
+PASS PTY round-trips raw UTF-8 Cyrillic and emoji
+PASS PTY preserves UTF-8 split across remote writes
+PASS PTY resize reaches stty rows and columns
+PASS independent exec remains usable alongside PTY
+PASS PTY shell state survives independent exec request
+PASS Ctrl+C interrupts real foreground sleep
+PASS Ctrl+D ends real interactive shell
+PASS closing PTY preserves independent session exec
+PASS SFTP-only account retains file subsystem and explains unavailable shell
+PASS SFTP-only account performs real create and stat
+PASS denied PTY does not disable established SFTP
+PASS shell-only account retains exec and explains unavailable SFTP
+PASS shell-only account performs real PTY interaction
+PASS failed SFTP operation preserves shell-only exec
+15 real key/PTY/restricted-mode checks passed
+PASS real ENOSPC replacement reports failed transfer
+PASS SFTP statvfs confirms and explains actual disk-full error
+PASS ENOSPC replacement preserves existing correct destination SHA256
+PASS ENOSPC upload preserves local source
+PASS ENOSPC cleans only its own temporary file
+PASS cross-filesystem move to full tmpfs reports failure
+PASS failed cross-filesystem move preserves remote source
+PASS failed cross-filesystem move preserves source SHA256
+PASS failed cross-filesystem move does not commit incomplete destination
+PASS successful cross-filesystem move falls back to verified streaming copy
+PASS successful cross-filesystem move deletes source only after copy
+PASS cross-filesystem failure and success leave no own temporaries
+12 real disk-full/cross-filesystem checks passed

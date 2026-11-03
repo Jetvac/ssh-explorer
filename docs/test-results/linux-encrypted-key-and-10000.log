@@ -1,0 +1,54 @@
+PASS proc/stat excludes guest double counting and counts CPUs
+PASS process stat preserves parentheses, newline, spaces and shell punctuation
+PASS malformed and overflowing counters stay unavailable
+PASS memory uses MemAvailable and KiB units
+PASS memory fallback is explicitly estimated
+PASS base64 framing preserves NUL and newline without record injection
+PASS truncated, duplicate and oversized protocol rejected
+PASS real counter formulas: first sample unknown, second CPU50%, PID5%, net1KiB/s
+PASS PID reuse does not inherit old CPU or I/O
+PASS process disappearing midway is excluded rather than mixed
+PASS reboot resets CPU, network and process baselines
+PASS counter reset is not negative or fabricated zero
+PASS missing UID disables process signal; missing metrics do not become zeros
+PASS df parser retains mount paths with spaces and 64-bit sizes
+PASS monitor serializes requests and bounds history
+PASS signal protects PID1, identity and allowed signals
+PASS signal rejects changed identity and leaves server rights unchanged
+PASS missing existing utility yields precise limitation
+PASS collector rejects unbounded PID limits and no server setup commands
+PASS POSIX paths preserve backslash, case and metacharacters
+PASS POSIX rejects NUL, relative paths and invalid names
+PASS pinned SSH.NET native SFTP bindings validate before use
+PASS Windows names are mapped and cannot escape chosen directory
+PASS host fingerprint is SHA256 public key, endpoint normalized
+PASS reject first host key never persists or grants session trust
+PASS temporary host trust belongs to one logical session only
+PASS temporary trust blocks changed key or algorithm inside its logical session
+PASS persistent trust survives restart and is bound to endpoint and algorithm
+PASS changed host key is blocked before ordinary trust dialog
+PASS simultaneous channels coalesce one logical-session trust prompt
+PASS explicit trust reset is endpoint scoped
+PASS profiles and settings survive atomic rewrite without inline secrets
+PASS DPAPI CurrentUser roundtrip is not plaintext in any store file
+PASS closing one logical session leaves the other lifetime independent
+PASS REAL SSH: independent host fingerprint and fresh account authentication
+PASS REAL SFTP: CRUD and hostile POSIX names do not execute shell syntax
+PASS REAL SFTP: streaming upload/download roundtrip and measured byte progress
+PASS REAL SFTP: rename safe undo; external change refuses undo
+PASS REAL SFTP: same-size external modification with preserved mtime refuses undo
+PASS REAL SFTP: same-server copy, move and descendant protection
+PASS REAL SFTP: conflicts skip, keep both and replace preserve correct original
+PASS REAL SFTP: recursive upload merges directories without deleting unrelated files
+PASS REAL SFTP: cancelled replacement preserves remote and local original
+PASS REAL SFTP: POSIX permissions and owner/group readback
+PASS REAL SFTP: symlink, broken link and cycle deletion never follows target
+PASS REAL Windows download: reserved names and case collisions have mapping
+PASS REAL SSH: second session independent; close stops owned connections
+PASS REAL Linux: /proc monitor without Python/htop and independent memory comparison
+PASS REAL Linux: PID identity mismatch blocks SIGTERM
+PASS REAL Linux: SIGTERM and separate SIGKILL terminate only dedicated PTY test processes
+DIRECTORY 10000 entries enumerated in 0,75s, RSS 89 MiB
+PASS REAL SFTP: directory with 10000 entries enumerates exact names and count
+PASS REAL SFTP: cleanup only this run's dedicated test directory
+RESULT: 52 passed, 0 failed

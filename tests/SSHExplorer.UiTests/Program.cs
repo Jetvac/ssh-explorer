@@ -1,0 +1,33 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using SSHExplorer.App;
+
+internal static class Program
+{
+    [STAThread]
+    static int Main()
+    {
+        try
+        {
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            var list = new ListBox { Width = 800, Height = 500, ItemsSource = Enumerable.Range(0, 10_000).Select(i => "item-" + i).ToList() };
+            var factory = new FrameworkElementFactory(typeof(VirtualizingWrapPanel)); factory.SetValue(VirtualizingWrapPanel.ItemWidthProperty, 100d); factory.SetValue(VirtualizingWrapPanel.ItemHeightProperty, 80d); list.ItemsPanel = new ItemsPanelTemplate(factory); list.SetValue(ScrollViewer.CanContentScrollProperty, true);
+            var host = new Window { Content = list, Width = 820, Height = 550, ShowInTaskbar = false, Left = -10_000, Top = -10_000 }; host.Show();
+            Layout(list); var panel = Find<VirtualizingWrapPanel>(list) ?? throw new Exception("Virtualizing panel was not created.");
+            Assert(Count<ListBoxItem>(list) is > 0 and < 100, "10,000 items only create visible containers");
+            panel.SetVerticalOffset(90_000); Layout(list); Assert(Count<ListBoxItem>(list) < 100, "scroll recycles containers");
+            list.ItemsSource = Array.Empty<string>(); Layout(list); Assert(Count<ListBoxItem>(list) == 0, "empty directory clears containers");
+            list.ItemsSource = Enumerable.Range(0, 100).Select(i => "replacement-" + i).ToArray(); panel.SetVerticalOffset(0); Layout(list); Assert(Count<ListBoxItem>(list) is > 0 and < 100, "new listing after an empty directory");
+            list.Width = 350; list.Height = 250; Layout(list); Assert(Count<ListBoxItem>(list) is > 0 and < 40, "resize limits realized containers");
+            panel.SetVerticalOffset(-100); Layout(list); Assert(panel.VerticalOffset == 0, "negative scroll is clamped");
+            var stateChecks = ViewModelTests.Run(Assert);
+            host.Close(); app.Shutdown(); Console.WriteLine($"RESULT: 6 WPF layout/virtualization + {stateChecks} MVVM state/binding checks passed"); return 0;
+        }
+        catch (Exception ex) { Console.WriteLine(ex); return 1; }
+    }
+    static void Layout(FrameworkElement e) { e.Measure(new Size(e.Width, e.Height)); e.Arrange(new Rect(0, 0, e.Width, e.Height)); e.UpdateLayout(); }
+    static void Assert(bool condition, string description) { if (!condition) throw new Exception(description); Console.WriteLine("PASS " + description); }
+    static T? Find<T>(DependencyObject parent) where T : DependencyObject { for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++) { var c = VisualTreeHelper.GetChild(parent, i); if (c is T t) return t; if (Find<T>(c) is T nested) return nested; } return null; }
+    static int Count<T>(DependencyObject parent) where T : DependencyObject { var count = 0; for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++) { var c = VisualTreeHelper.GetChild(parent, i); count += c is T ? 1 : Count<T>(c); } return count; }
+}

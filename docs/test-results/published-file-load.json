@@ -1,0 +1,8 @@
+{
+  "RealSftpEntryCount": 10000,
+  "RealizedRowCount": 16,
+  "DispatcherIdleMilliseconds": 280.055,
+  "WorkingSetMiB": 183.5,
+  "RowVirtualization": true,
+  "Passed": true
+}

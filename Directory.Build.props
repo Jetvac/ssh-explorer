@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <Company>SSH Explorer</Company>
+    <Product>SSH Explorer</Product>
+    <Version>0.1.0</Version>
+    <Copyright>Copyright © 2026 SSH Explorer contributors</Copyright>
+  </PropertyGroup>
+</Project>
