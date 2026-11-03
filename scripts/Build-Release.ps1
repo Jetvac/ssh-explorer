@@ -25,6 +25,8 @@ $runtimeUrl = 'https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservi
 $runtimeRoot = Join-Path $root '.tools\webview-runtime'
 $runtime = Join-Path $runtimeRoot "Microsoft.WebView2.FixedVersionRuntime.$runtimeVersion.x64"
 New-Item -ItemType Directory -Force -Path (Join-Path $root '.tools'),(Join-Path $root 'artifacts') | Out-Null
+Start-Transcript -LiteralPath (Join-Path $root 'artifacts\build-test.log') -Force | Out-Null
+trap { try { Stop-Transcript | Out-Null } catch {}; throw $_ }
 if (-not (Test-Path -LiteralPath (Join-Path $runtime 'msedgewebview2.exe'))) {
     $cab = Join-Path $root '.tools\webview.cab'
     if (-not (Test-Path -LiteralPath $cab)) { Invoke-WebRequest -Uri $runtimeUrl -OutFile $cab }
@@ -76,3 +78,4 @@ if (-not $NoZip) {
     '{0}  {1}' -f (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant(),[IO.Path]::GetFileName($archive) | Set-Content -LiteralPath (Join-Path $root 'artifacts\SHA256SUMS.txt') -Encoding utf8
 }
 Write-Output "Portable application: $destination\SSHExplorer.exe"
+Stop-Transcript | Out-Null

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Reflection;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
@@ -131,18 +132,29 @@ internal static class Program
         int phase=0;
         saved=RunStaticDialog(dialog=>
         {
-            if(phase++==0){Fill(dialog);Field(dialog,"Порт").Text="invalid";FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
-            else{Check(dialog is ProfileDialog{Model.PortError.Length:>0}&&Field(dialog,"Название").Text=="STA сервер","actual modal validation preserves input without closing");Field(dialog,"Порт").Text="22";FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
+            if(phase==0)
+            {
+                Fill(dialog);Field(dialog,"Порт").Text="invalid";phase=1;
+                FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+            else if(phase==1)
+            {
+                Check(dialog is ProfileDialog{Model.PortError.Length:>0}&&Field(dialog,"Название").Text=="STA сервер","actual modal validation preserves input without closing");
+                Field(dialog,"Порт").Text="22";phase=2;
+                FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+            // Phase 2 waits for the asynchronous commit and dialog close. A slow disk may
+            // produce many timer ticks here; the already-corrected error must not be asserted again.
         },repeat:true);
         Check(saved is not null&&store.Profiles.Count==2,"same modal dialog saves corrected port without reopening");
         var failedStore=NewStore("dialog-failure");Directory.CreateDirectory(Path.Combine(failedStore.DirectoryPath,"settings.json"));SetStore(failedStore);phase=0;
         saved=RunStaticDialog(dialog=>
         {
-            if(phase++==0){Fill(dialog);FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
-            else if(dialog is ProfileDialog d&&!d.Model.IsSaving&&d.Model.Status.Contains("Не удалось",StringComparison.Ordinal))
+            if(phase==0){Fill(dialog);phase=1;FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
+            else if(phase==1&&dialog is ProfileDialog d&&!d.Model.IsSaving&&d.Model.Status.Contains("Не удалось",StringComparison.Ordinal))
             {
                 Check(Field(dialog,"Название").Text=="STA сервер"&&failedStore.Profiles.Count==0,"actual modal persistence failure retains input without a partial profile");
-                Directory.Delete(Path.Combine(failedStore.DirectoryPath,"settings.json"));FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Directory.Delete(Path.Combine(failedStore.DirectoryPath,"settings.json"));phase=2;FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             }
         },repeat:true);
         Check(saved is not null&&failedStore.Profiles.Count==1,"modal remains usable and saves after write failure is repaired");
@@ -155,10 +167,10 @@ internal static class Program
         var content=(FrameworkElement)main.Content;content.Measure(new Size(1320,800));content.Arrange(new Rect(0,0,1320,800));content.UpdateLayout();
         for(int iteration=0;iteration<2;iteration++)
         {
-            var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(40)};int ticks=0;
+            var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(40)};var deadline=Stopwatch.StartNew();
             timer.Tick+=(_,_)=>
             {
-                if(++ticks>100)throw new TimeoutException("MainWindow AddProfile did not display dialog");
+                if(deadline.Elapsed>TimeSpan.FromSeconds(15))throw new TimeoutException("MainWindow AddProfile did not display dialog");
                 if(_app.Windows.Cast<Window>().FirstOrDefault(x=>x is ProfileDialog)is not Window dialog)return;
                 timer.Stop();Fill(dialog);Field(dialog,"Название").Text="Main profile "+iteration;FindButton(dialog,"Сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             };
@@ -218,11 +230,11 @@ internal static class Program
     }
     static ServerProfile? RunStaticDialog(Action<Window> step,ServerProfile? old=null,bool repeat=false)
     {
-        Exception? failure=null;var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(60)};int ticks=0;
+        Exception? failure=null;var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(60)};var deadline=Stopwatch.StartNew();
         timer.Tick+=(_,_)=>
         {
             var dialog=_app.Windows.Cast<Window>().FirstOrDefault(x=>x is ProfileDialog);if(dialog is null)return;
-            try{if(++ticks>100)throw new TimeoutException("Modal profile scenario did not complete");if(!repeat)timer.Stop();step(dialog);}
+            try{if(deadline.Elapsed>TimeSpan.FromSeconds(15))throw new TimeoutException("Modal profile scenario did not complete");if(!repeat)timer.Stop();step(dialog);}
             catch(Exception ex){failure=ex;timer.Stop();dialog.Close();}
         };
         timer.Start();var result=Dialogs.Profile(old);timer.Stop();if(failure is not null)throw failure;return result;
