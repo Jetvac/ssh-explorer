@@ -1,0 +1,26 @@
+{
+  "utc": "2026-11-03T15:21:58.569090+00:00",
+  "baseCommit": "bc39d8e9eab091348d763cfbb678e382bc569eca",
+  "sourceTreeDirty": true,
+  "scope": "Checkpoint2 actual template names and controlled MonitorView lifecycle, no Window/SSH",
+  "files": [
+    {
+      "file": "beta3-checkpoint2-resources-only.log",
+      "sha256": "e14822245d34b0115e241ebed79a53126a05961514e3032b35931ca428b9ebb1"
+    },
+    {
+      "file": "beta3-checkpoint2-monitor-poll-only.log",
+      "sha256": "24ce73e3aff388ff95a93e0cf02903565f2fb194699760be4703212e5635760e"
+    }
+  ],
+  "binaries": [
+    {
+      "file": "SSHExplorer.UiTests.dll",
+      "sha256": "33258c73b08aeea9d875bde901872d743c6228e3c4e59b9e66d9bdeea9104944"
+    },
+    {
+      "file": "SSHExplorer.dll",
+      "sha256": "8f39d2eaa42971b1925aff070c4a83dddb41bdf363bf28103ad03e5ea33803ad"
+    }
+  ]
+}

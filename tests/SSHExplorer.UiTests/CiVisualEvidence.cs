@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
@@ -31,6 +32,11 @@ internal sealed class CiVisualEvidence
     public void Capture(FrameworkElement visual,string state,object? measurements=null)
     {
         RequireCi();visual.Dispatcher.VerifyAccess();
+        // Observe the settled static state; do not alter or fast-forward product clocks.
+        // This CI-only observation wait is unrelated to command execution latency.
+        var settleFrame=new System.Windows.Threading.DispatcherFrame();var settleTimer=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromMilliseconds(300)};
+        settleTimer.Tick+=(_,_)=>{settleTimer.Stop();settleFrame.Continue=false;};settleTimer.Start();
+        try{System.Windows.Threading.Dispatcher.PushFrame(settleFrame);}finally{settleTimer.Stop();}
         var window=Window.GetWindow(visual);var source=PresentationSource.FromVisual(visual) as HwndSource;
         if(!visual.IsVisible||source is null||source.Handle==IntPtr.Zero||window is not null&&!window.IsVisible)
             throw new InvalidOperationException("Visual evidence requires the actual shown CI HWND.");
@@ -44,7 +50,7 @@ internal sealed class CiVisualEvidence
         captures.Add(new
         {
             state,file=Path.GetFileName(path),sha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant(),
-            scope=window is null?"actual WPF popup visual":"actual WPF client visual",
+            scope=window is null?"actual WPF popup visual":"actual WPF client visual",settleMilliseconds=300,
             clientDip=new{width=visual.ActualWidth,height=visual.ActualHeight},pixels=new{width,height},
             dpi=new{x=96*dpi.DpiScaleX,y=96*dpi.DpiScaleY},systemHighContrast=SystemParameters.HighContrast,
             systemClientAreaAnimation=SystemParameters.ClientAreaAnimation,
@@ -52,13 +58,20 @@ internal sealed class CiVisualEvidence
         });
         File.WriteAllText(Path.Combine(directory,"visual-evidence.json"),JsonSerializer.Serialize(new
         {
-            utc=DateTimeOffset.UtcNow,build=BuildInfo.Version,windows=Environment.OSVersion.VersionString,
+            utc=DateTimeOffset.UtcNow,build=BuildInfo.Version,commit=BuildInfo.Commit,windows=Environment.OSVersion.VersionString,
+            appAssembly=new
+            {
+                file=Path.GetFileName(typeof(App).Assembly.Location),
+                informationalVersion=typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+                fileVersion=System.Diagnostics.FileVersionInfo.GetVersionInfo(typeof(App).Assembly.Location).FileVersion,
+                sha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(App).Assembly.Location))).ToLowerInvariant()
+            },
             renderer="RenderTargetBitmap of actual WPF client/popup visual after CI HWND Show; native caption excluded",
             fixture="Deterministic offline component data; no SSH, no real process signals, no user settings",
             physicalKeyboardTested=false,liveMotionEvaluated=false,captures
         },new JsonSerializerOptions{WriteIndented=true}));
     }
-    public void CaptureRelatedScenes(MainWindow main,FileBrowserView files,AppStore store,Action<bool,string>? assert=null)
+    public void CaptureRelatedScenes(MainWindow main,FileBrowserView files,AppStore store,Action<bool,string>? assert=null,bool includeNarrowValidation=false)
     {
         RequireCi();
         var button=Descendants<Button>(files.CommandBar).Single(b=>AutomationProperties.GetName(b)=="Просмотреть");button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
@@ -66,12 +79,21 @@ internal sealed class CiVisualEvidence
         assert?.Invoke(ReferenceEquals(menu.PlacementTarget,button),"actual file view flyout remains anchored to the invoking command");
         Capture(menu,"files-view-menu",new{theme="Light",fixtureOnly=true,placement=menu.Placement.ToString()});menu.IsOpen=false;Pump();
         var tabs=(TabControl)typeof(MainWindow).GetField("tabs",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!.GetValue(main)!;tabs.SelectedIndex=0;main.UpdateLayout();Pump();Capture((FrameworkElement)main.Content,"home",new{theme="Light",fixtureOnly=true});
-        var dialog=new ProfileDialog(new ProfilePersistence(store),owner:main){Width=540};dialog.Show();Pump();
+        var dialog=new ProfileDialog(new ProfilePersistence(store),owner:main,allowConnect:true){Width=540};dialog.Show();Pump();
         try
         {
-            Descendants<Button>(dialog).Single(b=>Equals(b.Content,"Сохранить")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();dialog.UpdateLayout();
+            Descendants<Button>(dialog).Single(b=>Equals(b.Content,"Сохранить и подключиться")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();dialog.UpdateLayout();
             assert?.Invoke(dialog.Model.NameError.Length>0&&dialog.Model.HostError.Length>0,"actual profile validation keeps the window open with inline errors");
             Capture((FrameworkElement)dialog.Content,"profile-validation",new{theme="Light",fixtureOnly=true});
+            if(includeNarrowValidation)
+            {
+                dialog.Width=430;dialog.UpdateLayout();Pump();var content=(FrameworkElement)dialog.Content;
+                var actions=Descendants<Button>(dialog).Where(button=>button.IsVisible&&button.Content is string name&&name is "Отмена" or "Сохранить" or "Сохранить и подключиться").ToArray();
+                var bounds=actions.Select(button=>button.TransformToAncestor(content).TransformBounds(new Rect(button.RenderSize))).ToArray();bool overlap=false;
+                for(int i=0;i<bounds.Length;i++)for(int j=i+1;j<bounds.Length;j++){var shared=Rect.Intersect(bounds[i],bounds[j]);if(!shared.IsEmpty&&shared.Width>.5&&shared.Height>.5)overlap=true;}
+                assert?.Invoke(actions.Length==3&&!overlap&&bounds.All(rect=>rect.Left>=-.5&&rect.Right<=content.ActualWidth+.5&&rect.Bottom<=content.ActualHeight+.5),"narrow ordinary profile footer wraps all three real actions without overlap or clipping");
+                Capture(content,"profile-validation-narrow",new{theme="Light",fixtureOnly=true,widthRoleDip=430});
+            }
         }
         finally{dialog.Close();Pump();}
     }

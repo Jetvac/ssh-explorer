@@ -12,6 +12,7 @@
 - 13 operation/diagnostics/transfer assertions.
 - 6 graph geometry assertions: реальные timestamps, irregular intervals, explicit gap, unknown metric, независимая memory, границы интервала.
 - 16 monitor state/history assertions без Application/Window/SSH.
+- 8 actual MonitorView polling assertions: controlled executor, hide cancellation, hidden quiet, cancellation-ignoring late reply, serialized resume, current result and Dispose. Непоказанный UserControl, без Window/SSH; [checkpoint2 logs](test-results/beta3-checkpoint2-headless-evidence.json).
 - 7 opaque drag payload assertions: source session/user/files фиксируются до изменения navigation/selection, disposed source инвалидирует token. Это не OLE/Explorer gesture и не готовность реального SFTP drop target.
 
 Числа — отдельные assertions, не количество полных пользовательских маршрутов. [Локальные логи](test-results/beta3-headless-evidence.json) относятся к разработческому состоянию с указанными бинарными хешами; не выдаются за acceptance финального release EXE.
@@ -31,3 +32,5 @@ Pipeline сохраняет ordinary Add→PasswordBox→Trust→SFTP, fresh tes
 Before harness компилируется против **скачанного опубликованного beta.2**, SHA ZIP `c1a77b2ac57225963bc4b4a26de5317258a0b2a737ad1d64e18beb94941846e6`; его версии/816 внутренних хешей проверяются. After использует изменённую сборку. Общие fixture, выделенный PID, сортировка, timestamp, Light, outer size 1320×850 / 760×850 совпадают; actual client DIP/DPI/font/OS/HC фиксируются в metadata. Изображения не генерируются и не ретушируются. Сравнение не объявляется pixel-perfect из-за неизвестных условий Windows-референсов.
 
 Видеозапись, физический auth modal input, полные Explorer gestures, реальные переключения DPI/HC/system motion, multi-monitor и clean Windows — NOT RUN. [Текущая приёмка](../ACCEPTANCE.md).
+
+Первый [CI 41660491790](https://github.com/Jetvac/ssh-explorer/actions/runs/41660491790), commit `bc39d8e`, прошёл сборку/core/auth/startup, но actual-UI assertion не нашёл MetricSurface по Name. Добавлены явные Name DP и строгая материализация LoadContent/ContentPresenter.FindName без окна; ресурсный и polling прогоны после исправления прошли. Следующий CI отдельно проверяет фактические размеры/снимки.

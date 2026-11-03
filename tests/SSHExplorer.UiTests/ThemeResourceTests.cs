@@ -31,13 +31,14 @@ internal static class ThemeResourceTests
                     // LoadContent exercise templates without creating a Window.
                     role.Seal();MaterializeTemplates(role,templates);
                 }
+                MaterializeMonitorMetricTemplate();
                 foreach (var key in new[] { "Paper", "Surface", "NavigationSurface", "CaptionSurface", "Accent", "DropTarget", "Hover", "Selected", "DisabledInk", "FocusStroke", "SelectedFocusStroke", "PrimaryFocusStroke" })
                     if (app.FindResource(key) is not Brush) throw new Exception("Theme brush missing: " + key);
                 foreach (var key in new[] { "UIFontSize", "UICaptionSize", "UIHeadingSize", "ControlMinHeight", "CommandHeight", "RowHeight", "IconSize", "TreeIndent" })
                     if (app.FindResource(key) is not double) throw new Exception("Metric token missing: " + key);
                 foreach (var key in new[] { "ControlRadius", "FlyoutRadius" }) if (app.FindResource(key) is not CornerRadius) throw new Exception("Radius token missing: " + key);
                 foreach (var key in new[] { "MotionFast", "MotionSurface", "MotionSlow" }) if (app.FindResource(key) is not TimeSpan) throw new Exception("Motion token missing: " + key);
-                Console.WriteLine("PASS actual application Fluent styles, 22 explicit role styles and materialized templates: " + mode);
+                Console.WriteLine("PASS actual application Fluent styles, 22 explicit role styles, materialized templates and metric namescopes: " + mode);
             }
             var contrast = new ResourceDictionary { Source = new Uri("/PresentationFramework.Fluent;component/Themes/Fluent.HC.xaml", UriKind.Relative) };
             if (contrast[typeof(ComboBox)] is not Style contrastStyle) throw new Exception("Native High Contrast style missing."); contrastStyle.Seal();
@@ -79,5 +80,20 @@ internal static class ThemeResourceTests
             else if(trigger is MultiDataTrigger multiData)foreach(var setter in multiData.Setters.OfType<Setter>())Load(setter.Value);
         }
         void Load(object value){if(value is FrameworkTemplate template&&visited.Add(template))_ = template.LoadContent();}
+    }
+    static void MaterializeMonitorMetricTemplate()
+    {
+        using var monitor=new MonitorView(new MonitorViewModel());
+        var column=monitor.ProcessTable.Columns.OfType<DataGridTemplateColumn>().Single(column=>column.SortMemberPath==nameof(ProcessItemViewModel.Cpu));
+        var template=column.CellTemplate??throw new Exception("Metric cell template is missing.");
+        template.Seal();
+        var loaded=template.LoadContent() as Border??throw new Exception("Metric template did not materialize a Border.");
+        if(loaded.Name!="MetricSurface"||loaded.Child is not TextBlock{Name:"MetricValue"})throw new Exception("Factory template names were not propagated to actual element Name properties.");
+        var presenter=new ContentPresenter{ContentTemplate=template,Content=new ProcessItemViewModel(new(new(23,100,1000),"fixture","fixture","S",0,4096,0,0,null),1L<<30)};
+        presenter.Measure(new Size(200,40));presenter.Arrange(new Rect(0,0,200,40));presenter.UpdateLayout();
+        if(template.FindName("MetricSurface",presenter)is not Border surface||surface.Name!="MetricSurface"||template.FindName("MetricValue",presenter)is not TextBlock{Name:"MetricValue"})
+            throw new Exception("Actual metric content presenter did not register its named template parts.");
+        // This is a template materialization/name contract, not evidence of
+        // DataGrid cell width or a visible UI; that boundary is measured in CI.
     }
 }

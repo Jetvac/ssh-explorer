@@ -25,6 +25,7 @@ public sealed class MonitorView : UserControl, IDisposable
     readonly LinuxMonitor? monitor;
     readonly MonitorViewModel viewModel;
     readonly CancellationTokenSource lifetime;
+    CancellationTokenSource? pollCancellation;
     readonly DispatcherTimer timer = new();
     readonly Grid header = new(), pages = new();
     readonly TextBlock title = Ui.Text("Процессы", 18, true), status = Ui.Text("", 12), empty = Ui.Text("");
@@ -49,7 +50,8 @@ public sealed class MonitorView : UserControl, IDisposable
 
     public MonitorView(ServerSession session) : this(new MonitorViewModel(), session) { }
     // CI rendering uses the same composition with public data, no SSH or normal settings.
-    internal MonitorView(MonitorViewModel model) : this(model, null) { }
+    internal MonitorView(MonitorViewModel model) : this(model, (ServerSession?)null) { }
+    internal MonitorView(MonitorViewModel model, LinuxMonitor fixtureMonitor) : this(model, (ServerSession?)null) { monitor = fixtureMonitor; }
     MonitorView(MonitorViewModel model, ServerSession? owner)
     {
         session = owner; viewModel = model; DataContext = model;
@@ -134,9 +136,9 @@ public sealed class MonitorView : UserControl, IDisposable
         var total = Ui.Text("", 20); total.TextAlignment = TextAlignment.Right; total.SetBinding(TextBlock.TextProperty, new Binding(aggregate)); total.SetBinding(ToolTipProperty, new Binding(aggregateReason)); total.SetBinding(AutomationProperties.HelpTextProperty, new Binding(aggregateReason)); heading.Children.Add(total);
         var name = Ui.Text(caption, 12); name.TextAlignment = TextAlignment.Right; name.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); heading.Children.Add(name);
         var cell = new Style(typeof(DataGridCell), (Style)FindResource("ProcessMetricCellStyle")); cell.Setters.Add(new Setter(AutomationProperties.HelpTextProperty, new Binding(reason)));
-        var border = new FrameworkElementFactory(typeof(Border), "MetricSurface"); border.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Stretch); border.SetValue(VerticalAlignmentProperty, VerticalAlignment.Stretch); border.SetValue(Border.PaddingProperty, new Thickness(10, 4, 10, 4));
+        var border = new FrameworkElementFactory(typeof(Border), "MetricSurface"); border.SetValue(NameProperty, "MetricSurface"); border.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Stretch); border.SetValue(VerticalAlignmentProperty, VerticalAlignment.Stretch); border.SetValue(Border.PaddingProperty, new Thickness(10, 4, 10, 4));
         var heat = new MultiBinding { Converter = new MetricHeatConverter() }; heat.Bindings.Add(new Binding(metric)); heat.Bindings.Add(new Binding(nameof(DataGridRow.IsSelected)) { RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridRow), 1) }); heat.Bindings.Add(new Binding(nameof(DataGridRow.IsMouseOver)) { RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridRow), 1) }); heat.Bindings.Add(new Binding(nameof(PaletteRevision)) { RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(MonitorView), 1) }); heat.Bindings.Add(new Binding(nameof(ProcessItemViewModel.IsStale))); border.SetBinding(Border.BackgroundProperty, heat); border.SetBinding(ToolTipProperty, new Binding(reason));
-        var value = new FrameworkElementFactory(typeof(TextBlock), "MetricValue"); value.SetResourceReference(StyleProperty, "ProcessValueStyle"); value.SetBinding(TextBlock.TextProperty, new Binding(text)); value.SetBinding(AutomationProperties.HelpTextProperty, new Binding(reason)); value.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right); value.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); border.AppendChild(value);
+        var value = new FrameworkElementFactory(typeof(TextBlock), "MetricValue"); value.SetValue(NameProperty, "MetricValue"); value.SetResourceReference(StyleProperty, "ProcessValueStyle"); value.SetBinding(TextBlock.TextProperty, new Binding(text)); value.SetBinding(AutomationProperties.HelpTextProperty, new Binding(reason)); value.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right); value.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); border.AppendChild(value);
         AddColumn(key, new DataGridTemplateColumn { Header = heading, CellTemplate = new DataTemplate { VisualTree = border }, CellStyle = cell, SortMemberPath = metric, Width = width, MinWidth = 76 }, true);
     }
 
@@ -234,23 +236,31 @@ public sealed class MonitorView : UserControl, IDisposable
         var effective = active && !pausedByUser;
         if (viewModel.IsActive == effective && (timer.IsEnabled || !effective || monitor is null)) return;
         ++pollEpoch; viewModel.IsActive = effective; timer.Stop(); UpdateGraphTime();
-        if (!effective) { monitor?.MarkGap(DateTimeOffset.UtcNow, pausedByUser ? "Обновление приостановлено пользователем" : "Раздел мониторинга скрыт"); return; }
+        if (!effective) { pollCancellation?.Cancel(); monitor?.MarkGap(DateTimeOffset.UtcNow, pausedByUser ? "Обновление приостановлено пользователем" : "Раздел мониторинга скрыт"); return; }
         if (monitor is null) return;
-        var interval = TimeSpan.FromSeconds(Math.Clamp(App.Store.Settings.PollIntervalSeconds, 1, 60)); monitor.ExpectedInterval = interval; timer.Interval = interval; cpuGraph.GapThreshold = memoryGraph.GapThreshold = TimeSpan.FromSeconds(Math.Max(3, interval.TotalSeconds * 2.5)); timer.Start(); _ = Poll();
+        var interval = session is null ? monitor.ExpectedInterval : TimeSpan.FromSeconds(Math.Clamp(App.Store.Settings.PollIntervalSeconds, 1, 60)); monitor.ExpectedInterval = interval; timer.Interval = interval; cpuGraph.GapThreshold = memoryGraph.GapThreshold = TimeSpan.FromSeconds(Math.Max(3, interval.TotalSeconds * 2.5)); timer.Start(); _ = Poll();
     }
     async Task Poll()
     {
-        if (disposed || monitor is null || !viewModel.IsActive || viewModel.IsBusy) return;
-        var epoch = pollEpoch; viewModel.IsBusy = true;
+        if (disposed || monitor is null || !viewModel.IsActive || pollCancellation is not null || viewModel.IsBusy) return;
+        var epoch = pollEpoch; var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); pollCancellation = request; viewModel.IsBusy = true;
         try
         {
-            var sample = await monitor.SampleAsync(lifetime.Token);
+            var sample = await monitor.SampleAsync(request.Token);
             if (disposed || epoch != pollEpoch || !viewModel.IsActive) return;
             viewModel.ApplySnapshot(sample, monitor.History); UpdateGraphTime();
         }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
         catch (Exception ex) { if (!disposed && epoch == pollEpoch && viewModel.IsActive) { viewModel.ReportFailure(ErrorMessages.Describe(ex), monitor.History); UpdateGraphTime(); } }
-        finally { if (!disposed) viewModel.IsBusy = false; }
+        finally
+        {
+            if (ReferenceEquals(pollCancellation, request)) pollCancellation = null;
+            // Hide/Dispose only cancels. The request owns disposal after its awaited
+            // callback has unwound, so rapid resume never reuses a disposed CTS.
+            request.Dispose(); viewModel.IsBusy = false;
+            if (!disposed && viewModel.IsActive && epoch != pollEpoch)
+                _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, () => { if (!disposed && viewModel.IsActive) _ = Poll(); });
+        }
     }
     void ApplyProcesses()
     {
@@ -321,7 +331,7 @@ public sealed class MonitorView : UserControl, IDisposable
     }
     public void Dispose()
     {
-        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); lifetime.Cancel();
+        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); pollCancellation?.Cancel(); lifetime.Cancel(); viewModel.IsActive = false;
         viewModel.PropertyChanged -= ModelChanged; viewModel.ProcessesUpdated -= ApplyProcesses; viewModel.Processes.CollectionChanged -= ProcessesChanged; Theme.Changed -= PaletteChanged;
         foreach (var window in ownedWindows.ToArray()) if (window.IsLoaded) window.Close(); ownedWindows.Clear(); lifetime.Dispose();
     }

@@ -1,0 +1,10 @@
+SAFETY queued WPF startup consumed; desktop starts=0, application windows=0, ordinary settings unopened
+PASS visible monitor begins one controlled collector request without SSH
+PASS hiding the monitor cancels its active request and releases busy state without accepting a sample
+PASS hidden monitor performs no further collector calls across multiple poll intervals
+PASS rapid resume waits for an outstanding cancellation-ignoring executor instead of overlapping it
+PASS late response from the hidden epoch cannot replace data and resumed execution remains serialized
+PASS resumed monitor accepts the current real parser result rather than its discarded predecessor
+PASS disposing an active monitor cancels collection, drains callbacks and never restarts a timer
+PASS controlled polling leaves no Window, desktop startup or ordinary settings store
+RESULT: 8 actual MonitorView hide/cancel/resume/dispose checks passed; unshown view, controlled executor, no SSH or signals

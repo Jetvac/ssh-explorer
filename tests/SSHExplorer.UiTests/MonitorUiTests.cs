@@ -53,17 +53,17 @@ internal static class MonitorUiTests
             var table=monitor.ProcessTable;Layout(main);
             var warmup=Sample() with{System=Sample().System with{CpuPercent=null},Processes=Sample().Processes.Select(p=>p with{CpuPercent=null,ReadBytesPerSecond=null,WriteBytesPerSecond=null}).ToArray()};
             model.IsActive=true;model.IsBusy=true;model.ApplySnapshot(warmup,[]);Layout(main);
-            var firstRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromIndex(0)!;var unknownCpu=Descendants<DataGridCell>(firstRow).Single(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.Cpu));
-            var unknownSurface=Descendants<Border>(unknownCpu).Single(b=>b.Name=="MetricSurface");var unknownValue=Descendants<TextBlock>(unknownSurface).Single(t=>t.Name=="MetricValue");
-            Assert(unknownValue.Text=="—"&&AutomationProperties.GetHelpText(unknownValue).Length>0&&unknownSurface.Background is SolidColorBrush{Color.A:0},"first-sample unknown CPU has an uncolored dash and an accessible concrete reason");
             evidence.Capture((FrameworkElement)main.Content,"processes-initial",new{theme="Light",fixtureOnly=true,phase="initial delta baseline, independently available memory"});
+            var firstRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromIndex(0)!;var unknownCpu=Descendants<DataGridCell>(firstRow).Single(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.Cpu));
+            var unknownSurface=NamedPart<Border>(unknownCpu,"MetricSurface");var unknownValue=NamedPart<TextBlock>(unknownSurface,"MetricValue");
+            Assert(unknownValue.Text=="—"&&AutomationProperties.GetHelpText(unknownValue).Length>0&&unknownSurface.Background is SolidColorBrush{Color.A:0},"first-sample unknown CPU has an uncolored dash and an accessible concrete reason");
             model.ApplySnapshot(Sample(),History());model.IsBusy=false;Layout(main);
             var selected=model.Processes[3];table.SelectedItem=selected;table.ScrollIntoView(selected);Layout(main);
             Assert(model.SelectedIdentity==selected.Metric.Identity,"actual process table selection updates the exact process identity");
             var row=(DataGridRow)table.ItemContainerGenerator.ContainerFromItem(selected)!;
             var cell=Descendants<DataGridCell>(row).First(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.MemoryBytes));
-            var surface=Descendants<Border>(cell).Single(b=>b.Name=="MetricSurface");var label=Descendants<TextBlock>(surface).Single(t=>t.Name=="MetricValue");
-            Assert(surface.ActualWidth>40&&cell.ActualWidth-surface.ActualWidth<=2,"metric background occupies the measured full cell rather than only its text width");
+            var surface=NamedPart<Border>(cell,"MetricSurface");var label=NamedPart<TextBlock>(surface,"MetricValue");
+            Assert(surface.ActualWidth>40&&surface.ActualHeight>0&&Math.Abs(cell.ActualWidth-surface.ActualWidth)<=2&&Math.Abs(cell.ActualHeight-surface.ActualHeight)<=2,"metric background occupies both measured cell axes rather than only its text bounds");
             Assert(label.TextAlignment==TextAlignment.Right&&surface.Padding.Left==surface.Padding.Right&&surface.Padding.Right>0,"metric value is right aligned inside fixed symmetric cell padding");
             Assert(surface.Background is SolidColorBrush {Color.A:0},"selected process heat surface yields to the whole-row selection cue");
             table.SelectedItem=null;Layout(main);accentProbe.Enabled=true;Theme.Apply("Dark");Layout(main);
@@ -84,12 +84,23 @@ internal static class MonitorUiTests
             table.SelectedItem=model.Processes[3];scroll.ScrollToVerticalOffset(0);Layout(main);SetGraphTime(monitor);
             var captureRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromItem(model.Processes[3])!;
             var captureCell=Descendants<DataGridCell>(captureRow).Single(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.MemoryBytes));
-            var captureSurface=Descendants<Border>(captureCell).Single(b=>b.Name=="MetricSurface");
-            evidence.Capture((FrameworkElement)main.Content,"processes-wide",new{theme="Light",fixtureOnly=true,processCount=160,sampleTimestamp=Now,selectedPid=103,verticalOffset=scroll.VerticalOffset,sort="fixture order",metricCellDip=captureCell.ActualWidth,metricSurfaceDip=captureSurface.ActualWidth,metricPadding=captureSurface.Padding.Right});
+            var captureSurface=NamedPart<Border>(captureCell,"MetricSurface");
+            evidence.Capture((FrameworkElement)main.Content,"processes-wide",new{theme="Light",fixtureOnly=true,processCount=160,sampleTimestamp=Now,selectedPid=103,verticalOffset=scroll.VerticalOffset,sort="fixture order",metricCellDip=captureCell.ActualWidth,metricSurfaceDip=captureSurface.ActualWidth,metricCellHeightDip=captureCell.ActualHeight,metricSurfaceHeightDip=captureSurface.ActualHeight,metricPadding=captureSurface.Padding.Right});
             main.Width=760;Layout(main);CheckHeader(monitor,Assert);
             Assert(table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Name))&&table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Cpu)),"narrow viewport retains process name and CPU instead of only secondary columns");
             evidence.Capture((FrameworkElement)main.Content,"processes-narrow",new{theme="Light",fixtureOnly=true});
-            main.Width=1320;Layout(main);double fileOffset=0;var fileTable=(DataGrid)Field(files,"table");
+            main.Width=1320;Layout(main);
+            object originalFont=Application.Current.Resources["UIFontSize"]??throw new Exception("UI font role is unavailable.");
+            try
+            {
+                Application.Current.Resources["UIFontSize"]=22d;Layout(main);CheckHeader(monitor,Assert);
+                var largeRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromItem(model.Processes[3])!;
+                var largeLabels=Descendants<DataGridCell>(largeRow).Where(c=>c.IsVisible).SelectMany(c=>Descendants<TextBlock>(c)).Where(t=>t.IsVisible&&t.FontSize>=22).ToArray();
+                Assert(largeLabels.Length>0&&largeLabels.All(t=>t.ActualHeight+.5>=NaturalTextHeight(t)),"large UI font role keeps measured process cell text within an expanded row");
+                evidence.Capture((FrameworkElement)main.Content,"processes-large-text",new{theme="Light",fixtureOnly=true,uiFontRoleDip=22,osTextScaleChanged=false,dpiChanged=false});
+            }
+            finally{Application.Current.Resources["UIFontSize"]=originalFont;Layout(main);}
+            double fileOffset=0;var fileTable=(DataGrid)Field(files,"table");
             view.ShowSection("files");Layout(main);fileTable.SelectedItem=fileModel.Entries[5];var fileScroll=Descendants<ScrollViewer>(fileTable).First();fileScroll.ScrollToVerticalOffset(20);Layout(main);fileOffset=fileScroll.VerticalOffset;var fileSelection=fileModel.SelectedPaths.ToArray();int historyCount=fileModel.History.Count;
             view.ShowSection("processes");view.ShowSection("performance");Layout(main);SetGraphTime(monitor);
             Assert(monitor.Page==MonitorPage.Performance&&Ui.GetIsNavigationActive(navigation["performance"]),"performance subpage belongs to the common sidebar and uses the same monitor instance");
@@ -102,7 +113,7 @@ internal static class MonitorUiTests
             Assert(model.IsStale&&model.Processes.Count>0&&model.StatusDetails.Contains("Fixture",StringComparison.Ordinal),"failed sample keeps actual table rows with an explicit stale reason");
             evidence.Capture((FrameworkElement)main.Content,"processes-stale",new{theme="Light",fixtureOnly=true});
             Theme.Apply("Dark");Layout(main);evidence.Capture((FrameworkElement)main.Content,"processes-dark",new{theme="Dark",fixtureOnly=true});Theme.Apply("Light");
-            view.ShowSection("files");Layout(main);evidence.CaptureRelatedScenes(main,files,store,Assert);
+            view.ShowSection("files");Layout(main);evidence.CaptureRelatedScenes(main,files,store,Assert,includeNarrowValidation:true);
             Close(main,app);app.Shutdown();Console.WriteLine($"RESULT: {checks} monitor/shell actual WPF UI and graph checks passed; CI-only HWNDs, offline fixture, no SSH or process signals");return 0;
         }
         catch(Exception ex){Console.WriteLine(ex);return 1;}
@@ -137,6 +148,10 @@ internal static class MonitorUiTests
     }
     static IReadOnlyList<HistoryPoint> History()=>[new(Now.AddSeconds(-120),10,35,0,0),new(Now.AddSeconds(-119),30,36,0,0),new(Now.AddSeconds(-60),20,37,0,0),new(Now.AddSeconds(-59),50,38,0,0),new(Now,46,37.5,0,0)];
     static void SetGraphTime(MonitorView monitor){foreach(var graph in Descendants<MetricGraph>(monitor))graph.Now=Now;}
+    static double NaturalTextHeight(TextBlock actual)
+    {
+        var probe=new TextBlock{Text=actual.Text,FontFamily=actual.FontFamily,FontSize=actual.FontSize,FontWeight=actual.FontWeight,FontStyle=actual.FontStyle,FontStretch=actual.FontStretch};probe.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));return probe.DesiredSize.Height;
+    }
     static string? Value(string[] args,string name){int i=Array.IndexOf(args,name);return i<0?null:i+1<args.Length?args[i+1]:throw new ArgumentException(name+" needs a value");}
     static void Check(bool condition,string name){if(!condition)throw new Exception("FAIL "+name);Console.WriteLine("PASS "+name);}
     static object Field(object target,string name)=>target.GetType().GetField(name,BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(target)!;
@@ -147,6 +162,14 @@ internal static class MonitorUiTests
     static void Close(Window window,Application app){bool closed=false;window.Closed+=(_,_)=>closed=true;window.Close();var watch=System.Diagnostics.Stopwatch.StartNew();while(!closed||app.Windows.Cast<Window>().Contains(window)){if(watch.Elapsed>TimeSpan.FromSeconds(15))throw new TimeoutException("CI fixture did not close");Pump();}}
     static IEnumerable<T> Descendants<T>(DependencyObject root)where T:DependencyObject{for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T item)yield return item;foreach(var nested in Descendants<T>(child))yield return nested;}}
     static IEnumerable<T> Ancestors<T>(DependencyObject child)where T:DependencyObject{for(DependencyObject? parent=VisualTreeHelper.GetParent(child);parent is not null;parent=VisualTreeHelper.GetParent(parent))if(parent is T item)yield return item;}
+    static T NamedPart<T>(DependencyObject root,string name)where T:FrameworkElement
+    {
+        var matches=Descendants<T>(root).Where(element=>element.Name==name).ToArray();
+        if(matches.Length==1)return matches[0];
+        var nodes=Descendants<FrameworkElement>(root).Take(80).Select(element=>new{type=element.GetType().Name,name=element.Name,width=element.ActualWidth,height=element.ActualHeight}).ToArray();
+        Console.WriteLine("VISUAL_PART_DIAGNOSTIC "+System.Text.Json.JsonSerializer.Serialize(new{part=name,matches=matches.Length,nodes}));
+        throw new InvalidOperationException("Expected exactly one measured template part: "+name);
+    }
     sealed class AccentProbe:IDisposable
     {
         public static readonly Color ProbeColor=Color.FromRgb(145,57,193);public bool Enabled{get;set;}

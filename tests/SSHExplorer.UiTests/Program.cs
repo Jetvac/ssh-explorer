@@ -13,6 +13,7 @@ internal static class Program
         if (args.Length == 1 && args[0] == "--connection-only") return ConnectionTests.Run();
         if (args.Length == 1 && args[0] == "--monitor-graph-only") return MonitorUiTests.GraphOnly();
         if (args.Length == 1 && args[0] == "--drag-payload-only") return DragPayloadTests.Run();
+        if (args.Length == 1 && args[0] == "--monitor-poll-only") return MonitorPollTests.Run();
         if (args.Length == 1 && args[0] == "--monitor-state-only")
         {
             try { int count=MonitorStateTests.Run(Assert);Console.WriteLine($"RESULT: {count} monitor state/history assertions passed; no Application, Window or SSH created");return 0; }

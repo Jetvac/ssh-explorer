@@ -34,6 +34,26 @@ $bin=Join-Path $baselineRoot 'bin'
 if($LASTEXITCODE){throw 'Exact baseline render harness build failed.'}
 & (Join-Path $bin 'SSHExplorer.UiTests.exe') --render-beta2baseline --render-dir $before 2>&1 | Tee-Object -FilePath artifacts/ui-beta3-before.log
 if($LASTEXITCODE){throw 'Exact baseline composition render failed.'}
+$beforeMetadata=Get-Content -LiteralPath (Join-Path $before 'visual-evidence.json') -Raw | ConvertFrom-Json
+$afterMetadata=Get-Content -LiteralPath (Join-Path $after 'visual-evidence.json') -Raw | ConvertFrom-Json
+if($beforeMetadata.commit -ne 'e8424e548e89b8406444d3122157542597c3c33f' -or $afterMetadata.commit -ne $env:GITHUB_SHA){throw 'Render metadata commit mismatch.'}
+$comparisons=foreach($state in @('processes-wide','processes-narrow','performance-gap','files-tree','home')){
+    $old=@($beforeMetadata.captures | Where-Object state -eq $state)
+    $new=@($afterMetadata.captures | Where-Object state -eq $state)
+    if($old.Count -ne 1 -or $new.Count -ne 1){throw "Missing or duplicate comparison state: $state"}
+    foreach($dimension in @('width','height')){if([Math]::Abs($old[0].clientDip.$dimension-$new[0].clientDip.$dimension) -gt 0.5){throw "Client geometry differs for $state ($dimension)"}}
+    foreach($dimension in @('x','y')){if([Math]::Abs($old[0].dpi.$dimension-$new[0].dpi.$dimension) -gt 0.01){throw "DPI differs for $state"}}
+    if($old[0].uiFontSize -ne $new[0].uiFontSize -or $old[0].measurements.theme -ne $new[0].measurements.theme){throw "Font/theme differs for $state"}
+    [ordered]@{state=$state;clientDip=$new[0].clientDip;dpi=$new[0].dpi;uiFontSize=$new[0].uiFontSize;theme=$new[0].measurements.theme}
+}
+$evidenceSets=@([pscustomobject]@{directory=$before;metadata=$beforeMetadata},[pscustomobject]@{directory=$after;metadata=$afterMetadata})
+foreach($set in $evidenceSets){
+    foreach($capture in $set.metadata.captures){
+        $file=Join-Path $set.directory $capture.file
+        if((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $capture.sha256){throw "Render hash mismatch: $($capture.state)"}
+    }
+}
+[ordered]@{status='PASS';beforeCommit=$beforeMetadata.commit;afterCommit=$afterMetadata.commit;scope='Matching actual WPF client geometry, DPI, font role and theme; no motion/native caption or physical input claim';states=$comparisons} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $after 'comparison-verification.json') -Encoding utf8
 [xml]$properties=Get-Content -LiteralPath Directory.Build.props
 $version=[string]$properties.Project.PropertyGroup.Version
 $proof=Join-Path $root "artifacts/SSHExplorer-$version-ui-evidence.zip"
