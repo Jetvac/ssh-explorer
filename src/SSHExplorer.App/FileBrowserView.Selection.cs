@@ -48,8 +48,9 @@ public sealed partial class FileBrowserView
         lassoLayer = AdornerLayer.GetAdornerLayer(owner);
         if (lassoLayer is null) { lassoOwner = null; lastLassoEndReason = "no-adorner-layer"; return; }
         lassoAdorner = new SelectionAdorner(owner); lassoLayer.Add(lassoAdorner);
-        if (!owner.CaptureMouse()) { EndLasso("capture-denied"); return; }
         lastLassoEndReason = "active";
+        if (!owner.CaptureMouse()) { EndLasso("capture-denied"); return; }
+        if (lassoOwner != owner) return; // Capture events may synchronously cancel or unload the owner.
         if (!additive) ActiveSelected().Clear();
         dragStart = null;
         lassoTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(40), DispatcherPriority.Input, (_, _) => ScrollLasso(), Dispatcher);
