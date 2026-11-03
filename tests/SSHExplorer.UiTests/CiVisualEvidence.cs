@@ -20,6 +20,7 @@ internal sealed class CiVisualEvidence
 {
     readonly string directory;
     readonly List<object> captures=[];
+    internal static bool SoftwarePointerUsed{get;set;}
     public static void RequireCi()
     {
         if(!string.Equals(Environment.GetEnvironmentVariable("CI"),"true",StringComparison.OrdinalIgnoreCase)||
@@ -62,6 +63,7 @@ internal sealed class CiVisualEvidence
             windowActive=window?.IsActive,keyboardFocusType=Keyboard.FocusedElement?.GetType().Name,keyboardFocusElement=(Keyboard.FocusedElement as FrameworkElement)?.Name,
             dpi=new{x=96*dpi.DpiScaleX,y=96*dpi.DpiScaleY},systemHighContrast=SystemParameters.HighContrast,
             systemClientAreaAnimation=SystemParameters.ClientAreaAnimation,
+            softwarePointerInjected=SoftwarePointerUsed,physicalMouseTested=false,
             uiFontSize=visual.TryFindResource("UIFontSize"),measurements
         });
         File.WriteAllText(Path.Combine(directory,"visual-evidence.json"),JsonSerializer.Serialize(new
@@ -77,7 +79,7 @@ internal sealed class CiVisualEvidence
             renderer="RenderTargetBitmap of actual WPF client/popup visual after CI HWND Show; native caption excluded",nativeCaptionExcluded=true,
             primaryScreenDip=new{width=SystemParameters.PrimaryScreenWidth,height=SystemParameters.PrimaryScreenHeight},
             fixture="Deterministic offline component data; no SSH, no real process signals, no user settings",
-            physicalKeyboardTested=false,liveMotionEvaluated=false,captures
+            physicalKeyboardTested=false,physicalMouseTested=false,softwarePointerInjected=SoftwarePointerUsed,liveMotionEvaluated=false,captures
         },new JsonSerializerOptions{WriteIndented=true}));
     }
     public void CaptureRelatedScenes(MainWindow main,FileBrowserView files,AppStore store,Action<bool,string>? assert=null,bool includeNarrowValidation=false)

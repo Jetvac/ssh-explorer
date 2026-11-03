@@ -103,10 +103,11 @@ internal static class FormTabTests
         evidence.Capture((FrameworkElement)main.Content,"tabs-many-narrow",new{theme="Light",fixtureOnly=true,selectedTitle=SessionTabInfo.GetTitle(created[0].Tab),tabCount=tabs.Items.Count});
         var close=Descendants<Button>((FrameworkElement)created[0].Tab.Header).Single(button=>button.Name=="SessionTabCloseButton");
         assert(close.IsVisible&&close.ActualWidth>10&&AutomationProperties.GetName(close).Contains(duplicateProfile.Name,StringComparison.Ordinal),"selected tab exposes a measured close target with its full accessible name");
+        var targetLifetime=created[0].Session.Lifetime;var otherLifetimes=created.Skip(1).Select(pair=>pair.Session.Lifetime).ToArray();bool lifetimesWereLive=!targetLifetime.IsCancellationRequested&&otherLifetimes.All(token=>!token.IsCancellationRequested);
         Complete(main.CloseSessionTabAsync(created[0].Tab));Pump();
-        assert(!tabs.Items.Contains(created[0].Tab)&&ReferenceEquals(tabs.SelectedItem,created[1].Tab)&&created[0].Session.State==SessionState.Closed&&created.Skip(1).All(pair=>pair.Session.State!=SessionState.Closed),"closing the selected tab disposes only its session and selects the adjacent right tab");
-        var active=tabs.SelectedItem;Complete(main.CloseSessionTabAsync(created[^1].Tab));Pump();
-        assert(ReferenceEquals(tabs.SelectedItem,active)&&created[^1].Session.State==SessionState.Closed,"closing a background tab preserves the active session selection");
+        assert(lifetimesWereLive&&!tabs.Items.Contains(created[0].Tab)&&ReferenceEquals(tabs.SelectedItem,created[1].Tab)&&created[0].Session.State==SessionState.Closed&&targetLifetime.IsCancellationRequested&&otherLifetimes.All(token=>!token.IsCancellationRequested),"closing the selected tab cancels only its session lifetime and selects the adjacent right tab");
+        var active=tabs.SelectedItem;var backgroundLifetime=created[^1].Session.Lifetime;Complete(main.CloseSessionTabAsync(created[^1].Tab));Pump();
+        assert(ReferenceEquals(tabs.SelectedItem,active)&&!tabs.Items.Contains(created[^1].Tab)&&created[^1].Session.State==SessionState.Closed&&backgroundLifetime.IsCancellationRequested,"closing a background tab cancels its own lifetime and preserves the active session selection");
         tabs.SelectedIndex=0;Pump();var homeBar=Descendants<ResponsiveCommandBar>((DependencyObject)main.Content).Single(bar=>bar.Name=="HomeCommandBar");homeBar.Width=300;main.UpdateLayout();Pump();
         ((DataGrid)Field(main,"servers")).UnselectAll();Pump();var homeMenu=homeBar.CreateOverflowMenu();
         assert(homeBar.VisibleCommandKeys.Contains("add")&&homeBar.OverflowCommandKeys.Contains("remove")&&homeMenu.Items.OfType<MenuItem>().Where(item=>Equals(item.Header,"Удалить профиль")||Equals(item.Header,"Изменить")).All(item=>!item.IsEnabled),"narrow Home keeps Add visible and propagates disabled profile actions into overflow");
