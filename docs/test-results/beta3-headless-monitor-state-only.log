@@ -1,0 +1,17 @@
+PASS MVVM initial collection has a short status and unknown values rather than zero
+PASS MVVM first delta baseline preserves independently measured memory and accessible CPU reason
+PASS MVVM unavailable source stops promising an endless second sample
+PASS MVVM genuine zero I/O remains numeric and signal eligibility follows a valid backend identity
+PASS MVVM metric reason updates real unshown WPF and automation bindings without replacing the process row
+PASS MVVM failed sampling retains values and disables signals while explicitly marking stale data
+PASS MVVM failure inserts a timestamped gap instead of a fabricated zero
+PASS MVVM recovery preserves collection row identity and selection without table reset
+PASS MVVM pause keeps actual time and disables actions against paused data
+PASS MVVM resumed section requests a new baseline instead of calling paused data current
+PASS MVVM busy collection explains why signalling is temporarily disabled
+PASS MVVM signal policy rejects protected or unverifiable identity 1/123/1000
+PASS MVVM signal policy rejects protected or unverifiable identity 42/0/1000
+PASS MVVM signal policy rejects protected or unverifiable identity 42/123/4294967295
+PASS MVVM forwards real timestamps and null discontinuities without index-based resampling
+PASS MVVM compact status keeps technical sources and collection duration in separate details
+RESULT: 16 monitor state/history assertions passed; no Application, Window or SSH created

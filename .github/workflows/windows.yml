@@ -42,6 +42,10 @@ jobs:
       - name: Authentication network and ordinary WPF command route
         shell: pwsh
         run: ./scripts/Test-AuthNetwork.ps1 -Python .tools/auth-ci-python/Scripts/python.exe -RunOrdinaryUi
+      - name: UI composition, metric cells and exact beta.2 comparison renders
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/Test-UiComposition.ps1
       - name: Packaged EXE startup and graceful close in isolated settings
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         shell: pwsh
@@ -56,6 +60,7 @@ jobs:
           'CI exercises core regressions, WPF layout/state, motion clocks, profile STA dialogs, ordinary Add/Trust/Connect controls with real loopback SSH/SFTP and a fresh test process, plus native COM ABI.' >> $env:GITHUB_STEP_SUMMARY
           'STA control events are not physical keyboard input or a published EXE restart. Live Explorer gestures, DPI, High Contrast, motion recordings and clean Windows acceptance remain separate; see ACCEPTANCE.md.' >> $env:GITHUB_STEP_SUMMARY
           'Packaged EXE startup/normal close is a separate isolated CI process probe; it does not test password input or clean Windows.' >> $env:GITHUB_STEP_SUMMARY
+          'Beta.3 composition renders are actual WPF client visuals from CI HWNDs with offline data. Exact published beta.2 and current source use matching fixtures, outer sizes, theme and recorded DPI/text scale. They do not capture native caption buttons or prove motion/physical gestures/accessibility acceptance.' >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -67,6 +72,9 @@ jobs:
             artifacts/portable-startup-diagnostics.jsonl
             artifacts/auth-network/*.log
             artifacts/auth-network/scope.json
+            artifacts/ui-beta3-*.log
+            artifacts/ui-beta3-before/**
+            artifacts/ui-beta3-after/**
           if-no-files-found: warn
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

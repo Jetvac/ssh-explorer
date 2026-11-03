@@ -1,4 +1,21 @@
-# Windows 11 UI parity — beta.2 и доказательства beta.1
+# Сопоставление интерфейса с Windows 11
+
+## Актуальная композиция beta.3
+
+[Выбранная структура и роли](UI_COMPOSITION_BETA3.md). Референсы: приложенные Windows 11 Task Manager / Explorer, их физический DPI неизвестен. Доступный before — исторический кадр beta.2 ab01976, не последний пользовательский снимок (в новом сообщении такого файла нет). Сопоставимые реальные WPF-render кадры и проверки выполняются отдельно в Windows CI. Computer Use на host запрещён. Пользовательская визуальная приёмка открыта.
+
+| Референс / область | Конкретное расхождение beta.2 | Изменение beta.3 | Доказательство / граница |
+|---|---|---|---|
+| Task Manager: иерархия | Общий заголовок, внутренние window tabs, duplicate summary и table header | Processes/Performance в левой панели; одна верхняя command/search область, summary только в колонках | SessionView + MonitorView; фактический layout/render — CI, не ручная оценка |
+| Explorer: боковая панель | Общая прокрутка уносит основные разделы; current folder и монитор похожи | Fixed section nav, отдельный scroll дерева, secondary folder marker при другом разделе | Ui.IsNavigationActive / inherited IsFileSectionActive; shell navigation CI |
+| Task Manager: метрики | Заливка под текстом, повтор «Недоступно» | Stretch metric cell с padding0, числа справа, тире с tooltip/automation/details | Проверяется ActualWidth/ActualHeight, а не только setters; HC live отдельно |
+| Task Manager: колонки | Одновременно все второстепенные поля, text I/O sort | Numeric sort keys и выбор колонок, имя/CPU/Memory приоритетны | CI sort/resize/узкое окно; физическая клавиатура отдельно |
+| Task Manager: нижняя область | Постоянный многострочный технический footer | Короткий status + «Сведения», connect footer скрыт при здоровом мониторе | WPF composition; ошибки не маскируются |
+| Performance: история | X по индексу, потеря timestamp | Реальное время и явные gaps после паузы/ошибки/долгого запроса | Shared renderer geometry + fake-clock regression; реальный стенд отдельно |
+| Explorer: общая оболочка | Implicit Tab styles и одна плотность разных таблиц | Явные SessionTab, File/Process/Home/TransferTable, CommandBar/StatusBar, Dialog/Validation роли | Resource separation + реальные WPF controls; без заявления полного Windows parity |
+| Motion | Механизм beta.2 есть, но нет подтверждения ощущения | Сохраняется UiMotion, мгновенная смена page/команд, cleanup; без cell animation и HWND motion | Contract/clock tests; новое motion video NOT RUN |
+
+Разделы ниже сохранены как история beta.2. Финальная поставка beta.2 проверена: 816 portable files / 252 source files; [отчёт](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.2/SSHExplorer-0.2.0-beta.2-verification.json).
 
 Актуальное дополнение: после разрешения Computer Use выполнен [ограниченный живой прогон](LIVE_BETA2.md) со снимками таблицы, меню, дерева, четырёх видов, recovery, настоящего PTY и мониторинга. Ниже сохранены этапы resource/CI-проверки; их прежние NOT RUN на host уточняются этим отчётом только в явно проверенном объёме. Полная Windows/DPI/HC/motion приёмка остаётся открытой.
 

@@ -1,0 +1,50 @@
+{
+  "utc": "2026-11-03T15:06:00.9865182Z",
+  "baseCommit": "e8424e548e89b8406444d3122157542597c3c33f",
+  "sourceTreeDirty": true,
+  "scope": "Headless development checks, no host windows; later CI independently compiles committed source",
+  "files": [
+    {
+      "file": "beta3-headless-core-final.log",
+      "sha256": "9ceecaaa4402436ea9a8cc8d7013ed5c5d7f2b7e393c50002e07da38d57e07be"
+    },
+    {
+      "file": "beta3-headless-resources-only.log",
+      "sha256": "57d15c817b8804513baccb7c4a4846351037b0ee6ae7c8c5ce034bb3fb029328"
+    },
+    {
+      "file": "beta3-headless-motion-only.log",
+      "sha256": "3d0335da4e98397cd6470dc975edd0586798d7995e74923a1c269757642566b9"
+    },
+    {
+      "file": "beta3-headless-connection-only.log",
+      "sha256": "c5bbc3cc147504e19afa6bedbe39fd2672d7473268b47c52eddabd0e5b980162"
+    },
+    {
+      "file": "beta3-headless-monitor-graph-only.log",
+      "sha256": "d067b3283193f7f6fdc778c005ed14a45be0b9306e79bad573833c948c3bd191"
+    },
+    {
+      "file": "beta3-headless-monitor-state-only.log",
+      "sha256": "3b40206359008e6d22f8e135cb6e9868e6622fdab13e1fb9d98f84e40630026e"
+    },
+    {
+      "file": "beta3-headless-drag-payload-only.log",
+      "sha256": "e1ed2e8dac26794c38dc3b36fdb480488e1cf8d2317c1df66ebd94467d62a62e"
+    }
+  ],
+  "binaries": [
+    {
+      "file": "SSHExplorer.Tests.dll",
+      "sha256": "71c32d757e2a412bb7aa595ab471eca08c72157e4dc7cfc64898ed8aea89a8a7"
+    },
+    {
+      "file": "SSHExplorer.UiTests.dll",
+      "sha256": "31d35c03b4876493d0536f740c5bad054cdaaedaa356433374e9d1af8fcac2c0"
+    },
+    {
+      "file": "SSHExplorer.dll",
+      "sha256": "03099fbb707dc8f21ae50a992a433344047f6e18d20fbf4988c65eb96f10e800"
+    }
+  ]
+}

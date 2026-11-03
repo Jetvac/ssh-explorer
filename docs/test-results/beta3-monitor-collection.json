@@ -1,0 +1,291 @@
+{
+  "scope": "Read-only existing isolated Linux fixture; development snapshot, not final release acceptance",
+  "before": {
+    "label": "isolated-loopback-linux-monitor",
+    "utc": "2026-11-03T17:56:54.8101191+03:00",
+    "build": "0.2.0-beta.3+e8424e548e89b8406444d3122157542597c3c33f",
+    "runtime": ".NET 10.0.14",
+    "operatingSystem": "Microsoft Windows 10.0.26200",
+    "remoteOperations": "read-only existing /proc, /etc/passwd, df and fixed SSH probe; no writes, signals, installations or configuration changes",
+    "sampleCount": 8,
+    "intervalAfterCompletionSeconds": 1,
+    "elapsedSeconds": 23.973,
+    "meanDurationMilliseconds": 2111.3,
+    "maxDurationMilliseconds": 2143.672,
+    "measurements": [
+      {
+        "sample": 1,
+        "timestampUtc": "2026-11-03T17:56:32.9481925+03:00",
+        "durationMilliseconds": 2109.964,
+        "processCount": 83,
+        "cpuState": "Initial",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 2,
+        "timestampUtc": "2026-11-03T17:56:36.0967369+03:00",
+        "durationMilliseconds": 2120.097,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 3,
+        "timestampUtc": "2026-11-03T17:56:39.2261173+03:00",
+        "durationMilliseconds": 2113.136,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 4,
+        "timestampUtc": "2026-11-03T17:56:42.3134332+03:00",
+        "durationMilliseconds": 2083.482,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 5,
+        "timestampUtc": "2026-11-03T17:56:45.4447675+03:00",
+        "durationMilliseconds": 2118.487,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 6,
+        "timestampUtc": "2026-11-03T17:56:48.5943707+03:00",
+        "durationMilliseconds": 2143.672,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 7,
+        "timestampUtc": "2026-11-03T17:56:51.6812801+03:00",
+        "durationMilliseconds": 2077.744,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 8,
+        "timestampUtc": "2026-11-03T17:56:54.8084791+03:00",
+        "durationMilliseconds": 2123.815,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      }
+    ],
+    "provenance": {
+      "sourceTreeDirty": true,
+      "baseCommit": "e8424e548e89b8406444d3122157542597c3c33f",
+      "scope": "Development snapshot before collector optimization; exact binaries hashed",
+      "binaries": [
+        {
+          "file": "SSHExplorer.Tests.dll",
+          "sha256": "d28ab890fe289fc1609607cb51e1f4849f142a7f8901e02209401c8a94d07845"
+        },
+        {
+          "file": "SSHExplorer.Monitoring.dll",
+          "sha256": "c6582a45a51e99347a4ca7d7540d9c8d96484e9b1f8b9dfad3733f50c036035d"
+        },
+        {
+          "file": "SSHExplorer.Core.dll",
+          "sha256": "ff71714e4592153af3c9272a6902b40fdb7f83508d514d47e1f2d3f337a321f2"
+        }
+      ]
+    }
+  },
+  "after": {
+    "label": "isolated-loopback-linux-monitor",
+    "utc": "2026-11-03T18:00:49.7745159+03:00",
+    "build": "0.2.0-beta.3+e8424e548e89b8406444d3122157542597c3c33f",
+    "runtime": ".NET 10.0.14",
+    "operatingSystem": "Microsoft Windows 10.0.26200",
+    "remoteOperations": "read-only existing /proc, /etc/passwd, df and fixed SSH probe; no writes, signals, installations or configuration changes",
+    "sampleCount": 8,
+    "intervalAfterCompletionSeconds": 1,
+    "elapsedSeconds": 22.075,
+    "meanDurationMilliseconds": 1873.182,
+    "maxDurationMilliseconds": 1917.663,
+    "measurements": [
+      {
+        "sample": 1,
+        "timestampUtc": "2026-11-03T18:00:29.5977344+03:00",
+        "durationMilliseconds": 1897.084,
+        "processCount": 83,
+        "cpuState": "Initial",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 2,
+        "timestampUtc": "2026-11-03T18:00:32.5012276+03:00",
+        "durationMilliseconds": 1873.685,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 3,
+        "timestampUtc": "2026-11-03T18:00:35.3483616+03:00",
+        "durationMilliseconds": 1835.387,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 4,
+        "timestampUtc": "2026-11-03T18:00:38.2596596+03:00",
+        "durationMilliseconds": 1905.168,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 5,
+        "timestampUtc": "2026-11-03T18:00:41.1542168+03:00",
+        "durationMilliseconds": 1879.174,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 6,
+        "timestampUtc": "2026-11-03T18:00:43.981935+03:00",
+        "durationMilliseconds": 1823.356,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 7,
+        "timestampUtc": "2026-11-03T18:00:46.912202+03:00",
+        "durationMilliseconds": 1917.663,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      },
+      {
+        "sample": 8,
+        "timestampUtc": "2026-11-03T18:00:49.7724752+03:00",
+        "durationMilliseconds": 1853.938,
+        "processCount": 83,
+        "cpuState": "Available",
+        "memoryState": "Available",
+        "uptimeAvailable": true,
+        "networkSourceAvailable": true,
+        "diskSourceAvailable": true,
+        "processIoAvailable": 0,
+        "processIoUnavailable": 82
+      }
+    ],
+    "provenance": {
+      "sourceTreeDirty": true,
+      "baseCommit": "e8424e548e89b8406444d3122157542597c3c33f",
+      "scope": "Development snapshot after collector optimization; exact binaries hashed",
+      "binaries": [
+        {
+          "file": "SSHExplorer.Tests.dll",
+          "sha256": "41a881ec6fd9fe14046037b3128b02dcf4a5498698e6c04d1942baa7e5a26abd"
+        },
+        {
+          "file": "SSHExplorer.Monitoring.dll",
+          "sha256": "6e146ab7e31dbd8e12385cb4bd97c74852abdd70a1ad3f452609952baa692381"
+        },
+        {
+          "file": "SSHExplorer.Core.dll",
+          "sha256": "ff71714e4592153af3c9272a6902b40fdb7f83508d514d47e1f2d3f337a321f2"
+        }
+      ]
+    }
+  },
+  "meanReductionPercent": 11.28,
+  "encodingValidation": {
+    "automaticNowrap": "PASS",
+    "forcedUnsupportedNowrapFallback": "PASS",
+    "boundedBytes": 97,
+    "nulNewlineUtf8AndMissingSentinelPreserved": true
+  },
+  "limits": [
+    "One existing loopback Linux environment, approximately 83 processes",
+    "No server writes, signals, installation or configuration changes",
+    "No host UI, no performance claim for other networks or hosts"
+  ]
+}

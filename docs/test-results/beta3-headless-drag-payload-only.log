@@ -1,0 +1,9 @@
+SAFETY queued WPF startup consumed; desktop starts=0, application windows=0, ordinary settings unopened
+PASS drag registry exposes only a bounded opaque token and no nonexistent FileDrop path
+PASS destination/source navigation and selection changes cannot replace the captured source session or user
+PASS registered drag paths remain frozen after caller array mutation and selection changes
+PASS refresh/cleanup source view remains the original weak source instead of the active destination view
+PASS payload-only fixture never claims a disconnected SFTP target is ready
+PASS disposing the original source invalidates its tokens after navigation changes
+PASS drag registry checks leave no application windows or desktop startup
+RESULT: 7 opaque drag source/navigation checks passed; no Window, Clipboard, OLE, SSH or transfer

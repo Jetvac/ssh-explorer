@@ -1,5 +1,23 @@
 # SSH Explorer — приёмка 0.2.0-beta.2
 
+## Текущая итерация: beta.3
+
+Пользователь сообщил об успешном запуске beta.2 до рабочего экрана. Неизвестная причина прежнего crash не объявлена исправленной; сохраняется наблюдение и прежние защиты. Интерфейс пока не принят пользователем. [Целевая композиция](docs/UI_COMPOSITION_BETA3.md), [актуальная UI-матрица](docs/UI_PARITY.md).
+
+| Проверка | Текущий статус / граница |
+|---|---|
+| Композиция мониторинга/левая панель/общие роли | Реализовано; фактические CI layout/render результаты фиксируются для точного commit |
+| Metric states, independent sources, timestamp/gaps, selection | Новые регрессии; результаты текущего прогона отдельно от исторических |
+| Ordinary auth/retry/cancel/owner/secret/native ABI | Сохраняются, требуют CI изменённого commit |
+| Парольный crash | Пользователь дошёл до рабочего экрана; причина прежнего случая НЕ УСТАНОВЛЕНА |
+| Computer Use / desktop host | NOT RUN по прямому указанию пользователя; временное разрешение beta.2 не продлевается |
+| CI WPF-render снимки | Отдельный изолированный сценарий, не physical input и не пользовательская приёмка |
+| Полные Explorer gestures, live auth, DPI/HC, motion video, clean Windows | NOT RUN в этой итерации; воспроизводимые шаги описаны в матрице |
+
+Финальная beta.2 уже опубликована и скачана: [отчёт](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.2/SSHExplorer-0.2.0-beta.2-verification.json), 816 portable files / 252 source blobs, [финальный CI](https://github.com/Jetvac/ssh-explorer/actions/runs/41651021287). Нижележащие PARTIAL/«ещё не проверен» относятся к историческому checkpoint ab01976, не к итоговому релизу.
+
+## Исторические результаты beta.2
+
 03.11.2026. База — `v0.2.0-beta.1` / `eda137a734e8fc259eb97fca300b2072d11232a8`. **P0 парольного crash открыт.** Новая beta — промежуточный выпуск, не пользовательское принятие. После начального ограничения пользователь разрешил Computer Use на 40 минут: [фактический живой прогон](docs/LIVE_BETA2.md).
 
 Исправлена ошибка изоляции: WPF вызывает OnStartup из очереди конструктора Application даже без Run. У старых профильных прогонов отозвана отметка «без окон». Новый внутренний test constructor подавляет desktop startup; queued callback намеренно выполняется с проверкой desktop starts=0, windows/HWND=0 и неизменного isolated Store. Это не опция обычного EXE. [Подробности](docs/PROFILE_FLOW_BETA2.md).

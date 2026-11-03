@@ -1,0 +1,50 @@
+PASS proc/stat excludes guest double counting and counts CPUs
+PASS process stat preserves parentheses, newline, spaces and shell punctuation
+PASS malformed and overflowing counters stay unavailable
+PASS memory uses MemAvailable and KiB units
+PASS memory fallback is explicitly estimated
+PASS base64 framing preserves NUL and newline without record injection
+PASS truncated, duplicate and oversized protocol rejected
+PASS real counter formulas: first sample unknown, second CPU50%, PID5%, net1KiB/s
+PASS PID reuse does not inherit old CPU or I/O
+PASS process disappearing midway is excluded rather than mixed
+PASS reboot resets CPU, network and process baselines
+PASS counter reset is not negative or fabricated zero
+PASS missing UID disables process signal; missing metrics do not become zeros
+PASS df parser retains mount paths with spaces and 64-bit sizes
+PASS monitor serializes requests and bounds history
+PASS signal protects PID1, identity and allowed signals
+PASS signal rejects changed identity and leaves server rights unchanged
+PASS missing existing utility yields precise limitation
+PASS collector rejects unbounded PID limits and no server setup commands
+PASS metric states distinguish first sample, measured CPU and genuine zero throughput
+PASS persistently missing uptime preserves CPU and memory while rates explain unavailable clock
+PASS unreadable CPU source preserves independent memory and elapsed-time throughput
+PASS I/O denied does not promise second sample and readable source recovers through its own baseline
+PASS new process differs from missing source then transitions to a measured delta
+PASS reboot states are reset rather than unavailable and recover after a new baseline
+PASS CPU counter reset does not erase independent network counters
+PASS unavailable owner disables signal without losing independently readable CPU
+PASS backend and process metric use one signal identity policy and invalid identities never execute
+PASS failed sampling retains actual timestamps and a gap instead of zero then resets baseline
+PASS pause invalidates an in-flight history point and next collection starts a new baseline
+PASS slow SSH sample records actual collection duration and a timestamped history discontinuity
+PASS one missed polling interval is a gap even below the previous two-interval threshold
+PASS POSIX paths preserve backslash, case and metacharacters
+PASS POSIX rejects NUL, relative paths and invalid names
+PASS pinned SSH.NET native SFTP bindings validate before use
+PASS Windows names are mapped and cannot escape chosen directory
+PASS host fingerprint is SHA256 public key, endpoint normalized
+PASS reject first host key never persists or grants session trust
+PASS temporary host trust belongs to one logical session only
+PASS temporary trust blocks changed key or algorithm inside its logical session
+PASS persistent trust survives restart and is bound to endpoint and algorithm
+PASS changed host key is blocked before ordinary trust dialog
+PASS simultaneous channels coalesce one logical-session trust prompt
+PASS explicit trust reset is endpoint scoped
+PASS profiles and settings survive atomic rewrite without inline secrets
+PASS DPAPI CurrentUser roundtrip is not plaintext in any store file
+PASS closing one logical session leaves the other lifetime independent
+PASS failed native export unlinks source lifetime and is collectible
+PASS cancelled native export unlinks source lifetime and is collectible
+RESULT: 49 passed, 0 failed

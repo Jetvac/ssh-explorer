@@ -1,0 +1,7 @@
+PASS actual graph geometry separates a long sampling pause into two segments
+PASS actual graph horizontal positions use elapsed timestamps instead of sample index
+PASS explicit history gap never receives a connecting line
+PASS missing CPU does not interpolate across unknown data
+PASS independent available memory history is preserved when CPU is missing
+PASS graph excludes past-window and future measurements rather than fabricating edge samples
+RESULT: 6 timestamp/gap geometry checks passed; no Application, Window, HWND or SSH created
