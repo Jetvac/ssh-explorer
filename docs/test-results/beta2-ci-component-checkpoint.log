@@ -1,0 +1,20 @@
+2026-11-03T13:37:20.9489670Z RESULT: 36 passed, 0 failed
+2026-11-03T13:37:23.6198504Z RESULT: 6 WPF layout/virtualization + 18 MVVM state/binding + 12 UI component checks passed
+2026-11-03T13:37:25.5571605Z RESULT: 8 resource/contract + 18 MVVM checks passed; no Windows were created; layout, focus and live UI are separate
+2026-11-03T13:37:27.3370287Z RESULT: 17 real clock/contract assertions passed; no Windows or Popups opened; live motion/focus/HC remain separate
+2026-11-03T13:37:28.9646825Z RESULT: 13 headless operation/diagnostics/transfer checks passed
+2026-11-03T13:37:38.6881476Z PASS visible credentials prompt is owned by its requesting window
+2026-11-03T13:37:38.6909290Z PASS worker cancellation closes actual credentials modal without accepting stale input
+2026-11-03T13:37:38.6910311Z PASS cancelled credentials leaves no visible prompt
+2026-11-03T13:37:38.7231757Z PASS visible interactive prompt is owned by its requesting window
+2026-11-03T13:37:38.7255283Z PASS worker cancellation closes actual interactive modal without accepting stale input
+2026-11-03T13:37:38.7256185Z PASS cancelled interactive leaves no visible prompt
+2026-11-03T13:37:38.8605112Z PASS visible trust prompt is owned by its requesting window
+2026-11-03T13:37:38.8636051Z PASS worker cancellation closes actual trust modal without accepting stale input
+2026-11-03T13:37:38.8636974Z PASS cancelled trust leaves no visible prompt
+2026-11-03T13:37:38.9736320Z PASS visible profile prompt is owned by its requesting window
+2026-11-03T13:37:38.9844523Z PASS worker cancellation closes actual profile modal without accepting stale input
+2026-11-03T13:37:38.9850731Z PASS cancelled profile leaves no visible prompt
+2026-11-03T13:37:39.1431050Z PASS closing requesting window cancels its actual credentials modal
+2026-11-03T13:37:39.1507455Z RESULT: 110 profile validation, persistence and STA dialog checks passed
+2026-11-03T13:37:44.6569798Z PASS isolated ABI-only probe: synthetic zero-byte file, no SSH or live Explorer claimed

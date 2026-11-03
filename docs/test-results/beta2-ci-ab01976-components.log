@@ -1,0 +1,268 @@
+PASS proc/stat excludes guest double counting and counts CPUs
+PASS process stat preserves parentheses, newline, spaces and shell punctuation
+PASS malformed and overflowing counters stay unavailable
+PASS memory uses MemAvailable and KiB units
+PASS memory fallback is explicitly estimated
+PASS base64 framing preserves NUL and newline without record injection
+PASS truncated, duplicate and oversized protocol rejected
+PASS real counter formulas: first sample unknown, second CPU50%, PID5%, net1KiB/s
+PASS PID reuse does not inherit old CPU or I/O
+PASS process disappearing midway is excluded rather than mixed
+PASS reboot resets CPU, network and process baselines
+PASS counter reset is not negative or fabricated zero
+PASS missing UID disables process signal; missing metrics do not become zeros
+PASS df parser retains mount paths with spaces and 64-bit sizes
+PASS monitor serializes requests and bounds history
+PASS signal protects PID1, identity and allowed signals
+PASS signal rejects changed identity and leaves server rights unchanged
+PASS missing existing utility yields precise limitation
+PASS collector rejects unbounded PID limits and no server setup commands
+PASS POSIX paths preserve backslash, case and metacharacters
+PASS POSIX rejects NUL, relative paths and invalid names
+PASS pinned SSH.NET native SFTP bindings validate before use
+PASS Windows names are mapped and cannot escape chosen directory
+PASS host fingerprint is SHA256 public key, endpoint normalized
+PASS reject first host key never persists or grants session trust
+PASS temporary host trust belongs to one logical session only
+PASS temporary trust blocks changed key or algorithm inside its logical session
+PASS persistent trust survives restart and is bound to endpoint and algorithm
+PASS changed host key is blocked before ordinary trust dialog
+PASS simultaneous channels coalesce one logical-session trust prompt
+PASS explicit trust reset is endpoint scoped
+PASS profiles and settings survive atomic rewrite without inline secrets
+PASS DPAPI CurrentUser roundtrip is not plaintext in any store file
+PASS closing one logical session leaves the other lifetime independent
+PASS failed native export unlinks source lifetime and is collectible
+PASS cancelled native export unlinks source lifetime and is collectible
+RESULT: 36 passed, 0 failed
+SAFETY queued WPF startup consumed; desktop starts=0, application windows=0, ordinary settings unopened
+PASS 10,000 items only create visible containers
+PASS scroll recycles containers
+PASS empty directory clears containers
+PASS new listing after an empty directory
+PASS resize limits realized containers
+PASS negative scroll is clamped
+PASS MVVM late navigation cannot replace the current path or listing
+PASS MVVM failed navigation preserves path, listing and selection
+PASS MVVM POSIX selection keeps uppercase and lowercase identities distinct
+PASS MVVM failed history traversal does not advance the history cursor
+PASS MVVM successful history traversal restores the original selection and scroll position
+PASS MVVM navigation from history prunes the abandoned forward branch
+PASS MVVM refresh drops selections whose objects disappeared
+PASS MVVM file filtering hides dotfiles and sorts numeric names naturally
+PASS MVVM closed navigation ignores in-flight replies
+PASS MVVM home never calls an unchecked profile unavailable
+PASS MVVM real WPF two-way search binding drives profile filtering
+PASS MVVM property notifications update a real WPF bound status element
+PASS MVVM monitoring preserves exact process identity and does not invent missing I/O
+PASS MVVM repeated process snapshots preserve collection, row identity and selection without table reset
+PASS MVVM changed process measurements update existing selected row without replacing the collection
+PASS MVVM process selection rejects a reused PID with a new start time
+PASS MVVM process search filters the snapshot without changing server metrics
+PASS MVVM monitor failure marks existing measurements stale and keeps their values
+PASS real file view renders with inherited row states and bounded containers: Details
+PASS real file view renders with inherited row states and bounded containers: Huge
+PASS real file view renders with inherited row states and bounded containers: Large
+PASS real file view renders with inherited row states and bounded containers: Medium
+PASS real file view renders with inherited row states and bounded containers: Small
+PASS real file view renders with inherited row states and bounded containers: List
+PASS real file view renders with inherited row states and bounded containers: Tile
+PASS real file view renders with inherited row states and bounded containers: Content
+PASS selected real DataGrid row has no per-cell focus/selection rectangles
+PASS real keyboard focus draws one whole-row cue
+PASS nonempty and empty operation messages do not shift table headers
+PASS nested tree headers keep full selection width and current folder independent of table focus
+RESULT: 6 WPF layout/virtualization + 18 MVVM state/binding + 12 UI component checks passed
+SAFETY queued WPF startup consumed; desktop starts=0, application windows=0, ordinary settings unopened
+PASS actual application Fluent styles and parity tokens: Light
+PASS actual application Fluent styles and parity tokens: Dark
+PASS actual application Fluent styles and parity tokens: System
+PASS bundled native Fluent High Contrast resource dictionary loads
+PASS inherited Fluent cell visuals are replaced while whole-row keyboard focus remains defined
+PASS empty message collapses and nonempty status remains available
+PASS filled vector categories preserve special/link identity and preview refusal
+PASS flyout placement and explicit command icons do not depend on translated labels
+PASS MVVM late navigation cannot replace the current path or listing
+PASS MVVM failed navigation preserves path, listing and selection
+PASS MVVM POSIX selection keeps uppercase and lowercase identities distinct
+PASS MVVM failed history traversal does not advance the history cursor
+PASS MVVM successful history traversal restores the original selection and scroll position
+PASS MVVM navigation from history prunes the abandoned forward branch
+PASS MVVM refresh drops selections whose objects disappeared
+PASS MVVM file filtering hides dotfiles and sorts numeric names naturally
+PASS MVVM closed navigation ignores in-flight replies
+PASS MVVM home never calls an unchecked profile unavailable
+PASS MVVM real WPF two-way search binding drives profile filtering
+PASS MVVM property notifications update a real WPF bound status element
+PASS MVVM monitoring preserves exact process identity and does not invent missing I/O
+PASS MVVM repeated process snapshots preserve collection, row identity and selection without table reset
+PASS MVVM changed process measurements update existing selected row without replacing the collection
+PASS MVVM process selection rejects a reused PID with a new start time
+PASS MVVM process search filters the snapshot without changing server metrics
+PASS MVVM monitor failure marks existing measurements stale and keeps their values
+RESULT: 8 resource/contract + 18 MVVM checks passed; no Windows were created; layout, focus and live UI are separate
+SAFETY queued WPF startup consumed; desktop starts=0, application windows=0, ordinary settings unopened
+PASS real motion resources use project durations 83/167/250 ms
+PASS hover attaches one real opacity clock with the final base value already set
+PASS real WPF hover clock reaches an intermediate opacity without a Window
+PASS opposite hover replaces the old clock and retargets from its current value
+PASS rapid hover reversal does not accumulate clocks
+PASS hover finishes at its latest requested value without retained clocks
+PASS 64 repeated section transitions retain only the current opacity/translation clocks
+PASS real section clocks advance opacity and small presentation translation
+PASS motion preserves command object, focusability, hit-test flags and layout transform; no real keyboard input is claimed
+PASS disabling motion during a section transition snaps final values and removes clocks
+PASS disabled hover applies its final state immediately
+PASS disabled section transition has no residual opacity, transform or command delay
+PASS Unloaded cancels a real transition and restores its final presentation state
+PASS theme change during an active hover transition snaps and clears clocks
+PASS flyout presentation clock can be tested without opening a Popup
+PASS flyout Closed cleanup removes its clock without opening a Window or Popup
+PASS headless motion test created no Window
+RESULT: 17 real clock/contract assertions passed; no Windows or Popups opened; live motion/focus/HC remain separate
+SAFETY queued WPF startup consumed; desktop starts=0, application windows=0, ordinary settings unopened
+PASS duplicate profile command is rejected before credentials/trust can queue
+PASS explicit independent connection owns a separate operation and cancellation
+PASS cancelling one operation leaves the independent attempt alive
+PASS completed attempt releases its registry slot for a retry
+PASS owner shutdown cancels all remaining operations
+PASS operation, fatal and termination records are durable before returning
+PASS diagnostics retain exception type and method stack while excluding message, inner message and Data secrets
+PASS safe diagnostic records identify build, runtime environment and process
+PASS credential record string cannot expose its secret
+PASS unchanged transfer refresh preserves row identity without collection reset or property churn
+PASS transfer completion updates displayed properties on the existing row
+PASS transfer pruning and additions preserve surviving rows and selection identity
+PASS connection and diagnostics checks create no Window
+RESULT: 13 headless operation/diagnostics/transfer checks passed
+PASS queued startup is consumed with zero desktop starts, no windows and unchanged isolated store identity
+SAFETY startupCallbackObserved=true; desktopStartupCount=0; startupWindows=0; startupStoreIdentityUnchanged=true
+PASS offline DNS and Cyrillic display name save without network access
+PASS valid host accepted: 127.0.0.1
+PASS valid host accepted: 2001:db8::1
+PASS valid host accepted: [2001:db8::1]
+PASS valid host accepted: localhost
+PASS valid host accepted: пример.рф
+PASS invalid host stays inline: empty
+PASS invalid host stays inline: https://example.com
+PASS invalid host stays inline: host:22
+PASS invalid host stays inline: 999.1.1.1
+PASS invalid host stays inline: [broken
+PASS invalid host stays inline: name/path
+PASS invalid host stays inline: bad host
+PASS empty name stays inline
+PASS empty username stays inline
+PASS invalid port is rejected without clamp: 0
+PASS invalid port is rejected without clamp: 65536
+PASS invalid port is rejected without clamp: abc
+PASS invalid port is rejected without clamp: -1
+PASS invalid port is rejected without clamp: 999999999999
+PASS invalid timeout is rejected without clamp: 2
+PASS invalid timeout is rejected without clamp: 121
+PASS invalid timeout is rejected without clamp: -1
+PASS invalid timeout is rejected without clamp: abc
+PASS invalid timeout is rejected without clamp: 999999999999
+PASS relative initial path is rejected inline
+PASS missing key file is rejected without connecting
+PASS existing key path with empty passphrase can be saved offline
+PASS password-save opt-in requires a password
+PASS explicit password-save opt-in accepts entered secret
+PASS transaction commits one in-memory profile
+PASS profile and DPAPI secret survive restart
+PASS settings, backup and encrypted files never contain plaintext secret
+PASS real Windows sharing violation rejects atomic settings commit
+PASS failed edit preserves existing in-memory profile and original secret
+PASS failed settings replacement leaves exact original JSON bytes
+PASS failed settings commit removes only its staged encrypted secret
+PASS failed profile deletion preserves in-memory and persisted profile
+PASS disabling secret persistence removes the saved encrypted secret
+PASS edit preserves stable profile ID after restart
+PASS successful deletion survives restart
+PASS legacy profile-ID DPAPI file remains readable
+PASS legacy profile migrates to transactional secret reference
+PASS real settings write error is reported inline
+PASS failed save retains all input and creates no partial profile
+PASS same form input saves successfully after storage is repaired
+PASS real denied secret-file write creates no partial profile
+PASS secret storage failure preserves input and re-enables save
+PASS rapid double-save performs exactly one persistence operation
+PASS original save completes after duplicate click is ignored
+PASS actual masked control preserves Unicode, quotes and surrounding whitespace
+PASS reveal preserves exact value without editing or network work
+PASS editing revealed control synchronizes exact secret back to masked control
+PASS clearing secret control clears both presentations
+PASS new profile has explicit connect default and separate Save action without showing a window
+PASS save-and-connect returns the exact in-memory credential
+PASS without opt-in save-and-connect writes no secret file
+PASS profile submission diagnostic text contains no secret
+PASS new opted-in profile defers secret persistence until authenticated
+PASS successful authentication commits exact DPAPI secret transactionally
+PASS existing saved secret is available without manual re-entry
+PASS unverified replacement credentials never overwrite a good saved secret
+PASS failed post-auth settings commit preserves old good secret
+PASS post-auth failure removes its unreferenced secret file
+PASS separate Save with blank field preserves existing protected secret
+PASS late authenticated result cannot update a changed authentication identity
+PASS late success cannot recreate a deleted profile
+PASS separate Save has no connection side effect or credential result
+PASS untouched password field requests normal credential prompt instead of invented empty password
+PASS removed saved-secret file is an inline recoverable error instead of an async handler crash
+PASS same form recovers by entering a replacement secret after missing-file error
+PASS explicit empty key passphrase remains an in-memory credential distinct from missing secret
+PASS empty authenticated passphrase survives DPAPI restart without becoming null
+PASS schema1 beta.1 fixture clone retains profile ID and settings
+PASS schema1 cloned DPAPI secret and trusted key remain readable
+PASS beta.2 save and restart keep cloned protected secret reference
+PASS clone compatibility checks never alter original isolated beta.1 fixture bytes
+PASS pre-cancelled credentials and interactive prompts return without opening windows
+PASS pre-cancelled trust and profile prompts create no stale windows
+PASS delayed secret load cannot overwrite manually edited actual profile control (unshown component)
+PASS late password load is discarded after authentication method changes (unshown component)
+PASS advanced connection fields start collapsed
+PASS private-key block occupies no layout in password mode
+PASS dialog exposes correct Enter and Escape default actions
+PASS actual Dialogs.Profile opens, atomically saves and ignores double click
+PASS actual modal save persists offline profile after restart
+PASS cancel button leaves profiles unchanged
+PASS window close leaves profiles unchanged and dialog can reopen
+PASS actual modal validation preserves input without closing
+PASS same modal dialog saves corrected port without reopening
+PASS actual modal persistence failure retains input without a partial profile
+PASS modal remains usable and saves after write failure is repaired
+PASS actual edit modal updates the existing profile without duplication
+PASS full MainWindow AddProfile refreshes server list, iteration 1
+PASS full MainWindow AddProfile refreshes server list, iteration 2
+PASS full MainWindow AddProfile persistence survives restart with current selection
+WINDOW_SNAPSHOT {"stage":"before-main-close","selectedId":64088378,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true},{"type":"MainWindow","titleKind":"main-window","id":64088378,"requester":false,"selected":true,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+WINDOW_SNAPSHOT {"stage":"after-main-close","selectedId":64088378,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+WINDOW_SNAPSHOT {"stage":"before-credentials","selectedId":null,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+WINDOW_SNAPSHOT {"stage":"observed-credentials","selectedId":43495227,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true},{"type":"Window","titleKind":"credentials","id":43495227,"requester":false,"selected":true,"ownerIsRequester":true,"ownerType":"Window","ownerId":38451243,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+PASS visible credentials prompt is owned by its requesting window
+PASS worker cancellation closes actual credentials modal without accepting stale input
+PASS cancelled credentials leaves no visible prompt
+WINDOW_SNAPSHOT {"stage":"before-interactive","selectedId":null,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+WINDOW_SNAPSHOT {"stage":"observed-interactive","selectedId":52064796,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true},{"type":"Window","titleKind":"interactive","id":52064796,"requester":false,"selected":true,"ownerIsRequester":true,"ownerType":"Window","ownerId":38451243,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+PASS visible interactive prompt is owned by its requesting window
+PASS worker cancellation closes actual interactive modal without accepting stale input
+PASS cancelled interactive leaves no visible prompt
+WINDOW_SNAPSHOT {"stage":"before-trust","selectedId":null,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+WINDOW_SNAPSHOT {"stage":"observed-trust","selectedId":15326098,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true},{"type":"Window","titleKind":"trust","id":15326098,"requester":false,"selected":true,"ownerIsRequester":true,"ownerType":"Window","ownerId":38451243,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+PASS visible trust prompt is owned by its requesting window
+PASS worker cancellation closes actual trust modal without accepting stale input
+PASS cancelled trust leaves no visible prompt
+WINDOW_SNAPSHOT {"stage":"before-profile","selectedId":null,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+WINDOW_SNAPSHOT {"stage":"observed-profile","selectedId":1536226,"windows":[{"type":"Window","titleKind":"fixture-owner","id":38451243,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true},{"type":"ProfileDialog","titleKind":"add-profile","id":1536226,"requester":false,"selected":true,"ownerIsRequester":true,"ownerType":"Window","ownerId":38451243,"IsVisible":true,"IsLoaded":true,"state":"Normal","hasHwnd":true}]}
+PASS visible profile prompt is owned by its requesting window
+PASS worker cancellation closes actual profile modal without accepting stale input
+PASS cancelled profile leaves no visible prompt
+PASS closing requesting window cancels its actual credentials modal
+RESULT: 110 profile validation, persistence and STA dialog checks passed
+PASS negative/unknown size is rejected before unsigned FILEDESCRIPTOR conversion
+PASS native QI negotiates IDataObjectAsyncCapability
+PASS native descriptor group has entries
+DESCRIPTOR_COUNT 1
+PASS descriptor target contained in dedicated directory
+PASS native out-of-process IDataObject -> FILEDESCRIPTORW -> indexed IStream -> EndOperation
+PASS ABI-only native EndOperation completes zero-byte job
+PASS ABI-only native stream produced zero-byte test file
+PASS isolated ABI-only probe: synthetic zero-byte file, no SSH or live Explorer claimed

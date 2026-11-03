@@ -1,0 +1,37 @@
+{
+  "Utc": "2026-11-03T14:07:48.2575259Z",
+  "Commit": "4895d45687e662fa4586f5eb7642127b299ac199",
+  "Version": "0.2.0-beta.2",
+  "Binaries": [
+    {
+      "File": "SSHExplorer.exe",
+      "FileVersion": "0.2.0.2",
+      "ProductVersion": "0.2.0-beta.2+4895d45687e662fa4586f5eb7642127b299ac199",
+      "Sha256": "b6ae60c6cd3281ba2ab2ca320f022f450637ec10a95e293b3c3e5f401d43639a"
+    },
+    {
+      "File": "SSHExplorer.dll",
+      "FileVersion": "0.2.0.2",
+      "ProductVersion": "0.2.0-beta.2+4895d45687e662fa4586f5eb7642127b299ac199",
+      "Sha256": "12c4b3c54059b69746ab2e70d7abb359a7232a5ee27fa1532884442c250b4a60"
+    },
+    {
+      "File": "SSHExplorer.Core.dll",
+      "FileVersion": "0.2.0.2",
+      "ProductVersion": "0.2.0-beta.2+4895d45687e662fa4586f5eb7642127b299ac199",
+      "Sha256": "7754de922d45b79fc1bdf29040ac65f873218da2c3b6218ed4d4fcd25b0def1d"
+    },
+    {
+      "File": "SSHExplorer.Monitoring.dll",
+      "FileVersion": "0.2.0.2",
+      "ProductVersion": "0.2.0-beta.2+4895d45687e662fa4586f5eb7642127b299ac199",
+      "Sha256": "94ffe425c7618e61bbf49d35bfdb94426ebb53c608d351c39f4d569ea2e6ee45"
+    }
+  ],
+  "Scope": "Live authorized desktop; exact downloaded successful CI portable bundle; harness login for display only",
+  "Sequence": "double-click empty-folder; click Back (becomes disabled at root); Alt+Right",
+  "Result": "PASS: history moves forward and no whole-address-host focus rectangle appears",
+  "Screenshot": "docs/screenshots/beta2/nav-focus-fixed-ci-4895d45.png",
+  "ScreenshotSHA256": "b8ff437231a7c239ce138ec7e363a07ee77e14963632caf2379f517deb2471c9",
+  "OrdinaryPasswordLoginTested": false
+}

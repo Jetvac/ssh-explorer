@@ -1,0 +1,12 @@
+PASS queued startup is consumed with zero desktop starts, no windows and unchanged isolated store identity
+SAFETY startupCallbackObserved=true; desktopStartupCount=0; startupWindows=0; startupStoreIdentityUnchanged=true
+PASS ordinary Trust dialog displays independently generated fixture fingerprint
+PASS ordinary Save-and-connect defers opted-in secret before authentication
+PASS ordinary MainWindow Add button reaches actual profile and Trust controls without credential or trust overrides
+PASS ordinary control route authenticates exact Unicode whitespace password
+PASS ordinary successful connection persists opted-in secret for restart
+PASS ordinary Trust button persists exact fixture host key
+WINDOW_SNAPSHOT {"stage":"before-main-close","selectedId":5808453,"windows":[{"type":"Window","titleKind":"fixture-owner","id":58483006,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true},{"type":"MainWindow","titleKind":"main-window","id":5808453,"requester":false,"selected":true,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+WINDOW_SNAPSHOT {"stage":"after-main-close","selectedId":5808453,"windows":[{"type":"Window","titleKind":"fixture-owner","id":58483006,"requester":true,"selected":false,"ownerIsRequester":false,"ownerType":null,"ownerId":null,"IsVisible":true,"IsLoaded":true,"state":"Minimized","hasHwnd":true}]}
+PASS fresh test process reuses saved credential through ordinary Connect control without prompting
+RESULT: 8 profile validation, persistence and STA dialog checks passed

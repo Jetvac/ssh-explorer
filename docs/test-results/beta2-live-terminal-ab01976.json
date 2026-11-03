@@ -1,0 +1,15 @@
+{
+  "Utc": "2026-11-03T14:02:13.3912456Z",
+  "Commit": "ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d",
+  "Scope": "Actual downloaded CI portable EXE, real OpenSSH/PTY and bundled WebView2 on authorized desktop; explicit TestSessionHarness credentials and expected fingerprint, not ordinary login",
+  "Probe": {
+    "EngineVersion": "156.0.4314.58",
+    "BundledEngine": true,
+    "Columns": 115,
+    "Rows": 34,
+    "RealOutput": true,
+    "Utf8": true,
+    "AnsiRed": true
+  },
+  "Screenshot": "docs/screenshots/beta2/real-linux-terminal-utf8-ansi-ci-ab01976.png"
+}

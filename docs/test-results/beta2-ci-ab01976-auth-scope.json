@@ -1,0 +1,10 @@
+{
+  "utc": "2026-11-03T13:44:04.1296321Z",
+  "commit": "ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d",
+  "completed": true,
+  "guiMode": "CI STA component + real network + fresh test process",
+  "liveKeyboard": "NOT RUN",
+  "publishedExe": "NOT RUN",
+  "fixtureSecrets": "ignored .tools only; not uploaded",
+  "requirementsSha256": "7d046e841ebcf13e234a8c21d8b1de73c5a1aff6396f8d64baa53ed6fdb5fd64"
+}

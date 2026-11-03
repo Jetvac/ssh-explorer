@@ -1,0 +1,47 @@
+{
+  "runId": "41646603882",
+  "runUrl": "https://github.com/Jetvac/ssh-explorer/actions/runs/41646603882",
+  "commit": "ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d",
+  "conclusion": "success",
+  "completedUtc": "2026-11-03T13:44:24Z",
+  "scope": "CI build/components/STA/loopback network/packaged EXE startup",
+  "publishedReleaseZipTested": false,
+  "physicalKeyboardTested": false,
+  "cleanWindowsTested": false,
+  "source": "Downloaded Windows-regression-report artifact",
+  "componentsLogExtraction": "PASS / RESULT / SAFETY / fixed-allowlist WINDOW_SNAPSHOT / DESCRIPTOR_COUNT lines only; PowerShell transcript header excluded",
+  "files": [
+    {
+      "file": "beta2-ci-ab01976-components.log",
+      "sha256": "cbd3914c37ed3c281536bff278d86107324a70fb475c706bf7bfba48af1f6f81"
+    },
+    {
+      "file": "beta2-ci-ab01976-auth-component.log",
+      "sha256": "897394e044a0c26023af0798b7653280e1100c498072dca12bfeca348a34cf13"
+    },
+    {
+      "file": "beta2-ci-ab01976-auth-network.log",
+      "sha256": "446eb7da4e1ffaca96808eaf634bd909ad0bbd8a6865ffb12a0151029fc02702"
+    },
+    {
+      "file": "beta2-ci-ab01976-ordinary-sta.log",
+      "sha256": "21631a9225b6dd20190a2669b5a48ef4570192078291be3386a1a2e3f0d41def"
+    },
+    {
+      "file": "beta2-ci-ab01976-auth-scope.json",
+      "sha256": "0813c5b85540b63843c694a471b2ae27ca5f04640f762ce074a19da6b8f4e452"
+    },
+    {
+      "file": "beta2-ci-ab01976-portable-verification.json",
+      "sha256": "dd3ed240bdd586c04d555ff809af676cc54d39c8977f9bd3b1130dc4de34cf02"
+    },
+    {
+      "file": "beta2-ci-ab01976-portable-startup.json",
+      "sha256": "879a87bbaca75c8ab279793ff7309433e8757725e8162c43e4723101ec05e2ac"
+    },
+    {
+      "file": "beta2-ci-ab01976-portable-startup-diagnostics.jsonl",
+      "sha256": "a64feb035b669ae3d6e2145b0092efcc32222df92ff7cc9c81936d7ba81c77c1"
+    }
+  ]
+}

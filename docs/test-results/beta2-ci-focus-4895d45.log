@@ -1,0 +1,11 @@
+2026-11-03T14:02:12.9862870Z RESULT: 36 passed, 0 failed
+2026-11-03T14:02:15.1532877Z PASS real SessionView presentation hosts reject direct focus and are excluded from tab order
+2026-11-03T14:02:15.1533938Z PASS nonfocusable presentation wrappers preserve interactive buttons and path textbox tab stops
+2026-11-03T14:02:15.2245495Z PASS disabling the focused Back button cannot move keyboard focus onto an entire presentation row
+2026-11-03T14:02:15.2565807Z PASS path textbox still receives real focus inside the nonfocusable address host
+2026-11-03T14:02:15.3835093Z RESULT: 6 WPF layout/virtualization + 18 MVVM state/binding + 16 UI component checks passed
+2026-11-03T14:02:16.8190609Z RESULT: 8 resource/contract + 18 MVVM checks passed; no Windows were created; layout, focus and live UI are separate
+2026-11-03T14:02:18.1859085Z RESULT: 17 real clock/contract assertions passed; no Windows or Popups opened; live motion/focus/HC remain separate
+2026-11-03T14:02:19.2638031Z RESULT: 13 headless operation/diagnostics/transfer checks passed
+2026-11-03T14:02:26.5048899Z RESULT: 110 profile validation, persistence and STA dialog checks passed
+2026-11-03T14:03:32.2856699Z RESULT: 8 profile validation, persistence and STA dialog checks passed

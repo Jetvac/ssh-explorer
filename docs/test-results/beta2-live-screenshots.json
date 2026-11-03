@@ -1,0 +1,73 @@
+{
+  "Date": "2026-11-03",
+  "Authorization": "User allowed Computer Use for about 40 minutes from 13:41:53 UTC",
+  "Environment": "Windows 11 x64 build 26200; Light theme; tool capture 1320x850 for main window; physical DPI not measured",
+  "SourceCandidates": [
+    "ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d",
+    "4895d45687e662fa4586f5eb7642127b299ac199"
+  ],
+  "Connection": "Explicit TestSessionHarness with isolated settings, generated loopback fixture / pre-authorized OpenSSH fixture. Never presented as ordinary auth proof.",
+  "InputLimitation": "Owned Profile dialog typing lost focus and indexed fields were unavailable in the tool. No ordinary password login claimed.",
+  "Images": [
+    {
+      "File": "empty-folder-tree-current-ci-ab01976.png",
+      "Sha256": "3e11e7bdc61ff02124433a70754e36f1665501f2a402fe738918a91d2235d4cc"
+    },
+    {
+      "File": "files-content-ci-ab01976.png",
+      "Sha256": "a47c045196e503b7751f25ff426f3c6be947412fa98da05b3e111c437b0dee2c"
+    },
+    {
+      "File": "files-details-empty-selection-ci-ab01976.png",
+      "Sha256": "ab8f7efc56ab9bf986e36ea068ee140c70541cd22595c5acbf7639989eb8ce34"
+    },
+    {
+      "File": "files-huge-ci-ab01976.png",
+      "Sha256": "4022400b4867b0709ebcf7d3da86cc28c98f5943b9c89c841609b8a7704dc687"
+    },
+    {
+      "File": "files-list-ci-ab01976.png",
+      "Sha256": "9fd65bd01f96e76f4f4c6e56ba58f97c4d2a876d1dcb8900f3e6c76d9026403a"
+    },
+    {
+      "File": "files-selected-full-row-ci-ab01976.png",
+      "Sha256": "33ef49c1f2ec86b61e891815fdccbfbb423294943e3a3876dac0ed997952b930"
+    },
+    {
+      "File": "initial-folder-error-ci-ab01976.png",
+      "Sha256": "d8e227d9ff422168186271889769a25de95b3020a553f3aa4b4c3c6cea672259"
+    },
+    {
+      "File": "initial-folder-recovered-ci-ab01976.png",
+      "Sha256": "95b02539e66825c312100043452840b2f35b7b2d448ebc981c60c8a8ed01dde2"
+    },
+    {
+      "File": "linux-monitor-live-ci-ab01976.png",
+      "Sha256": "a63358c508f13714dea34e9b10f3ab89eb78b6bfb39b233b3822fd7bd3903d7f"
+    },
+    {
+      "File": "linux-monitor-selection-stable-ci-ab01976.png",
+      "Sha256": "6d01c0e733b6638e2bfe4666064dd9cff66a967809c4d13c5fa2a55215ad07de"
+    },
+    {
+      "File": "nav-focus-defect-before-ci-ab01976.png",
+      "Sha256": "b1a13cc5c11aabb1b00845986134cf360b17267ac82a138b731fa886bc3ee590"
+    },
+    {
+      "File": "nav-focus-fixed-ci-4895d45.png",
+      "Sha256": "b8ff437231a7c239ce138ec7e363a07ee77e14963632caf2379f517deb2471c9"
+    },
+    {
+      "File": "real-linux-terminal-utf8-ansi-ci-ab01976.png",
+      "Sha256": "099c458a6e6fcd00e5e8d1cd0e81bd58a6c40072b7fd5a50a886c9d34919960a"
+    },
+    {
+      "File": "terminal-loaded-ci-ab01976.png",
+      "Sha256": "efea9a446bc3ee061d3e14c3a8ce8e50a3ba111365360f6ff6cf4751c380026b"
+    },
+    {
+      "File": "view-menu-anchored-ci-ab01976.png",
+      "Sha256": "8e46b222d427361f4a5baf4da71a5032fb856b79801de5a8f6897b59f2e36ba6"
+    }
+  ]
+}

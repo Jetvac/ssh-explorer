@@ -1,0 +1,5 @@
+{"utc":"2026-11-03T13:44:06.0000000+00:00","build":"0.2.0-beta.2+ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d","process":4568,"stage":"app.started","outcome":"event","hasException":false}
+{"utc":"2026-11-03T13:44:06.0000000+00:00","build":"0.2.0-beta.2+ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d","process":4568,"stage":"app.close.requested","outcome":"event","hasException":false}
+{"utc":"2026-11-03T13:44:06.0000000+00:00","build":"0.2.0-beta.2+ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d","process":4568,"stage":"app.close.completed","outcome":"event","hasException":false}
+{"utc":"2026-11-03T13:44:06.0000000+00:00","build":"0.2.0-beta.2+ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d","process":4568,"stage":"app.exit","outcome":"0","hasException":false}
+{"utc":"2026-11-03T13:44:06.0000000+00:00","build":"0.2.0-beta.2+ab019761db7cb2d0ae401dcebb1c3ca2ec9cb34d","process":4568,"stage":"process.exit","outcome":"observed","hasException":false}
