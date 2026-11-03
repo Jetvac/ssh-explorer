@@ -325,10 +325,18 @@ public sealed partial class MainWindow : Window
     void OnKey(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape) CancelDragFeedback();
-        if (Keyboard.Modifiers == (ModifierKeys.Control|ModifierKeys.Shift) && e.Key==Key.A && !IsInputEditing(Keyboard.FocusedElement as DependencyObject)) { e.Handled=true;Ui.OpenFlyout(allTabsButton!,CreateTabListMenu());return; }
-        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && e.Key == Key.Tab) { e.Handled = true; var delta = (Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? -1 : 1; tabs.SelectedIndex = (tabs.SelectedIndex + delta + tabs.Items.Count) % tabs.Items.Count; }
-        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && e.Key == Key.F4 && tabs.SelectedItem is TabItem tab && tab != home) { e.Handled = true; _ = Ui.Guard(() => CloseTab(tab)); }
+        if(TryHandleTabShortcut(e.Key,Keyboard.Modifiers,e.OriginalSource as DependencyObject,Keyboard.FocusedElement as DependencyObject)){e.Handled=true;return;}
         if (!e.Handled && tabs.SelectedItem is TabItem current && sessions.TryGetValue(current, out var session)) session.RouteFileKey(e);
+    }
+    internal bool TryHandleTabShortcut(Key key,ModifierKeys modifiers,DependencyObject? source,DependencyObject? focused)
+    {
+        // Editors and the terminal own their keystrokes. OriginalSource also
+        // covers routed input when WPF has no current keyboard focus element.
+        if(IsInputEditing(source)||IsInputEditing(focused))return false;
+        if (modifiers == (ModifierKeys.Control|ModifierKeys.Shift) && key==Key.A) { Ui.OpenFlyout(allTabsButton!,CreateTabListMenu());return true; }
+        if ((modifiers & ModifierKeys.Control) != 0 && key == Key.Tab) { var delta = (modifiers & ModifierKeys.Shift) != 0 ? -1 : 1; tabs.SelectedIndex = (tabs.SelectedIndex + delta + tabs.Items.Count) % tabs.Items.Count;return true; }
+        if ((modifiers & ModifierKeys.Control) != 0 && key == Key.F4 && tabs.SelectedItem is TabItem tab && tab != home) { _ = Ui.Guard(() => CloseTab(tab));return true; }
+        return false;
     }
     static bool IsInputEditing(DependencyObject? element)
     {
