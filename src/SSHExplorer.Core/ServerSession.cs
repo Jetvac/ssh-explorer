@@ -209,8 +209,13 @@ public sealed partial class ServerSession : IAsyncDisposable
         catch (Exception caught)
         {
             Exception error = context.Error ?? caught;
-            if (timeout.IsCancellationRequested && !caller.IsCancellationRequested && !Lifetime.IsCancellationRequested)
+            if (error is not SshOperationTimeoutException && timeout.IsCancellationRequested && !caller.IsCancellationRequested && !Lifetime.IsCancellationRequested)
                 error = new TimeoutException("Истекло время ожидания подключения или авторизации.", error);
+            // SSH.NET's kernel wait can time out before the CTS timer callback runs.
+            // Disposing a CTS does not cancel it: revoke prompts on every failed handshake,
+            // while retaining the failure chosen before cancellation can unwind callbacks.
+            try { await linked.CancelAsync().ConfigureAwait(false); }
+            catch (AggregateException) { /* Caller cancellation registrations cannot replace the primary handshake failure. */ }
             if (client is not null)
             {
                 // SFTP OnConnected can fail after SSH authentication has already succeeded.

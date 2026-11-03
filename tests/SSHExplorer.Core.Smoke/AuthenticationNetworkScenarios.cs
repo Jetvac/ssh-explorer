@@ -192,10 +192,21 @@ internal static class AuthenticationNetworkScenarios
             {
                 var observedCancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var timer = Stopwatch.StartNew();
-                await ThrowsAsync<TimeoutException>(() => session.ConnectAsync(new(secret, CancellablePrompt: async (_, ct) =>
-                { try { await Task.Delay(Timeout.Infinite, ct); return null; } finally { if (ct.IsCancellationRequested) observedCancellation.TrySetResult(); } }), Trust));
+                int pendingCallbacks=0;Exception? timeoutFailure=null;
+                try
+                {
+                    await session.ConnectAsync(new(secret,CancellablePrompt:async(_,ct)=>
+                    {
+                        Interlocked.Increment(ref pendingCallbacks);
+                        try { await Task.Delay(Timeout.Infinite,ct);return null; }
+                        finally { Interlocked.Decrement(ref pendingCallbacks);if(ct.IsCancellationRequested)observedCancellation.TrySetResult(); }
+                    }),Trust);
+                }
+                catch(Exception error)when(error.GetType()==typeof(TimeoutException)||error.GetType()==typeof(SshOperationTimeoutException)) { timeoutFailure=error; }
+                if(timeoutFailure is null)throw new Exception("Expected a bounded authentication timeout.");
                 await observedCancellation.Task.WaitAsync(TimeSpan.FromSeconds(2));
-                Check(timer.Elapsed < TimeSpan.FromSeconds(7), "transport authentication timeout cancels pending OTP callback and returns bounded timeout");
+                Check(Volatile.Read(ref pendingCallbacks)==0&&timer.Elapsed < TimeSpan.FromSeconds(7), "transport authentication timeout cancels pending OTP callback and returns bounded timeout");
+                Console.WriteLine("INFO expected authentication timeout type: "+timeoutFailure.GetType().Name+"; active callbacks: "+Volatile.Read(ref pendingCallbacks));
             }
             foreach (var mode in new[] { "sftp-denied", "exec-denied", "both-denied" })
             {
