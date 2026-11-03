@@ -11,7 +11,7 @@
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
       <Grid>
         <Border x:Name="FieldChrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource ControlRadius}"/>
-        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+        <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
         <Border x:Name="FocusUnderline" Height="2" Margin="1,0,1,0" VerticalAlignment="Bottom" CornerRadius="0,0,3,3" Background="{DynamicResource Accent}" Visibility="Collapsed" IsHitTestVisible="False"/>
       </Grid>
       <ControlTemplate.Triggers>
@@ -31,7 +31,7 @@
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="PasswordBox">
       <Grid>
         <Border x:Name="FieldChrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource ControlRadius}"/>
-        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+        <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
         <Border x:Name="FocusUnderline" Height="2" Margin="1,0,1,0" VerticalAlignment="Bottom" CornerRadius="0,0,3,3" Background="{DynamicResource Accent}" Visibility="Collapsed" IsHitTestVisible="False"/>
       </Grid>
       <ControlTemplate.Triggers>
@@ -74,7 +74,7 @@
         </ToggleButton>
         <ContentPresenter x:Name="SelectionPresenter" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,6,36,6" IsHitTestVisible="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
         <TextBox x:Name="PART_EditableTextBox" Visibility="Collapsed" Margin="1,1,34,1" IsReadOnly="{TemplateBinding IsReadOnly}" Background="Transparent" Foreground="{TemplateBinding Foreground}" CaretBrush="{DynamicResource Ink}" VerticalContentAlignment="Center" Padding="9,5">
-          <TextBox.Style><Style TargetType="TextBox"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox"><ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/></ControlTemplate></Setter.Value></Setter></Style></TextBox.Style>
+          <TextBox.Style><Style TargetType="TextBox"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox"><ScrollViewer x:Name="PART_ContentHost" Margin="0"/></ControlTemplate></Setter.Value></Setter></Style></TextBox.Style>
         </TextBox>
         <Path x:Name="DropDownChevron" Data="M0,0 L4,4 8,0" Width="8" Height="4" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,13,0" IsHitTestVisible="False"/>
         <Border x:Name="FocusUnderline" Height="2" Margin="1,0,1,0" VerticalAlignment="Bottom" CornerRadius="0,0,3,3" Background="{DynamicResource Accent}" Visibility="Collapsed" IsHitTestVisible="False"/>
