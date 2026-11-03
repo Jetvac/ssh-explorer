@@ -34,6 +34,7 @@ jobs:
           & .tools/auth-ci-python/Scripts/python.exe -m pip install -r scripts/testing/requirements-auth.txt
           if ($LASTEXITCODE -ne 0) { throw 'Pinned fixture dependency installation failed.' }
       - name: Build, run regression checks, package portable EXE
+        id: package
         shell: pwsh
         run: |
           ./scripts/Build-Release.ps1 -RequireClean
@@ -42,6 +43,7 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-AuthNetwork.ps1 -Python .tools/auth-ci-python/Scripts/python.exe -RunOrdinaryUi
       - name: Packaged EXE startup and graceful close in isolated settings
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         shell: pwsh
         run: |
           [xml]$properties = Get-Content -LiteralPath Directory.Build.props

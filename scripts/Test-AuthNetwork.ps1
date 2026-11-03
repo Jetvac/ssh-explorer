@@ -129,11 +129,11 @@ print(json.dumps({'python':platform.python_version(),'machine':platform.machine(
             if ($timer.Elapsed.TotalSeconds -gt 20) { throw 'Ordinary SSH fixture readiness timed out.' }
             Start-Sleep -Milliseconds 100
         }
-        $configuration = Get-Content -LiteralPath $configurationFile -Raw | ConvertFrom-Json
-        if ($configuration.Host -ne '127.0.0.1' -or $configuration.ExpectedHostFingerprint -notmatch '^SHA256:[A-Za-z0-9+/]{43}$') {
+        $fixtureConfiguration = Get-Content -LiteralPath $configurationFile -Raw | ConvertFrom-Json
+        if ($fixtureConfiguration.Host -ne '127.0.0.1' -or $fixtureConfiguration.ExpectedHostFingerprint -notmatch '^SHA256:[A-Za-z0-9+/]{43}$') {
             throw 'Ordinary fixture must be generated loopback with an independently recorded host fingerprint.'
         }
-        $redactions = @([IO.File]::ReadAllText($configuration.SecretFile),[IO.File]::ReadAllText($configuration.OtpFile))
+        $redactions = @([IO.File]::ReadAllText($fixtureConfiguration.SecretFile),[IO.File]::ReadAllText($fixtureConfiguration.OtpFile))
         # Launch its apphost: the fresh-process restart scenario uses Environment.ProcessPath.
         Invoke-OwnedProcess (Join-Path $profileOut 'SSHExplorer.ProfileTests.exe') @('--ordinary-only','--ordinary-fixture',$configurationFile) 'ordinary-sta-network' 120 $redactions
     }
