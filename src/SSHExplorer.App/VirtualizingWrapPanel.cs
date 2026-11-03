@@ -53,6 +53,19 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         return finalSize;
     }
     protected override void OnItemsChanged(object sender, ItemsChangedEventArgs args) { base.OnItemsChanged(sender, args); InvalidateMeasure(); }
+    protected override void BringIndexIntoView(int index)
+    {
+        var owner = ItemsControl.GetItemsOwner(this);
+        if (owner is null || index < 0 || index >= owner.Items.Count) return;
+        UpdateLayout(); // SetMode/refresh may have changed the column count and extent.
+        // ListBox.ScrollIntoView uses this path when the item has no container yet.
+        // Moving the viewport realizes only its row and the normal small buffer.
+        var top = index / Math.Max(1, columns) * ItemHeight;
+        if (top < offset) SetVerticalOffset(top);
+        else if (top + ItemHeight > offset + viewport.Height) SetVerticalOffset(top + ItemHeight - viewport.Height);
+        UpdateLayout();
+        if (owner.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container) container.BringIntoView();
+    }
     public bool CanHorizontallyScroll { get; set; }
     public bool CanVerticallyScroll { get; set; } = true;
     public double ExtentWidth => extent.Width;
