@@ -361,7 +361,7 @@ public sealed class MonitorView : UserControl, IDisposable
     }
     public void Dispose()
     {
-        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); resizeSettled.Stop(); pollCancellation?.Cancel(); lifetime.Cancel(); viewModel.IsActive = false;
+        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); pollCancellation?.Cancel(); lifetime.Cancel(); viewModel.IsActive = false;
         viewModel.PropertyChanged -= ModelChanged; viewModel.ProcessesUpdated -= ApplyProcesses; viewModel.Processes.CollectionChanged -= ProcessesChanged; Theme.Changed -= PaletteChanged;
         foreach (var window in ownedWindows.ToArray()) if (window.IsLoaded) window.Close(); ownedWindows.Clear(); lifetime.Dispose();
     }
