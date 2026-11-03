@@ -22,17 +22,31 @@ jobs:
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Prepare isolated SSH test fixture dependencies
+        shell: pwsh
+        run: |
+          python -m venv .tools/auth-ci-python
+          if ($LASTEXITCODE -ne 0) { throw 'Test Python environment creation failed.' }
+          & .tools/auth-ci-python/Scripts/python.exe -m pip install -r scripts/testing/requirements-auth.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned fixture dependency installation failed.' }
       - name: Build, run regression checks, package portable EXE
         shell: pwsh
         run: |
           ./scripts/Build-Release.ps1 -RequireClean
           ./scripts/Package-Source.ps1 -RequireClean
+      - name: Authentication network and ordinary WPF command route
+        shell: pwsh
+        run: ./scripts/Test-AuthNetwork.ps1 -Python .tools/auth-ci-python/Scripts/python.exe -RunOrdinaryUi
       - name: Record scope of CI checks
         if: always()
         shell: pwsh
         run: |
-          'CI exercises core regressions, WPF layout/state, profile STA dialogs and native COM ABI.' >> $env:GITHUB_STEP_SUMMARY
-          'Live Explorer mouse gestures, DPI, High Contrast and clean Windows acceptance are separate checks; see ACCEPTANCE.md.' >> $env:GITHUB_STEP_SUMMARY
+          'CI exercises core regressions, WPF layout/state, motion clocks, profile STA dialogs, ordinary Add/Trust/Connect controls with real loopback SSH/SFTP and a fresh test process, plus native COM ABI.' >> $env:GITHUB_STEP_SUMMARY
+          'STA control events are not physical keyboard input or a published EXE restart. Live Explorer gestures, DPI, High Contrast, motion recordings and clean Windows acceptance remain separate; see ACCEPTANCE.md.' >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -40,6 +54,8 @@ jobs:
           path: |
             artifacts/build-test.log
             artifacts/portable-verification.json
+            artifacts/auth-network/*.log
+            artifacts/auth-network/scope.json
           if-no-files-found: warn
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

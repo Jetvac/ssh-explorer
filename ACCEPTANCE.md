@@ -1,4 +1,32 @@
-# SSH Explorer — приёмка 0.2.0-beta.1
+# SSH Explorer — приёмка 0.2.0-beta.2
+
+03.11.2026. База — `v0.2.0-beta.1` / `eda137a734e8fc259eb97fca300b2072d11232a8`. **P0 парольного crash открыт.** Новая beta — промежуточный выпуск, не пользовательское принятие. Действует «Продолжайте код и CI, окна позже».
+
+## Beta.2: фактические уровни доказательства
+
+| Сценарий | Статус | Доказательство и предел |
+|---|---|---|
+| Повторный парольный crash актуального EXE | **BLOCKED** | Живое воспроизведение отложено пользователем. После Connect, до Trust. [Отдельное расследование](docs/PROFILE_CRASH.md); неизвестная причина не объявлена исправленной |
+| Два последних Windows Application Error | **PASS** | Версия в событиях 0.1.0.0, `0xC00000FD`; [метаданные](docs/test-results/beta2-os-crash-provenance.json). Это происхождение событий, не диагноз beta.1 |
+| Auth callbacks и transport lifecycle | **PASS** | 13 component + 26 loopback network assertions; password/key MFA, OTP cancel, reject trust, wrong→correct password, timeout, exec/SFTP/PTY/export. [AUTH_NETWORK](docs/AUTH_NETWORK.md) |
+| Linux OpenSSH и существующие операции | **PASS** | 5 auth assertions (password, encrypted Ed25519, auxiliary channels); 54 существующих assertions = 36 component + 18 Linux integration. [Лог](docs/test-results/beta2-core-linux-regression.log). Нет установки компонентов на сервер |
+| Пароль, RAM handoff, atomic DPAPI, opt-out/stale results | **PASS** | 85 headless component assertions, включая реальные DPAPI и отказы хранения; [лог](docs/test-results/beta2-profiles-headless.log). Непоказанные контролы не равны живому вводу |
+| Совместимость опубликованного Core beta.1 | **PASS** | 92 headless assertions = прежние 85 + 7 baseline. Старый Core создаёт isolated store, beta.2 изменяет копию, original bytes/DLL неизменны. [Отчёт](docs/PROFILE_FLOW_BETA2.md), [лог](docs/test-results/beta2-profiles-published-baseline.log) |
+| Add→PasswordBox→Trust→SFTP, fresh test process | **NOT RUN** до CI | Обычные команды без injected credentials/trust. STA control events + real network не равны физическому вводу или опубликованному EXE |
+| Modal cancellation и owner close | **NOT RUN** до CI | Реальные Credentials/Trust/Interactive/Profile диалоги; host окна запрещены |
+| Motion interruption/disable/unload/theme | **PASS** | [17 actual WPF clock assertions](docs/test-results/ui-beta2-motion.log), без Window/Popup. [Контракт](docs/MOTION_SPEC.md). OS toggle, HC и визуальное качество отдельно |
+| Стили, иконки, binding/state | **PASS** | 8 resource + 18 MVVM assertions; [лог](docs/test-results/ui-beta2-headless.log). Resource load не доказывает живой HC |
+| Layout, row/focus/tree, восемь видов | **NOT RUN** до CI | Подготовлены реальные WPF component tests; сопоставимые screenshots и все DPI открыты |
+| Dedup/cancel, durable private diagnostics, stable transfer rows | **PASS** | [13 headless assertions](docs/test-results/beta2-connection-headless.log) в совокупности; без сброса всего списка при update |
+| Native COM ABI новой сборки | **NOT RUN** до CI | Протокол сохранён, изменена очистка UI drop/hover. >2 ГБ прогон beta.1 остаётся историческим доказательством своего уровня |
+| Новый ZIP: версия, commit, внутренние хеши | **NOT RUN** до CI/публикации | Скачанный опубликованный ZIP подлежит статической проверке до финального отчёта. EXE на host не запускается |
+| Live password input, published EXE restart, screenshots, video | **BLOCKED** | Указание пользователя об окнах; компоненты не подменяют эти строки |
+| Explorer gestures, 100/125/150/200% DPI, HC, системное motion off | **BLOCKED** | Нет разрешённого desktop-прогона новой сборки; старые screenshots исторические |
+| Чистая Windows, offline terminal, multi-monitor | **NOT RUN** | Отдельная среда не предоставлена. CI runner не объявляется пользовательским desktop |
+
+Числа — assertions, не число пользовательских маршрутов. Логи host относятся к разработческим исходным состояниям (metadata отдельных проверок сохранены); финальный commit/версия дополнительно фиксируются clean CI, тегом, `build-info.json` и SHA-манифестом. CI результаты будут внесены после прогона.
+
+## История beta.1 — не результаты beta.2
 
 03.11.2026. Пользовательская 0.1.0 не принята. Разработка 0.2.0-beta.1 идёт в https://github.com/Jetvac/ssh-explorer, ветка `codex/windows11-hardening`. **Итерация и обязательная приёмка ещё открыты.** Публикация beta не означает пользовательского принятия.
 
@@ -7,7 +35,7 @@
 | Область | Доказательство | Фактический статус |
 |---|---|---|
 | Причина падения | DLL старой поставки SHA-256 `769acec50c113e5de5236f08400809ee9696078c7b50def68c496f1dc3c09a62`; exit `0xC00000FD`; [стек](docs/test-results/profile-crash-baseline.txt) | Рекурсия DataGrid.SelectionChanged → обработчик TabControl → RefreshHome. Исправление причины отправлено коммитом `62e85c4` |
-| Профили | [PROFILE_CRASH](docs/PROFILE_CRASH.md), 65 STA-сценариев, 34 регрессии ядра, 6 свежих SSH/SFTP-сценариев | Реальные WPF-форма и MainWindow Add→Save→выбор→restart прошли STA. Живой ввод в owned modal через инструмент не завершён: индексы дочернего окна недоступны, активация родителя теряет фокус |
+| Профили | [PROFILE_CRASH](docs/PROFILE_CRASH.md), 65 STA assertions, 34 регрессии ядра, 6 свежих SSH/SFTP-сценариев | Реальные WPF-форма и MainWindow Add→Save→выбор прошли STA; store перечитывался в том же тестовом процессе. Это не перезапуск опубликованного EXE. Живой ввод в owned modal через инструмент не завершён |
 | UI | [Матрица](docs/UI_PARITY.md), [светлая файловая область](docs/screenshots/v02/files-light.jpg), [native system menu](docs/screenshots/v02/native-system-menu.jpg) | Fullwidth navigation/commands, caption tabs, компактная форма. Живо: нативные maximize/restore, Alt+Space, Win+Arrow. Полный Snap-hover, resize, все экраны/темы/DPI не засчитаны |
 | Native Shell export | Новый FILEDESCRIPTORW/FILECONTENTS/IStream с async capability, отдельный out-of-process consumer, реальный SFTP и SHA | Native COM, отмена, source-close, потерянный target, Skip, zero-byte validation и сетевой путь проверены: [подробности](docs/DRAG_DROP.md). Малый файл фактически получен настоящим Explorer: [SHA/результат](docs/test-results/explorer-native-small.json). Инструмент двух межоконных жестов сообщал outside-window-bounds, поэтому вся матрица одного жеста этим не закрыта |
 | Живой DnD между серверами | [Результаты A↔B и same-session](docs/test-results/live-cross-session.json) | По одному обычному drag на заголовок другой вкладки в обоих направлениях: Completed, SHA совпали, исходники сохранены. Внутри сессии drag README в строку Target: источник исчез, назначение SHA совпало |

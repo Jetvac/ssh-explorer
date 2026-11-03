@@ -1,0 +1,59 @@
+{
+  "CollectedUtc": "2026-11-03T13:17:10.9021154Z",
+  "Scope": "Sanitized Windows Application Error metadata; no desktop app launched",
+  "Events": [
+    {
+      "Utc": "2026-11-03T12:34:52.0310151Z",
+      "AppVersion": "0.1.0.0",
+      "ModuleName": "unknown",
+      "ModuleVersion": "0.0.0.0",
+      "ExceptionCode": "c00000fd",
+      "Offset": "00007fff5a9d226d",
+      "ProcessId": "16864"
+    },
+    {
+      "Utc": "2026-11-03T12:34:16.2180542Z",
+      "AppVersion": "0.1.0.0",
+      "ModuleName": "coreclr.dll",
+      "ModuleVersion": "10.0.1426.52326",
+      "ExceptionCode": "c00000fd",
+      "Offset": "00000000000a2a20",
+      "ProcessId": "43912"
+    }
+  ],
+  "CurrentFilesAtEventLocations": [
+    {
+      "EventUtc": "2026-11-03T12:34:52.0310151Z",
+      "Location": "workspace legacy portable",
+      "File": "SSHExplorer.exe",
+      "FileVersion": "0.1.0.0",
+      "ProductVersion": "0.1.0",
+      "Sha256": "433CBB4167AD9BB72DE8374DA69CF156955716BD27C402EF858A46270444F935"
+    },
+    {
+      "EventUtc": "2026-11-03T12:34:52.0310151Z",
+      "Location": "workspace legacy portable",
+      "File": "SSHExplorer.dll",
+      "FileVersion": "0.1.0.0",
+      "ProductVersion": "0.1.0",
+      "Sha256": "769ACEC50C113E5DE5236F08400809EE9696078C7B50DEF68C496F1DC3C09A62"
+    },
+    {
+      "EventUtc": "2026-11-03T12:34:16.2180542Z",
+      "Location": "workspace legacy portable",
+      "File": "SSHExplorer.exe",
+      "FileVersion": "0.1.0.0",
+      "ProductVersion": "0.1.0",
+      "Sha256": "433CBB4167AD9BB72DE8374DA69CF156955716BD27C402EF858A46270444F935"
+    },
+    {
+      "EventUtc": "2026-11-03T12:34:16.2180542Z",
+      "Location": "workspace legacy portable",
+      "File": "SSHExplorer.dll",
+      "FileVersion": "0.1.0.0",
+      "ProductVersion": "0.1.0",
+      "Sha256": "769ACEC50C113E5DE5236F08400809EE9696078C7B50DEF68C496F1DC3C09A62"
+    }
+  ],
+  "Limitation": "Event records identify AppVersion 0.1.0.0. Hashes were measured from files at recorded locations during investigation, not from captured process memory. This does not establish the cause of an unobserved beta.1 password crash."
+}

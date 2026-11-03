@@ -40,12 +40,17 @@ if ($LASTEXITCODE -ne 0) { throw 'Dependency restore failed.' }
 & $sdk build SSHExplorer.sln -c Release --no-restore -m:1 -nr:false @buildProperties | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
 if (-not $SkipTests) {
+    if ($env:CI -ne 'true') { throw 'Window regression checks run only in CI. Use -SkipTests on the host after reviewing CI results.' }
     & $sdk run --project tests\SSHExplorer.Tests\SSHExplorer.Tests.csproj -c Release --no-build | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Risk regression tests failed.' }
     & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Windows virtualization tests failed.' }
     & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build -- --resources-only | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Theme resource tests failed.' }
+    foreach ($mode in @('--motion-only','--connection-only')) {
+        & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build -- $mode | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw "Headless UI contract checks failed: $mode" }
+    }
     foreach ($project in @('SSHExplorer.ProfileTests','SSHExplorer.NativeDrag.Tests')) {
         & $sdk restore "tests\$project\$project.csproj" --locked-mode --disable-parallel | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "$project restore failed." }

@@ -42,6 +42,23 @@
 
 Fixture `scripts/testing/auth_fixture.py` используется только тестами: слушает IPv4 loopback на случайных свободных портах, генерирует свежие host/client keys и секреты в ignored `.tools`, вычисляет fingerprint непосредственно из сгенерированного публичного ключа до подключения. В production приложение его не включает и Python не требует. SFTP fixture читает только свой ограниченный локальный каталог; реальные Linux-проверки используют отдельный известный fingerprint из разрешённого fixture config. Процесс fixture запускается с `CreateNoWindow` и завершается в `finally` runner.
 
+## CI-driver и Python dependencies
+
+[`requirements-auth.txt`](../scripts/testing/requirements-auth.txt) фиксирует проверенные версии Paramiko и зависимостей с SHA-256 Windows x64 wheels для CPython 3.13. Все восемь wheel hashes сверены с официальным PyPI release JSON; offline `pip download --require-hashes` с target `win_amd64/cp313` прошёл. Выполнение этих конкретных CPython 3.13 binaries на host не заявляется: локальные component/network проверки использовали Python 3.10 с теми же версиями пакетов. Настоящее исполнение CPython 3.13 принадлежит CI.
+
+[`Test-AuthNetwork.ps1`](../scripts/Test-AuthNetwork.ps1) по умолчанию собирает и выполняет только headless auth component/scripted network проверки. На host driver прошёл 13 + 26 assertions; создаваемые им console/fixture процессы завершились. Парсер PowerShell и отказ `-RunOrdinaryUi` на обычном host проверены отдельно. Switch `-RunOrdinaryUi` требует одновременно `GITHUB_ACTIONS=true`, `RUNNER_OS=Windows`, числовой `GITHUB_RUN_ID` и `CI=true` **до запуска дочернего процесса**. Только этот режим строит/запускает ProfileTests ordinary STA route. Он использует apphost `.exe` тестового runner, поскольку сценарий нового процесса использует `Environment.ProcessPath`.
+
+Driver пишет только test logs и scope metadata в `artifacts/auth-network`. Fixture config, host/client private keys, пароли и профильное хранилище остаются в ignored `.tools`; они не входят в каталог evidence. Запросы завершения относятся только к созданным driver процессам. Оконный режим driver на host не запускался и не засчитывается как пройденный.
+
+```powershell
+# CI после установки CPython 3.13 x64. Это test-only venv, не часть portable поставки.
+python -m venv .tools/auth-python
+.tools/auth-python/Scripts/python.exe -m pip install --require-hashes --only-binary=:all: -r scripts/testing/requirements-auth.txt
+./scripts/Test-AuthNetwork.ps1 -Python .tools/auth-python/Scripts/python.exe -RunOrdinaryUi
+# На host — только без switch окон; Python должен уже иметь закреплённые test dependencies.
+./scripts/Test-AuthNetwork.ps1 -Python C:/path/to/python.exe
+```
+
 ## Повторение разрешённых headless проверок
 
 ```powershell

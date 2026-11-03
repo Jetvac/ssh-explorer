@@ -1,5 +1,18 @@
 # История изменений
 
+## 0.2.0-beta.2 — 2026-11-03, открытый P0
+
+Повторный пользовательский crash актуальной поставки не воспроизведён и остаётся открытым. Последние доступные Windows crash events относятся к 0.1.0; это не доказывает исправность beta.1. Новое [расследование](docs/PROFILE_CRASH.md) отделено от старой рекурсии SelectionChanged.
+
+- «Сохранить и подключиться» передаёт точный пароль в памяти; opt-in DPAPI обновляется после успешного подключения. Недоступный секрет предлагает повторный ввод, прежняя корректная копия защищена от неудачной/устаревшей попытки.
+- Operation IDs, cancellation/timeout, защита повторных Connect, owner-bound Trust/Credentials/Interactive, сериализация дополнительных MFA-запросов. Раннее закрытие vendor SSH transport и отмена callback получили сетевые регрессии; OTP не заполняется сохранённым паролем.
+- Разделены transport/auth/exec/SFTP, построение UI, первая папка и терминал. Terminal/monitor создаются при открытии; ошибка папки предлагает Home/root. Unknown Dispatcher failures не подавляются безусловно, безопасные fatal/exit записи сбрасываются синхронно.
+- Явный шаблон DataGridCell убирает внутренние рамки; общие row selection/focus/drop состояния. Status message не сдвигает таблицу, дерево получает полноширинную строку и заполненные иконки, flyout привязан к источнику, glyphs заданы явно.
+- Общий [motion policy](docs/MOTION_SPEC.md): hover-подложка, flyout, рабочая поверхность; interruption заменяет clocks, disabled/HC устанавливают final state. Команды не ждут анимацию, HWND терминала не перемещается.
+- Мониторинг и передачи обновляют существующие строки без полного сброса коллекции. Drag/hover cleanup согласован с Esc, закрытием вкладки и завершением операции. Native virtual files протокол сохранён.
+- Headless, real-network и CI STA проверки обычных Add/Trust/Connect с новым тестовым процессом для saved-secret reuse. Это не физический ввод или запуск опубликованного EXE. Live UI, DPI/HC/Explorer/video и clean Windows остаются открыты: [приёмка](ACCEPTANCE.md).
+- Версионная portable-папка beta.2, clean source commit, включённые .NET/WebView2 и SHA-256. Python/Paramiko нужны только стенду разработки/CI, не пользователю приложения.
+
 ## 0.2.0-beta.1 — 2026-11-03
 
 Предварительная версия. Пользовательская приёмка **не закрыта**; обязательные открытые пункты перечислены в [ACCEPTANCE.md](ACCEPTANCE.md). Текущее сопоставление с референсами и статус реальных снимков — [UI_PARITY.md](docs/UI_PARITY.md). Выпуск и его загрузки публикуются на [GitHub Releases](https://github.com/Jetvac/ssh-explorer/releases).

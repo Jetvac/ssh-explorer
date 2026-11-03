@@ -208,9 +208,10 @@ for mode in ["password", "password-delay", "password-mfa", "key-mfa", "interacti
     threading.Thread(target=listen, args=(listener, mode), daemon=True).start()
 
 fingerprint = "SHA256:" + base64.b64encode(hashlib.sha256(hostkey.asbytes()).digest()).decode().rstrip("=")
-with open(os.path.join(root, "fixture.json"), "w", encoding="utf-8") as output:
+with open(os.path.join(root, "fixture.json.tmp"), "w", encoding="utf-8") as output:
     json.dump({"Host": "127.0.0.1", "Username": "fixture", "Ports": ports,
                "SecretFile": os.path.join(root, "password.txt"), "OtpFile": os.path.join(root, "otp.txt"),
                "PrivateKeyPath": os.path.join(root, "client.key"), "ExpectedHostFingerprint": fingerprint}, output)
+os.replace(os.path.join(root, "fixture.json.tmp"), os.path.join(root, "fixture.json"))
 print("READY", flush=True)
 threading.Event().wait()

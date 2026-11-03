@@ -19,7 +19,6 @@ internal static class AuthenticationNetworkScenarios
         Directory.CreateDirectory(root);
         var start = new ProcessStartInfo(python) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(Path.GetFullPath("scripts/testing/auth_fixture.py")); start.ArgumentList.Add(root);
-        start.Environment["PYTHONPATH"] = Path.GetFullPath(".tools/python-libs");
         using var fixture = Process.Start(start) ?? throw new IOException("Unable to start isolated headless auth fixture");
         // Observe output without publishing server responses or secrets.
         var stderr = fixture.StandardError.ReadToEndAsync();

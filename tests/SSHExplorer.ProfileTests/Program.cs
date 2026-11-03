@@ -258,6 +258,9 @@ internal static class Program
         var profile=new ServerProfile{Name="attempt cancellation",Host="fixture.invalid",Username="fixture"};
         foreach(var kind in new[]{"credentials","interactive","trust","profile"})
         {
+            DumpWindowState("before-"+kind);
+            if(new System.Windows.Interop.WindowInteropHelper(_owner).Handle==IntPtr.Zero)throw new InvalidOperationException("CI modal fixture requester has no existing HWND before "+kind);
+            if(_app.Windows.Cast<Window>().Any(w=>w!=_owner&&w.IsVisible))throw new InvalidOperationException("CI modal fixture has a previous visible window before "+kind);
             using var cancelled=new CancellationTokenSource();bool observed=false;Exception? error=null;var watch=Stopwatch.StartNew();
             var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(30)};
             timer.Tick+=(_,_)=>
@@ -265,6 +268,7 @@ internal static class Program
                 var modal=_app.Windows.Cast<Window>().FirstOrDefault(w=>w!=_owner&&w.IsVisible);
                 if(modal is not null)
                 {
+                    DumpWindowState("observed-"+kind,modal);
                     try{Check(modal.Owner==_owner,"visible "+kind+" prompt is owned by its requesting window");observed=true;}
                     catch(Exception ex){error=ex;}
                     timer.Stop();_ = Task.Run(cancelled.Cancel);
@@ -292,6 +296,31 @@ internal static class Program
         closing.Tick+=(_,_)=>{if(_app.Windows.Cast<Window>().Any(w=>w.Owner==owner&&w.IsVisible)){child=true;closing.Stop();owner.Close();}};
         closing.Start();SessionCredentials? result;try{result=Dialogs.Credentials(profile,null,owner);}finally{closing.Stop();if(owner.IsVisible)owner.Close();}
         Check(child&&result is null,"closing requesting window cancels its actual credentials modal");
+    }
+    static void DumpWindowState(string stage,Window? selected=null)
+    {
+        static string TitleKind(Window window)=>window.Title switch
+        {
+            "Isolated STA profile regression"=>"fixture-owner",
+            "Attempt owner"=>"close-owner",
+            "Вход — attempt cancellation"=>"credentials",
+            "Дополнительная проверка SSH"=>"interactive",
+            "Проверка ключа сервера"=>"trust",
+            "Добавить сервер"=>"add-profile",
+            "Изменить сервер"=>"edit-profile",
+            _=>window is MainWindow?"main-window":"unrecognized"
+        };
+        var windows=_app.Windows.Cast<Window>().Take(12).Select(window=>new
+        {
+            type=window.GetType().Name,titleKind=TitleKind(window),id=RuntimeHelpers.GetHashCode(window),
+            requester=ReferenceEquals(window,_owner),selected=ReferenceEquals(window,selected),
+            ownerIsRequester=ReferenceEquals(window.Owner,_owner),ownerType=window.Owner?.GetType().Name,
+            ownerId=window.Owner is null?(int?)null:RuntimeHelpers.GetHashCode(window.Owner),
+            window.IsVisible,window.IsLoaded,state=window.WindowState.ToString(),
+            hasHwnd=new System.Windows.Interop.WindowInteropHelper(window).Handle!=IntPtr.Zero
+        }).ToArray();
+        // Titles are classified from a fixed allowlist; never print arbitrary titles or control values.
+        Console.WriteLine("WINDOW_SNAPSHOT "+System.Text.Json.JsonSerializer.Serialize(new{stage,windows}));
     }
     static void DelayedSecretComponents()
     {
