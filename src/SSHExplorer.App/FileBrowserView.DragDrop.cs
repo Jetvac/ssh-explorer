@@ -18,6 +18,7 @@ public sealed partial class FileBrowserView
     static readonly Dictionary<string, ClipboardToken> remoteClipboardTokens = [];
     async Task CopySelection(bool cut)
     {
+        if (!viewModel.HasSelection || nameEdit?.IsActive == true) return;
         var selected = Selected(); if (selected.Count == 0) return; var payload = new RemoteClipboard(session, selected.Select(r => r.Entry.FullPath).ToArray(), cut, new WeakReference<FileBrowserView>(this));
         var data = RemoteData(payload); Clipboard.SetDataObject(data, false); var clipboardSequence = WindowsClipboard.CurrentSequence; foreach (var r in all) { r.IsCut = cut && selected.Contains(r); r.Notify(); }
         if (cut) { viewModel.Message = "Объекты вырезаны. Вставьте их в папку этого приложения. Для передачи в Windows используйте копирование."; return; }
@@ -31,6 +32,7 @@ public sealed partial class FileBrowserView
     }
     async Task Paste()
     {
+        if (!CanPaste()) return;
         var data = Clipboard.GetDataObject(); var clipboardSequence = WindowsClipboard.CurrentSequence; if (data is null || string.IsNullOrEmpty(CurrentPath)) return;
         if (GetRemote(data) is RemoteClipboard remote)
         {
@@ -53,10 +55,10 @@ public sealed partial class FileBrowserView
     void ConfigureDrag(Control control)
     {
         control.AllowDrop = true;
-        control.PreviewMouseLeftButtonDown += (_, e) => dragStart = ItemAt(e.OriginalSource as DependencyObject) is not null ? e.GetPosition(control) : null;
+        control.PreviewMouseLeftButtonDown += (_, e) => dragStart = nameEdit?.IsActive != true && FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null && ItemAt(e.OriginalSource as DependencyObject) is not null ? e.GetPosition(control) : null;
         control.PreviewMouseMove += async (_, e) =>
         {
-            if (preparingDrag || e.LeftButton != MouseButtonState.Pressed || dragStart is not Point start || (e.GetPosition(control) - start).Length < 10 || Selected().Count == 0) return;
+            if (nameEdit?.IsActive == true || lassoOwner is not null || preparingDrag || e.LeftButton != MouseButtonState.Pressed || dragStart is not Point start || (e.GetPosition(control) - start).Length < 10 || Selected().Count == 0) return;
             if (FindAncestor<DataGridColumnHeader>(e.OriginalSource as DependencyObject) is not null) return;
             dragStart = null; preparingDrag = true;
             try
@@ -90,7 +92,7 @@ public sealed partial class FileBrowserView
         => CanDropTo(data, CurrentPath, keys);
     internal DragDropEffects CanDropTo(IDataObject data, string path, DragDropKeyStates keys)
     {
-        if (string.IsNullOrEmpty(path) || !session.SftpAvailable || session.Lifetime.IsCancellationRequested) return DragDropEffects.None;
+        if (creating || nameEdit?.IsBusy == true || string.IsNullOrEmpty(path) || !session.SftpAvailable || session.Lifetime.IsCancellationRequested) return DragDropEffects.None;
         if ((keys & (DragDropKeyStates.ControlKey | DragDropKeyStates.ShiftKey)) == (DragDropKeyStates.ControlKey | DragDropKeyStates.ShiftKey)) return DragDropEffects.None;
         if (GetRemote(data) is RemoteClipboard payload)
         {
@@ -152,6 +154,20 @@ public sealed partial class FileBrowserView
         if (!data.GetDataPresent("SSHExplorer.RemoteFiles", false)) return null;
         var raw = data.GetData("SSHExplorer.RemoteFiles", false); var token = raw is MemoryStream stream ? Encoding.UTF8.GetString(stream.ToArray()).TrimEnd('\0') : raw as string;
         return token is not null && remoteClipboardTokens.TryGetValue(token, out var payload) && payload.Session.TryGetTarget(out var owner) && owner.State is not SessionState.Closing and not SessionState.Closed ? new RemoteClipboard(owner, payload.Paths, payload.Cut, payload.SourceView) : null;
+    }
+    bool CanPaste()
+    {
+        if (!viewModel.CanCreate || nameEdit?.IsActive == true) return false;
+        try { return Clipboard.GetDataObject() is { } data && CanPasteData(data); }
+        catch (System.Runtime.InteropServices.ExternalException) { return false; }
+    }
+    internal bool CanPasteData(IDataObject data)
+    {
+        if (!viewModel.CanCreate || session.Lifetime.IsCancellationRequested) return false;
+        if (GetRemote(data) is { } remote)
+            return remote.Paths.Length > 0 && remote.Session.Files.Available && !remote.Paths.Any(p =>
+                remote.Session.Id == session.Id && (PosixPath.IsSameOrDescendant(CurrentPath, p) || remote.Cut && PosixPath.Combine(CurrentPath, PosixPath.Name(p)) == p));
+        return data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 };
     }
     void DisposeDragDrop()
     {

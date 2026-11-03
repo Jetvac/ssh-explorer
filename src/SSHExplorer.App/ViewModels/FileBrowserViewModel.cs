@@ -8,7 +8,7 @@ public sealed record BrowserContext(string Path, List<BrowserHistoryItem> Histor
 public sealed class FileBrowserViewModel : ObservableObject
 {
     string currentPath = "", viewMode = "Details", sortKey = "Name", searchQuery = "", message = "", statusText = "Элементов: 0";
-    bool descending, isLoading, available;
+    bool descending, isLoading, available, isMutating, isEditingName;
     long navigationGeneration;
     int historyIndex = -1;
     List<FileItemViewModel> entries = [];
@@ -24,7 +24,9 @@ public sealed class FileBrowserViewModel : ObservableObject
     public string StatusText { get => statusText; private set => Set(ref statusText, value); }
     public bool IsLoading { get => isLoading; private set { if (Set(ref isLoading, value)) RaiseAvailability(); } }
     public bool Available { get => available; set { if (Set(ref available, value)) RaiseAvailability(); } }
-    public bool CanCreate => Available && !IsLoading && CurrentPath.Length > 0;
+    public bool IsMutating { get => isMutating; set { if (Set(ref isMutating, value)) RaiseAvailability(); } }
+    public bool IsEditingName { get => isEditingName; set { if (Set(ref isEditingName, value)) RaiseAvailability(); } }
+    public bool CanCreate => Available && !IsLoading && !IsMutating && !IsEditingName && CurrentPath.Length > 0;
     public bool HasSelection => CanCreate && SelectedPaths.Count > 0;
     public bool CanRename => HasSelection && SelectedPaths.Count == 1;
     public bool CanGoUp => Available && CurrentPath.Length > 0 && CurrentPath != "/";
@@ -52,7 +54,8 @@ public sealed class FileBrowserViewModel : ObservableObject
             History.Add(new BrowserHistoryItem(path, [], 0)); HistoryIndex = History.Count - 1;
         }
         else if (targetHistoryIndex is int index) HistoryIndex = Math.Clamp(index, 0, Math.Max(0, History.Count - 1));
-        CurrentPath = path; Entries = result.Select(e => new FileItemViewModel(e)).ToList(); SearchQuery = "";
+        var existing = priorPath == path ? Entries.ToDictionary(r => r.Entry.FullPath, StringComparer.Ordinal) : [];
+        CurrentPath = path; Entries = result.Select(e => { if (!existing.TryGetValue(e.FullPath, out var row)) return new FileItemViewModel(e); row.UpdateEntry(e); return row; }).ToList(); SearchQuery = "";
         var restore = targetHistoryIndex is int && HistoryIndex >= 0 ? History[HistoryIndex].Selection : priorPath == path ? priorSelection : [];
         SetSelection(restore); IsLoading = false; Message = Entries.Count == 0 ? "Эта папка пуста." : ""; return true;
     }

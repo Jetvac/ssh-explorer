@@ -3,6 +3,12 @@ using SSHExplorer.Monitoring;
 
 var suite = new TestSuite();
 #if CORE_TESTS
+if (args.Length == 2 && args[0] == "--files-inline-integration")
+{
+    await FileCreationIntegration.RunAsync(suite, args[1]);
+    Console.WriteLine($"RESULT: {suite.Passed} passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 2 && args[0] == "--collector-encoding-check")
     return await CollectorEncodingChecks.RunAsync(args[1]);
 if (args.Length is 2 or 3 && args[0] == "--monitor-benchmark")

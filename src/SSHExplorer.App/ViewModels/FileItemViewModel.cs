@@ -8,7 +8,10 @@ public sealed class FileItemViewModel(RemoteEntry entry) : ObservableObject
 {
     bool showExtensions = true, isCut;
     ImageSource? thumbnail;
+    FileNameEdit? edit;
     public RemoteEntry Entry => entry;
+    public FileNameEdit? Edit { get => edit; set => Set(ref edit, value); }
+    public void UpdateEntry(RemoteEntry value) { entry = value; Notify(); }
     public string Name => entry.Name;
     public bool ShowExtensions { get => showExtensions; set { if (Set(ref showExtensions, value)) Raise(nameof(DisplayName)); } }
     public bool IsCut { get => isCut; set { if (Set(ref isCut, value)) Raise(nameof(Opacity)); } }

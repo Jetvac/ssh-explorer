@@ -15,6 +15,7 @@ public sealed class RemoteFileService
     public string HomeDirectory { get; private set; } = "/";
     public bool Available { get { try { return _client?.IsConnected == true; } catch (ObjectDisposedException) { return false; } } }
     public bool CanUndo { get { lock (_undo) return _undo.Count > 0; } }
+    public string? UndoDescription { get { lock (_undo) return _undo.TryPeek(out var item) ? $"Отменить: «{PosixPath.Name(item.Destination)}» → «{PosixPath.Name(item.Source)}»" : null; } }
     public string? LastUndoUnavailableReason { get; private set; }
     internal RemoteFileService(ServerSession session) => _session = session;
     internal async Task ConnectAsync(CancellationToken ct)
@@ -78,6 +79,29 @@ public sealed class RemoteFileService
     { path = PosixPath.Normalize(path, HomeDirectory); PosixPath.ValidateName(PosixPath.Name(path)); if (Exists(c, path)) throw new IOException("Объект с таким именем уже существует."); c.CreateDirectory(path); }, ct);
     public Task CreateFileAsync(string path, CancellationToken ct = default) => RunAsync((c, t) =>
     { path = PosixPath.Normalize(path, HomeDirectory); PosixPath.ValidateName(PosixPath.Name(path)); using var stream = c.Open(path, FileMode.CreateNew, FileAccess.Write); }, ct);
+    /// <summary>MKDIR and exclusive CREATE are authoritative; an existence preflight alone cannot avoid a race.</summary>
+    public Task<string> CreateUniqueAsync(string parent, bool directory, CancellationToken ct = default) => RunAsync((c, t) =>
+    {
+        parent = PosixPath.Normalize(parent, HomeDirectory);
+        for (var index = 1; index <= 1000; index++)
+        {
+            t.ThrowIfCancellationRequested();
+            var suffix = index == 1 ? "" : $" ({index})";
+            var name = directory ? "Новая папка" + suffix : "Новый файл" + suffix + ".txt";
+            var path = PosixPath.Combine(parent, name);
+            try
+            {
+                if (directory) c.CreateDirectory(path);
+                else { using var stream = c.Open(path, FileMode.CreateNew, FileAccess.Write); }
+                return path;
+            }
+            catch (Exception ex) when (ex is SshException or IOException)
+            {
+                if (!Exists(c, path)) throw;
+            }
+        }
+        throw new IOException("Не удалось подобрать свободное имя. Обновите папку и повторите создание.");
+    }, ct);
     public Task RenameAsync(string source, string destination, CancellationToken ct = default) => RunAsync((c, t) =>
     {
         source = PosixPath.Normalize(source, HomeDirectory); destination = PosixPath.Normalize(destination, HomeDirectory);
