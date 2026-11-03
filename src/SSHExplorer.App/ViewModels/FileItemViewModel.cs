@@ -12,11 +12,25 @@ public sealed class FileItemViewModel(RemoteEntry entry) : ObservableObject
     public RemoteEntry Entry => entry;
     public FileNameEdit? Edit { get => edit; set => Set(ref edit, value); }
     public void UpdateEntry(RemoteEntry value) { entry = value; Notify(); }
+    public void RenameConfirmed(string path)
+    {
+        UpdateEntry(new RemoteEntry { Name = PosixPath.Name(path), FullPath = path, IsDirectory = entry.IsDirectory,
+            IsSymbolicLink = entry.IsSymbolicLink, IsRegularFile = entry.IsRegularFile, Length = entry.Length,
+            LastWriteTimeUtc = entry.LastWriteTimeUtc, LastAccessTimeUtc = entry.LastAccessTimeUtc, UserId = entry.UserId,
+            GroupId = entry.GroupId, Permissions = entry.Permissions, LinkTarget = entry.LinkTarget });
+    }
     public string Name => entry.Name;
     public bool ShowExtensions { get => showExtensions; set { if (Set(ref showExtensions, value)) Raise(nameof(DisplayName)); } }
     public bool IsCut { get => isCut; set { if (Set(ref isCut, value)) Raise(nameof(Opacity)); } }
     public double Opacity => IsCut ? .45 : 1;
-    public string DisplayName => ShowExtensions || entry.IsDirectory || entry.IsSymbolicLink ? entry.Name : Path.GetFileNameWithoutExtension(entry.Name);
+    public string DisplayName
+    {
+        get
+        {
+            var dot = entry.Name.LastIndexOf('.');
+            return ShowExtensions || entry.IsDirectory || entry.IsSymbolicLink || entry.Name.StartsWith('.') || dot <= 0 || dot == entry.Name.Length - 1 ? entry.Name : entry.Name[..dot];
+        }
+    }
     public FileIconKind IconKind => FileSystemIcons.Kind(entry);
     public ImageSource FileIcon => FileSystemIcons.For(entry);
     public bool CanPreview => entry.IsRegularFile && !entry.IsSymbolicLink;

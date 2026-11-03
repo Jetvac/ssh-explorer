@@ -1,0 +1,20 @@
+{
+  "scope": "Dirty development snapshot; not final published package",
+  "utc": "2026-11-03T16:59:16.0554473Z",
+  "baseCommit": "e8ef6815dd3417dcbda632077ed8408c77576d04",
+  "sourceFileCommit": "7c05efa",
+  "hostWindowsOpened": 0,
+  "computerUse": false,
+  "coreAssertions": 49,
+  "sftpCases": 5,
+  "sftp": "Previously authorized isolated Linux fixture; two independent clients; pinned expected fingerprint; only test GUID directory; cleaned after run",
+  "signalsSent": 0,
+  "remoteSoftwareInstalled": false,
+  "assembly": "0.2.0-beta.4+e8ef6815dd3417dcbda632077ed8408c77576d04",
+  "hashes": {
+    "SSHExplorer.Core.dll": "3a44e6adfe2bf29575d021b8ff383f508f25a049ad8e87cf5c00ee7e70df62ef",
+    "SSHExplorer.Tests.dll": "efe2c8b3d31775a93327802ea6b00045bd4fb03220508220edfc4dd02133f17f",
+    "beta4-core.log": "9ceecaaa4402436ea9a8cc8d7013ed5c5d7f2b7e393c50002e07da38d57e07be",
+    "beta4-files-sftp.log": "d083cc0b1b5efd276fc50a8d0070d8fecf6adf573bbabead29addbe10ba5bfac"
+  }
+}

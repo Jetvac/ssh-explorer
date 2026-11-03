@@ -17,7 +17,7 @@ public sealed class FileNameEdit(FileItemViewModel item) : ObservableObject
     public static int SelectionLength(string name, bool directory)
     {
         var dot = name.LastIndexOf('.');
-        return directory || dot <= 0 ? name.Length : dot;
+        return directory || name.StartsWith('.') || dot <= 0 || dot == name.Length - 1 ? name.Length : dot;
     }
     public bool Cancel()
     {

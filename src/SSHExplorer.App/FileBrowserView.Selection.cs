@@ -11,7 +11,8 @@ namespace SSHExplorer.App;
 public sealed partial class FileBrowserView
 {
     Control? lassoOwner;
-    Point lassoStart, lassoPointer;
+    Point lassoStart, lassoPointer, lassoViewportStart;
+    bool lassoMoved;
     HashSet<FileItemViewModel> lassoBaseline = [];
     SelectionAdorner? lassoAdorner;
     AdornerLayer? lassoLayer;
@@ -41,11 +42,12 @@ public sealed partial class FileBrowserView
     {
         EndLasso(); lassoOwner = owner;
         lassoBaseline = additive ? ActiveSelected().OfType<FileItemViewModel>().ToHashSet() : [];
-        lassoStart = ContentPoint(point); lassoPointer = point;
+        lassoStart = ContentPoint(point); lassoPointer = lassoViewportStart = point; lassoMoved = false;
         lassoLayer = AdornerLayer.GetAdornerLayer(owner);
         if (lassoLayer is null) { lassoOwner = null; return; }
         lassoAdorner = new SelectionAdorner(owner); lassoLayer.Add(lassoAdorner);
         if (!owner.CaptureMouse()) { EndLasso(); return; }
+        if (!additive) ActiveSelected().Clear();
         dragStart = null;
         lassoTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(40), DispatcherPriority.Input, (_, _) => ScrollLasso(), Dispatcher);
         UpdateLasso(point);
@@ -75,6 +77,8 @@ public sealed partial class FileBrowserView
     internal void UpdateLasso(Point point)
     {
         if (lassoOwner is null || lassoAdorner is null) return;
+        if (!lassoMoved && (point - lassoViewportStart).Length < Math.Max(SystemParameters.MinimumHorizontalDragDistance, SystemParameters.MinimumVerticalDragDistance)) return;
+        lassoMoved = true;
         lassoPointer = point; var layout = LassoLayout(); var end = ContentPoint(point);
         var rectangle = new Rect(lassoStart, end);
         var selected = new HashSet<FileItemViewModel>(lassoBaseline);
@@ -86,7 +90,7 @@ public sealed partial class FileBrowserView
     }
     void ScrollLasso()
     {
-        if (lassoOwner is null) return;
+        if (lassoOwner is null || !lassoMoved) return;
         var scroller = FindVisualChild<ScrollViewer>(lassoOwner);
         if (scroller is null) return;
         if (lassoPointer.Y < 30) scroller.LineUp();

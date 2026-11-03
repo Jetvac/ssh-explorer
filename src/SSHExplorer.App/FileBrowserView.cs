@@ -238,6 +238,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     public Task InitializeAsync(string path, CancellationToken ct) => Navigate(path, true, requestToken: ct, throwOnFailure: true);
     async Task<bool> Navigate(string path, bool addHistory, BrowserHistoryItem? restore = null, int? targetHistoryIndex = null, CancellationToken requestToken = default, bool throwOnFailure = false)
     {
+        EndLasso();
         recursiveSearchCts?.Cancel();
         thumbnailCts.Cancel(); thumbnailCts.Dispose(); thumbnailCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, session.Lifetime);
         if (!operations.Available) { viewModel.Message = "SFTP-подсистема недоступна."; if (throwOnFailure) throw new InvalidOperationException(viewModel.Message); return false; }
@@ -296,6 +297,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     void ApplyItems()
     {
+        EndLasso();
         if (disposed) return; var selection = viewModel.SelectedPaths.ToList(); restoringSelection = true;
         try { viewModel.ApplyFilter(App.Store.Settings.ShowHidden, App.Store.Settings.ShowExtensions); RestoreSelection(selection); }
         finally { restoringSelection = false; }
@@ -317,6 +319,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     void SetMode(string value, bool save = true)
     {
+        EndLasso();
         var selection = Selected().Select(r => r.Entry.FullPath).ToList(); mode = value; App.Store.Settings.ViewMode = mode; content.Content = mode == "Details" ? table : tiles;
         if (mode != "Details")
         {
@@ -467,7 +470,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (mode == "Details") table.ScrollIntoView(row); else tiles.ScrollIntoView(row);
         _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
         {
-            if (disposed || row.Edit?.IsActive != true) return;
+            if (disposed || !IsLoaded || !IsVisible || row.Edit?.IsActive != true) return;
             FindVisualChildren<FileNamePresenter>(mode == "Details" ? table : tiles).FirstOrDefault(p => ReferenceEquals(p.DataContext, row))?.FocusEditor(selectBase);
         }));
     }
@@ -489,6 +492,8 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (target is null) { viewModel.Message = edit.Error; RevealNameEditor(edit.Item, false); return; }
         nameEdit = null; viewModel.IsEditingName = false;
         if (CurrentPath != parent) return;
+        // The server has confirmed the rename. Retain that row and its selection even if the following listing fails.
+        edit.Item.RenameConfirmed(target); viewModel.SetSelection([target]); ApplyItems();
         await RefreshAsync(); RestoreSelection([target]);
         var row = all.FirstOrDefault(r => r.Entry.FullPath == target);
         if (row is not null) { if (mode == "Details") table.ScrollIntoView(row); else tiles.ScrollIntoView(row); }

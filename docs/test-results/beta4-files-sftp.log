@@ -1,0 +1,6 @@
+PASS REAL SFTP unique file creation preserves occupied name and contents
+PASS REAL SFTP concurrent exclusive file creates use independent clients without overwriting
+PASS REAL SFTP concurrent MKDIR creates return distinct confirmed directories
+PASS REAL SFTP POSIX rename conflict retains original and allows corrected Unicode punctuation
+PASS REAL SFTP cancelled create starts no object
+RESULT: 5 passed, 0 failed

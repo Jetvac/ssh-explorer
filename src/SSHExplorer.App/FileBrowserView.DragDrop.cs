@@ -96,6 +96,7 @@ public sealed partial class FileBrowserView
         if ((keys & (DragDropKeyStates.ControlKey | DragDropKeyStates.ShiftKey)) == (DragDropKeyStates.ControlKey | DragDropKeyStates.ShiftKey)) return DragDropEffects.None;
         if (GetRemote(data) is RemoteClipboard payload)
         {
+            if (!payload.Session.SftpAvailable || payload.Session.Lifetime.IsCancellationRequested) return DragDropEffects.None;
             var sameUserEndpoint = HostTrustStore.NormalizeHost(payload.Session.Profile.Host) == HostTrustStore.NormalizeHost(session.Profile.Host) && payload.Session.Profile.Port == session.Profile.Port && payload.Session.Profile.Username == session.Profile.Username;
             if (sameUserEndpoint && payload.Paths.Any(p => PosixPath.IsSameOrDescendant(path, p) || PosixPath.Combine(path, PosixPath.Name(p)) == p)) return DragDropEffects.None;
             if ((keys & DragDropKeyStates.ShiftKey) != 0 && payload.Session.Id != session.Id) return DragDropEffects.None;

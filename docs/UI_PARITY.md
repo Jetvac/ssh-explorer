@@ -1,6 +1,27 @@
 # Сопоставление интерфейса с Windows 11
 
-## Актуальная композиция beta.3
+## Актуальная итерация beta.4
+
+Тройка: исходные Explorer/Task Manager пользователя → immutable beta.3 `e8ef6815dd3417dcbda632077ed8408c77576d04` → beta.4. Физический DPI и active state Windows-референсов неизвестны: оценка структуры/контролов ограничена этой неопределённостью, pixel-perfect не заявляется. [Реализация](UI_ITERATION_BETA4.md), [доказательства и статусы](CI_BETA4.md), [приёмка](../ACCEPTANCE.md).
+
+| Windows-референс / роль | Наблюдаемая beta.3 | Цель и изменение beta.4 | Проверяемое доказательство |
+|---|---|---|---|
+| Explorer: F2 на месте | `Rename` использовал отдельный Prompt | TextBox в name template Details/всех плиток; basename/dotfile, Enter/Esc, busy/error/retry | Controlled operations + настоящий WPF редактор; source identity при sort/refresh, одна pending операция; физический F2 отдельно |
+| Explorer: новая папка | Имя запрашивалось до сетевого создания | Сначала confirmed exclusive create, потом имя; Esc сохраняет созданное, ошибки не создают фиктивную строку | Реальный SFTP: два клиента одновременно, sentinel не изменяется; CI delay/failure/duplicate/error controls |
+| Explorer: исправление адреса | Enter и LostKeyboardFocus скрывали неверный путь | Ошибка оставляет поле/ввод/причину, Enter исправляет, Esc восстанавливает; поздний reply не фиксирует старую папку | Актуальные production navigation generation/CTS, controlled failed/correct/late responses и actual field |
+| Explorer: группа/рамка/drag | Рамка только tiles и только реализованные контейнеры | Details+tiles, model content geometry, edge scroll, единый cleanup; drag начинается на объекте, рамка на фоне | 10 000 моделей с ограниченным числом контейнеров, capture/adorner/timer cleanup; полный Explorer gesture NOT RUN |
+| Explorer: command row | Files/Home WrapPanel давал случайные новые ряды | Один ResponsiveCommandBar; приоритет Create/Add/Connect выше вторичных, остаток в «…»; одинаковые действия/disabled/focus | Фактические narrow/layout/overflow controls и invocation, keyboard menu events; font22 явно отмечен как app font |
+| Explorer: контекст | Общие Pin/Unpin, Paste/Undo без точного enabled; все8 views имели один glyph | Компактная5-action группа, актуальный clipboard/target/session, конкретный Undo и Pin,8 разных смысловых иконок | Menu composition/selection/keyboard/availability checks; при открытии нет сетевых запросов. Удаление остаётся окончательным |
+| Windows/Fluent: текст/пароль/список | На фактическом profile PNG classic серый ComboBox, квадратное поле и другие chrome рядом; setters не заменяли theme fallback | Реальные общие InputControls templates, radius4/min34, focus underline, hover/pressed/disabled/error, настоящий popup/items/checkbox/reveal | Материализованные named parts + actual popup/form/error/narrow кадры; normal/fill/error и keyboard checks. Секрет/auth lifecycle прежний |
+| Explorer: несколько вкладок | Скрытая горизонтальная прокрутка и ограниченный tooltip | Scroll arrows и список всех вкладок, полное имя/endpoint, доступная active close; закрытие выбирает правого, затем левого соседа | Много длинных одноимённых сессий/resize/menu/close; токены tab/file различаются, file source immutable; physical hover-drag отдельно |
+| Task Manager: фоновый сбор | Poll ставил IsBusy и мешал Signal action | Poll, stale и собственная команда разделены; captured identity и recheck перед backend guard | Controlled pending poll/command/reused PID; никаких реальных сигналов в новой итерации |
+| Task Manager: числа/колонки | Один общий формат, колонки только в экземпляре View | Header целый%, row дробный%, размер/скорость/время отдельно; user visibility/order/width/sort persistent, responsive hide временный | Production formatters ru-RU/en-US; restore через AppStore, header/menu sort, unknown-last обоих направлений, stable rows/selection/scroll |
+
+Официальные дополнительные референсы: [Windows ComboBox](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/combo-box), [Windows TextBox](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/text-box), [Windows текстовые контролы](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/text-controls), [WPF ComboBox](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/combobox), [WPF PasswordBox](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/passwordbox). Используются настоящие WPF-классы и их template parts, без смены архитектуры на веб.
+
+Серое выделение неактивного сравнения, fixture культура, отсутствие sort arrow после deliberate clear и исключённая DWM-зона не объявлялись дефектами продукта. Новые metadata фиксируют culture, active/focus/sort и source DLL. `R/S/D` в representative fixture проходят production parser: «Выполняется», «Ожидание», «Ожидание I/O». Исторические кадры ниже сохраняют свои commit/версии.
+
+## Проверенная композиция beta.3 (история)
 
 [Выбранная структура и роли](UI_COMPOSITION_BETA3.md). Референсы: приложенные Windows 11 Task Manager / Explorer, их физический DPI неизвестен. Доступный before — исторический кадр beta.2 ab01976, не последний пользовательский снимок (в новом сообщении такого файла нет). Сопоставимые реальные WPF-render кадры и проверки выполняются отдельно в Windows CI. Computer Use на host запрещён. Пользовательская визуальная приёмка открыта.
 
