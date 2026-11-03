@@ -14,6 +14,10 @@ public sealed partial class FileBrowserView
 {
     Control? dropTarget; TreeViewItem? hoverNode; DateTime hoverSince;
     Point? dragStart; bool preparingDrag;
+    Control? pressedGroupOwner;
+    FileItemViewModel? pressedGroupItem;
+    RemoteEntry[]? pressedGroupEntries;
+    long pressedGroupGeneration;
     readonly Dictionary<string, StringCollection> preparedFiles = [];
     static readonly Dictionary<string, ClipboardToken> remoteClipboardTokens = [];
     async Task CopySelection(bool cut)
@@ -55,16 +59,38 @@ public sealed partial class FileBrowserView
     void ConfigureDrag(Control control)
     {
         control.AllowDrop = true;
-        control.PreviewMouseLeftButtonDown += (_, e) => dragStart = nameEdit?.IsActive != true && FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null && ItemAt(e.OriginalSource as DependencyObject) is not null ? e.GetPosition(control) : null;
+        control.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            ClearPressedGroup();
+            var item = ItemAt(e.OriginalSource as DependencyObject);
+            dragStart = viewModel.CanCreate && nameEdit?.IsActive != true && FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null && item is not null ? e.GetPosition(control) : null;
+            if (dragStart is not null && e.ClickCount == 1 && item is not null && BeginSelectedGroupPress(control, item, Keyboard.Modifiers)) e.Handled = true;
+        };
+        // DataGridCell handles even already-handled mouse-down events. Restore synchronously
+        // after its native selection handler, before a frame or a drag can expose a smaller group.
+        control.AddHandler(Mouse.MouseDownEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton == MouseButton.Left && pressedGroupOwner == control && pressedGroupEntries is not null)
+                RestoreSelection(pressedGroupEntries.Select(entry => entry.FullPath));
+        }), true);
+        control.PreviewMouseLeftButtonUp += (_, e) =>
+        {
+            if (pressedGroupOwner != control) return;
+            FinishSelectedGroupClick(); e.Handled = true;
+        };
+        control.LostMouseCapture += (_, _) => { if (pressedGroupOwner == control && !control.IsMouseCaptureWithin) { ClearPressedGroup(); dragStart = null; } };
+        control.Unloaded += (_, _) => { if (pressedGroupOwner == control) { ClearPressedGroup(); dragStart = null; } };
         control.PreviewMouseMove += async (_, e) =>
         {
             if (nameEdit?.IsActive == true || lassoOwner is not null || preparingDrag || e.LeftButton != MouseButtonState.Pressed || dragStart is not Point start || (e.GetPosition(control) - start).Length < 10 || Selected().Count == 0) return;
             if (FindAncestor<DataGridColumnHeader>(e.OriginalSource as DependencyObject) is not null) return;
-            dragStart = null; preparingDrag = true;
+            var entries = CaptureDragEntries();
+            dragStart = null; ClearPressedGroup();
+            if (entries.Length == 0) return;
+            preparingDrag = true;
             try
             {
                 // Freeze the source before a destination tab activates. No file content is downloaded here.
-                var entries = Selected().Select(r => r.Entry).ToArray();
                 var payload = new RemoteClipboard(session, entries.Select(x => x.FullPath).ToArray(), false, new WeakReference<FileBrowserView>(this));
                 var token = RegisterRemote(payload);
                 var data = await NativeDragDrop.ShellVirtualDataObject.CreateAsync(session, entries, token, App.Transfers);
@@ -87,6 +113,35 @@ public sealed partial class FileBrowserView
             var effect = CanDropTo(e.Data, destination, e.KeyStates); e.Effects = effect; ClearDropTarget();
             if (effect != DragDropEffects.None) await Ui.Guard(() => DropData(e.Data, destination, e.KeyStates));
         };
+    }
+    internal bool BeginSelectedGroupPress(Control owner, FileItemViewModel item, ModifierKeys modifiers)
+    {
+        var selected = Selected();
+        if (!viewModel.CanCreate || modifiers != ModifierKeys.None || selected.Count < 2 || !selected.Contains(item) || nameEdit?.IsActive == true) return false;
+        pressedGroupOwner = owner; pressedGroupItem = item; pressedGroupGeneration = generation;
+        pressedGroupEntries = selected.Select(row => row.Entry).ToArray();
+        owner.Focus();
+        if (!owner.CaptureMouse()) { ClearPressedGroup(); return false; }
+        return true;
+    }
+    internal RemoteEntry[] CaptureDragEntries()
+    {
+        var current = Selected().Select(row => row.Entry).ToArray();
+        if (pressedGroupEntries is null) return current;
+        // Never transfer files which the source no longer visibly selects.
+        return pressedGroupGeneration == generation && current.Select(e => e.FullPath).ToHashSet(StringComparer.Ordinal).SetEquals(pressedGroupEntries.Select(e => e.FullPath)) ? pressedGroupEntries.ToArray() : [];
+    }
+    internal void FinishSelectedGroupClick()
+    {
+        var clicked = pressedGroupItem;
+        bool current = pressedGroupGeneration == generation && ReferenceEquals(pressedGroupOwner, mode == "Details" ? (Control)table : tiles);
+        ClearPressedGroup(); dragStart = null;
+        if (current && clicked is not null) RestoreSelection([clicked.Entry.FullPath]);
+    }
+    void ClearPressedGroup()
+    {
+        var owner = pressedGroupOwner; pressedGroupOwner = null; pressedGroupItem = null; pressedGroupEntries = null;
+        if (owner?.IsMouseCaptureWithin == true) Mouse.Capture(null);
     }
     internal DragDropEffects DragEffect(IDataObject data, DragDropKeyStates keys)
         => CanDropTo(data, CurrentPath, keys);
@@ -172,11 +227,12 @@ public sealed partial class FileBrowserView
     }
     void DisposeDragDrop()
     {
+        ClearPressedGroup();
         ClearDropTarget();
         foreach (var token in remoteClipboardTokens.Where(x => x.Value.SessionId == session.Id).Select(x => x.Key).ToArray()) remoteClipboardTokens.Remove(token);
         preparedFiles.Clear();
     }
-    internal void CancelDragFeedback() { dragStart = null; ClearDropTarget(); }
+    internal void CancelDragFeedback() { dragStart = null; ClearPressedGroup(); ClearDropTarget(); }
     sealed record RemoteClipboard(ServerSession Session, string[] Paths, bool Cut, WeakReference<FileBrowserView>? SourceView = null);
     sealed record ClipboardToken(Guid SessionId, WeakReference<ServerSession> Session, string[] Paths, bool Cut, WeakReference<FileBrowserView>? SourceView);
 }

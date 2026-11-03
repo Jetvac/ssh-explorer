@@ -17,6 +17,8 @@ public sealed partial class FileBrowserView
     SelectionAdorner? lassoAdorner;
     AdornerLayer? lassoLayer;
     DispatcherTimer? lassoTimer;
+    string lastLassoEndReason = "not-started";
+    internal string LastLassoEndReason => lastLassoEndReason;
     void ConfigureLasso(Control owner)
     {
         owner.PreviewMouseLeftButtonDown += (_, e) =>
@@ -30,11 +32,11 @@ public sealed partial class FileBrowserView
         owner.PreviewMouseMove += (_, e) =>
         {
             if (lassoOwner != owner) return;
-            if (e.LeftButton != MouseButtonState.Pressed) { EndLasso(); return; }
+            if (e.LeftButton != MouseButtonState.Pressed) { EndLasso("left-button-released"); return; }
             UpdateLasso(e.GetPosition(owner)); e.Handled = true;
         };
         owner.PreviewMouseLeftButtonUp += (_, e) => { if (lassoOwner == owner) { EndLasso(); e.Handled = true; } };
-        owner.LostMouseCapture += (_, _) => { if (lassoOwner == owner) EndLasso(); };
+        owner.LostMouseCapture += (_, _) => { if (lassoOwner == owner && !owner.IsMouseCaptureWithin) EndLasso("capture-lost"); };
         owner.Unloaded += (_, _) => { if (lassoOwner == owner) EndLasso(); };
     }
     // Same entry points are used by mouse handlers and isolated CI layout checks.
@@ -44,9 +46,10 @@ public sealed partial class FileBrowserView
         lassoBaseline = additive ? ActiveSelected().OfType<FileItemViewModel>().ToHashSet() : [];
         lassoStart = ContentPoint(point); lassoPointer = lassoViewportStart = point; lassoMoved = false;
         lassoLayer = AdornerLayer.GetAdornerLayer(owner);
-        if (lassoLayer is null) { lassoOwner = null; return; }
+        if (lassoLayer is null) { lassoOwner = null; lastLassoEndReason = "no-adorner-layer"; return; }
         lassoAdorner = new SelectionAdorner(owner); lassoLayer.Add(lassoAdorner);
-        if (!owner.CaptureMouse()) { EndLasso(); return; }
+        if (!owner.CaptureMouse()) { EndLasso("capture-denied"); return; }
+        lastLassoEndReason = "active";
         if (!additive) ActiveSelected().Clear();
         dragStart = null;
         lassoTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(40), DispatcherPriority.Input, (_, _) => ScrollLasso(), Dispatcher);
@@ -98,8 +101,9 @@ public sealed partial class FileBrowserView
         else return;
         lassoOwner.UpdateLayout(); UpdateLasso(lassoPointer);
     }
-    internal void EndLasso()
+    internal void EndLasso(string reason = "cancelled")
     {
+        if (lassoOwner is not null) lastLassoEndReason = reason;
         lassoTimer?.Stop(); lassoTimer = null;
         var owner = lassoOwner; lassoOwner = null;
         if (lassoAdorner is not null) lassoLayer?.Remove(lassoAdorner);

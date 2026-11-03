@@ -239,6 +239,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     async Task<bool> Navigate(string path, bool addHistory, BrowserHistoryItem? restore = null, int? targetHistoryIndex = null, CancellationToken requestToken = default, bool throwOnFailure = false)
     {
         EndLasso();
+        CancelDragFeedback();
         recursiveSearchCts?.Cancel();
         thumbnailCts.Cancel(); thumbnailCts.Dispose(); thumbnailCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, session.Lifetime);
         if (!operations.Available) { viewModel.Message = "SFTP-подсистема недоступна."; if (throwOnFailure) throw new InvalidOperationException(viewModel.Message); return false; }
@@ -627,7 +628,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (ctrl && key == Key.F) { e.Handled = true; search.Focus(); search.SelectAll(); return; }
         if (key == Key.Escape)
         {
-            recursiveSearchCts?.Cancel(); EndLasso();
+            recursiveSearchCts?.Cancel(); EndLasso(); CancelDragFeedback();
             if (nameEdit?.IsActive == true && (FindAncestor<FileNamePresenter>(e.OriginalSource as DependencyObject) is not null || FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null)) { CancelNameEdit(); e.Handled = true; return; }
         }
         if (FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is not null || FindAncestor<PasswordBox>(e.OriginalSource as DependencyObject) is not null) return;
