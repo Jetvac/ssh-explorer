@@ -320,7 +320,7 @@ internal static class Program
             hasHwnd=new System.Windows.Interop.WindowInteropHelper(window).Handle!=IntPtr.Zero
         }).ToArray();
         // Titles are classified from a fixed allowlist; never print arbitrary titles or control values.
-        Console.WriteLine("WINDOW_SNAPSHOT "+System.Text.Json.JsonSerializer.Serialize(new{stage,windows}));
+        Console.WriteLine("WINDOW_SNAPSHOT "+System.Text.Json.JsonSerializer.Serialize(new{stage,selectedId=selected is null?(int?)null:RuntimeHelpers.GetHashCode(selected),windows}));
     }
     static void DelayedSecretComponents()
     {
@@ -518,10 +518,17 @@ internal static class Program
     }
     static void CloseMainAndWait(MainWindow main)
     {
-        main.Close();
-        // MainWindow may cancel this first Close while its asynchronous disposal/save runs.
-        // Keep its Dispatcher pumping before a fresh process or the next modal scenario starts.
-        WaitFor(()=>!main.IsVisible,TimeSpan.FromSeconds(15));
+        bool closed=false;EventHandler completed=(_,_)=>closed=true;
+        main.Closed+=completed;
+        DumpWindowState("before-main-close",main);
+        try
+        {
+            main.Close();
+            // Visibility can change before the asynchronous Closing path has finished.
+            // Only Closed and collection removal prove this exact window is gone.
+            WaitFor(()=>closed&&!_app.Windows.Cast<Window>().Contains(main),TimeSpan.FromSeconds(15));
+        }
+        finally{main.Closed-=completed;DumpWindowState("after-main-close",main);}
         _app.MainWindow=_owner;
     }
     static void WaitFor(Func<bool> completed,TimeSpan timeout)

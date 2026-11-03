@@ -20,7 +20,7 @@ public partial class App : Application
             args.Handled = false;
         };
         AppDomain.CurrentDomain.UnhandledException += (_, args) => LocalDiagnostics.RecordCritical("runtime.unhandled.failure", args.ExceptionObject as Exception);
-        TaskScheduler.UnobservedTaskException += (_, args) => LocalDiagnostics.RecordCritical("task.unobserved.failure", args.Exception);
+        TaskScheduler.UnobservedTaskException += (_, args) => LocalDiagnostics.RecordSynchronous("task.unobserved.failure", "observed", args.Exception);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => LocalDiagnostics.RecordSynchronous("process.exit", "observed");
         try
         {

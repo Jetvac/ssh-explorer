@@ -347,6 +347,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             attempt.Token.ThrowIfCancellationRequested();
             navigationButtons["terminal"].IsEnabled = Session.ShellAvailable;
             navigationButtons["monitor"].IsEnabled = Session.ShellAvailable;
+            navigationButtons["files"].IsEnabled = Session.SftpAvailable;
             if (Session.SftpAvailable)
             {
                 stage = "view.files"; await attempt.RecordAsync(stage, "started");
@@ -364,7 +365,9 @@ public sealed class SessionView : UserControl, IAsyncDisposable
                 screen.Content = new TextBlock { Text = "Файловая подсистема недоступна. Можно открыть терминал или диспетчер задач; переподключение доступно после закрытия этой сессии.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(24) };
                 SetNotice("Вход выполнен; SFTP недоступен. " + Session.SftpError);
             }
-            viewModel.Update(Session); return true;
+            viewModel.Update(Session);
+            if (!Session.SftpAvailable) SetNotice("Вход выполнен; SFTP недоступен. " + Session.SftpError);
+            return true;
         }
         catch (Exception ex)
         {
@@ -383,9 +386,10 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             return false;
         }
     }
-    internal void SetNotice(string text) => viewModel.StatusText = text;
+    internal void SetNotice(string text) { if (!disposed) viewModel.StatusText = text; }
     internal void SetConnectionFailure(Exception error, bool timeout)
     {
+        if (disposed) return;
         failed = true; viewModel.Update(Session);
         viewModel.StatusText = timeout ? "Время подключения истекло. Повторите попытку." : error is OperationCanceledException ? "Подключение отменено. Можно повторить попытку." : ErrorMessages.Describe(error);
         addressHost.Content = commandHost.Content = fileStatusHost.Content = null;
@@ -393,7 +397,9 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     }
     void Show(string key)
     {
-        if (disposed || (section == key && screen.Content is not null)) return;
+        if (disposed) return;
+        if (section == key && screen.Content is not null &&
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal))) return;
         section = key; monitor?.SetActive(false);
         addressHost.Visibility = commandHost.Visibility = fileStatusHost.Visibility = key == "files" ? Visibility.Visible : Visibility.Collapsed;
         foreach (var (name, button) in navigationButtons) { button.SetResourceReference(BackgroundProperty, name == key ? "Selected" : "NavigationSurface"); button.SetResourceReference(BorderBrushProperty, "Accent"); button.BorderThickness = name == key ? new Thickness(2, 0, 0, 0) : new Thickness(0); }
@@ -402,7 +408,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             if (!Session.ShellAvailable) return;
             try { monitor ??= new MonitorView(Session); screen.Content = monitor; monitor.SetActive(active); }
-            catch (Exception ex) { _ = LocalDiagnostics.RecordAsync("monitor.construct.failed", ex); SetNotice(ErrorMessages.Describe(ex)); }
+            catch (Exception ex) { _ = LocalDiagnostics.RecordAsync("monitor.construct.failed", ex); SetNotice(ErrorMessages.Describe(ex)); screen.Content = new TextBlock { Text = "Диспетчер задач не удалось открыть. Нажмите раздел для повторной попытки.", Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap }; }
         }
         else screen.Content = files;
         UiMotion.SurfaceChanged(screen);
@@ -414,14 +420,23 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         try
         {
             await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", "started");
-            if (disposed) throw new OperationCanceledException();
+            if (disposed || section != "terminal") throw new OperationCanceledException();
             terminal ??= new TerminalView(Session); screen.Content = terminal;
             // WebView2 is an HWND host: do not animate/reposition it or delay its input.
             UiMotion.Stop(screen); screen.Opacity = 1; screen.RenderTransform = Transform.Identity;
             await terminal.StartAsync();
             await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", "succeeded");
         }
-        catch (Exception ex) { await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", ex is OperationCanceledException ? "cancelled" : "failed", ex); if (!disposed) SetNotice(ErrorMessages.Describe(ex)); }
+        catch (Exception ex)
+        {
+            await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", ex is OperationCanceledException ? "cancelled" : "failed", ex);
+            if (ex is not OperationCanceledException) { terminal?.Dispose(); terminal = null; }
+            if (!disposed && section == "terminal")
+            {
+                SetNotice(ErrorMessages.Describe(ex));
+                screen.Content = new TextBlock { Text = "Терминал не удалось открыть. Нажмите раздел для повторной попытки.", Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap };
+            }
+        }
     }
     public void SetActive(bool value) { active = value; monitor?.SetActive(value && section == "monitor"); }
     public void RouteFileKey(KeyEventArgs e) { if (section == "files") files?.RouteGlobalKey(e); }
