@@ -46,6 +46,7 @@ jobs:
             artifacts/ui-beta4-before/**
             artifacts/ui-beta4-after/**
             artifacts/ui-beta4-interactions/**
+            artifacts/ui-beta4-forms/**
             artifacts/*ui-evidence.zip
           if-no-files-found: warn
           retention-days: 14

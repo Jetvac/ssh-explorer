@@ -76,6 +76,7 @@ jobs:
             artifacts/ui-beta4-before/**
             artifacts/ui-beta4-after/**
             artifacts/ui-beta4-interactions/**
+            artifacts/ui-beta4-forms/**
           if-no-files-found: warn
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

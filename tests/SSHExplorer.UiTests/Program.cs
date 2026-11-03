@@ -21,6 +21,7 @@ internal static class Program
             catch(Exception ex){Console.WriteLine(ex);return 1;}
         }
         if (args.Length > 0 && args[0] == "--file-interactions-ui") return FileInteractionTests.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--forms-tabs-ui") return FormTabTests.Run(args.Skip(1).ToArray());
         if (args.Length == 1 && args[0] == "--monitor-state-only")
         {
             try { int count=MonitorStateTests.Run(Assert);Console.WriteLine($"RESULT: {count} monitor state/history assertions passed; no Application, Window or SSH created");return 0; }

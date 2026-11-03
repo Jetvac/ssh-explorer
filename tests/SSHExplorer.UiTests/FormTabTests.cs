@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.IO;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -12,7 +14,23 @@ using SSHExplorer.Core;
 
 internal static class FormTabTests
 {
-    // Called only inside the guarded real-window CI runner, after file scenarios.
+    public static int Run(string[] args)
+    {
+        CiVisualEvidence.RequireCi();
+        try
+        {
+            var app=TestApplication.Create();SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));Theme.Apply("Light");CultureInfo.CurrentCulture=CultureInfo.GetCultureInfo("ru-RU");CultureInfo.CurrentUICulture=CultureInfo.GetCultureInfo("ru-RU");
+            var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","form-tab-ui-store",Guid.NewGuid().ToString("N")));typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);
+            int index=Array.IndexOf(args,"--render-dir");var evidence=new CiVisualEvidence(index<0?"artifacts/ui-beta4-forms":args[index+1]);
+            var main=new MainWindow{Width=1320,Height=850,ShowInTaskbar=false,ShowActivated=false,Left=-10000,Top=-10000,WindowStartupLocation=WindowStartupLocation.Manual};main.Show();Pump();int count=0;
+            Run(main,store,evidence,(value,label)=>{if(!value)throw new InvalidOperationException(label);count++;Console.WriteLine("PASS "+label);});
+            bool closed=false;main.Closed+=(_,_)=>closed=true;main.Close();var watch=System.Diagnostics.Stopwatch.StartNew();
+            while(!closed||app.Windows.Cast<Window>().Contains(main)){if(watch.Elapsed>TimeSpan.FromSeconds(15))throw new TimeoutException("Form/tab fixture main window did not close.");Pump();}
+            app.Shutdown();Console.WriteLine($"RESULT: {count} actual form/tab/overflow checks passed; CI-only HWNDs; fresh independent component fixture, no SSH or physical keyboard input");return 0;
+        }
+        catch(Exception ex){Console.WriteLine(ex);return 1;}
+    }
+    // Uses a fresh guarded real-window component fixture, independent of file mutations.
     public static void Run(MainWindow main,AppStore store,CiVisualEvidence evidence,Action<bool,string> assert)
     {
         CiVisualEvidence.RequireCi();

@@ -155,7 +155,6 @@ internal static class FileInteractionTests
             files.BeginLasso(table,origin,false);files.UpdateLasso(new Point(60,origin.Y+40));view.ShowSection("processes");Layout(main);
             Assert(Field(files,"lassoOwner") is null&&Field(files,"lassoAdorner") is null,"leaving the file section clears selection capture and adorner");
             view.ShowSection("files");Layout(main);
-            FormTabTests.Run(main,store,evidence,Assert);
             bool closed=false;main.Closed+=(_,_)=>closed=true;main.Close();WaitFor(()=>closed&&!app.Windows.Cast<Window>().Contains(main));app.Shutdown();
             Console.WriteLine($"RESULT: {checks} actual file interaction checks passed; CI-only HWNDs; controlled operations; no SSH, clipboard writes or process signals");return 0;
         }

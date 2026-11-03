@@ -17,9 +17,12 @@ $monitorExit=$LASTEXITCODE
 $interactions=Join-Path $root 'artifacts/ui-beta4-interactions'
 & $sdk run --project tests/SSHExplorer.UiTests/SSHExplorer.UiTests.csproj -c Release --no-build -- --file-interactions-ui --render-dir $interactions 2>&1 | Tee-Object -FilePath artifacts/ui-beta4-interactions.log
 $interactionExit=$LASTEXITCODE
-# These scopes run in separate processes. Collect both actual-window reports
-# before failing, so a monitor regression cannot hide file/form/tab evidence.
-if($monitorExit -or $interactionExit){throw "Current UI checks failed (monitor=$monitorExit; files/forms/tabs=$interactionExit). See both reports; no comparison package was produced."}
+$forms=Join-Path $root 'artifacts/ui-beta4-forms'
+& $sdk run --project tests/SSHExplorer.UiTests/SSHExplorer.UiTests.csproj -c Release --no-build -- --forms-tabs-ui --render-dir $forms 2>&1 | Tee-Object -FilePath artifacts/ui-beta4-forms.log
+$formExit=$LASTEXITCODE
+# These scopes run in separate processes. Collect all actual-window reports
+# before failing, so one domain cannot hide the other domains' evidence.
+if($monitorExit -or $interactionExit -or $formExit){throw "Current UI checks failed (monitor=$monitorExit; files=$interactionExit; forms/tabs=$formExit). See the three independent reports; no comparison package was produced."}
 
 # The comparison uses the already-published immutable beta.3 package, not a
 # recompiled approximation. The exact same offline fixture and client size are
@@ -54,8 +57,9 @@ $comparisons=foreach($state in @('processes-wide','processes-narrow','performanc
     [ordered]@{state=$state;clientDip=$new[0].clientDip;dpi=$new[0].dpi;uiFontSize=$new[0].uiFontSize;culture=$new[0].culture;theme=$new[0].measurements.theme}
 }
 $interactionMetadata=Get-Content -LiteralPath (Join-Path $interactions 'visual-evidence.json') -Raw | ConvertFrom-Json
-if($interactionMetadata.commit -ne $env:GITHUB_SHA){throw 'Interaction evidence commit mismatch.'}
-$evidenceSets=@([pscustomobject]@{directory=$before;metadata=$beforeMetadata},[pscustomobject]@{directory=$after;metadata=$afterMetadata},[pscustomobject]@{directory=$interactions;metadata=$interactionMetadata})
+$formMetadata=Get-Content -LiteralPath (Join-Path $forms 'visual-evidence.json') -Raw | ConvertFrom-Json
+if($interactionMetadata.commit -ne $env:GITHUB_SHA -or $formMetadata.commit -ne $env:GITHUB_SHA){throw 'Interaction evidence commit mismatch.'}
+$evidenceSets=@([pscustomobject]@{directory=$before;metadata=$beforeMetadata},[pscustomobject]@{directory=$after;metadata=$afterMetadata},[pscustomobject]@{directory=$interactions;metadata=$interactionMetadata},[pscustomobject]@{directory=$forms;metadata=$formMetadata})
 foreach($set in $evidenceSets){
     foreach($capture in $set.metadata.captures){
         $file=Join-Path $set.directory $capture.file
@@ -66,7 +70,7 @@ foreach($set in $evidenceSets){
 [xml]$properties=Get-Content -LiteralPath Directory.Build.props
 $version=[string]$properties.Project.PropertyGroup.Version
 $proof=Join-Path $root "artifacts/SSHExplorer-$version-ui-evidence.zip"
-Compress-Archive -LiteralPath $after,$before,$interactions -DestinationPath $proof
+Compress-Archive -LiteralPath $after,$before,$interactions,$forms -DestinationPath $proof
 '{0}  {1}' -f (Get-FileHash -LiteralPath $proof -Algorithm SHA256).Hash.ToLowerInvariant(),[IO.Path]::GetFileName($proof) | Add-Content -LiteralPath artifacts/SHA256SUMS.txt -Encoding utf8
 git diff --exit-code -- tests/SSHExplorer.UiTests/packages.lock.json
 if($LASTEXITCODE){throw 'Baseline harness changed the normal locked dependency graph.'}
