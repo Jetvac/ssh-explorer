@@ -102,7 +102,15 @@ internal static class FileInteractionTests
             evidence.Capture((FrameworkElement)main.Content,"files-created-folder",new{theme="Light",fixtureOnly=true,serverConfirmed=true,remoteOperations="controlled boundary"});
             SendKey(editor,Key.Escape);Layout(main);Assert(operations.Exists(created.Entry.FullPath)&&created.Edit is null,"Escape after successful creation keeps the created remote object");
             // Reuse the same name presenter in the virtualized tile template.
-            Invoke(files,"SetMode","Medium",false);Layout(main);var dotfile=model.Entries.Single(row=>row.Name==".bashrc");tiles.SelectedItem=dotfile;tiles.ScrollIntoView(dotfile);Layout(main);SendKey(tiles,Key.F2);Layout(main);editor=Editor(files,dotfile);
+            operations.AddMany(10000);Complete(files.RefreshAsync());Invoke(files,"SetMode","Medium",false);Layout(main);
+            var dotfile=model.Entries.Single(row=>row.Name==".bashrc");int dotfileIndex=model.VisibleEntries.ToList().IndexOf(dotfile);bool initiallyRealized=tiles.ItemContainerGenerator.ContainerFromItem(dotfile)is not null;
+            tiles.SelectedItem=dotfile;tiles.ScrollIntoView(dotfile);Layout(main);SendKey(tiles,Key.F2);Layout(main);
+            var tilePanel=Descendants<VirtualizingWrapPanel>(tiles).Single();var matchedPresenters=Descendants<FileNamePresenter>(tiles).Where(presenter=>ReferenceEquals(presenter.DataContext,dotfile)).ToArray();
+            var tileDiagnostic=new{theme="Light",fixtureOnly=true,visibleContainsItem=model.VisibleEntries.Contains(dotfile),visibleCount=model.VisibleEntries.Count,dotfileIndex,initiallyRealized,selectedPaths=model.SelectedPaths.ToArray(),editActive=dotfile.Edit?.IsActive,canRename=model.CanRename,realizedContainers=Descendants<ListBoxItem>(tiles).Count(),realizedPresenters=Descendants<FileNamePresenter>(tiles).Count(),matchedPresenters=matchedPresenters.Length,matchedVisibleEditors=matchedPresenters.SelectMany(Descendants<TextBox>).Count(input=>input.IsVisible),panelOffset=tilePanel.VerticalOffset,panelViewport=tilePanel.ViewportHeight,panelExtent=tilePanel.ExtentHeight};
+            Console.WriteLine("DIAGNOSTIC tile editor "+System.Text.Json.JsonSerializer.Serialize(tileDiagnostic));evidence.Capture((FrameworkElement)main.Content,"files-tiles-before-editor",tileDiagnostic);
+            var dotContainer=tiles.ItemContainerGenerator.ContainerFromItem(dotfile)as ListBoxItem;var clipped=dotContainer is null?Rect.Empty:Rect.Intersect(new Rect(tiles.RenderSize),dotContainer.TransformToAncestor(tiles).TransformBounds(new Rect(dotContainer.RenderSize)));
+            Assert(dotfileIndex>1000&&dotContainer is not null&&!clipped.IsEmpty&&clipped.Width>0&&clipped.Height>0&&Descendants<ListBoxItem>(tiles).Count()<250,"ScrollIntoView realizes and displays the offscreen selected tile in a ten-thousand-item list while keeping containers bounded");
+            editor=Editor(files,dotfile);
             Assert(editor.IsVisible&&editor.SelectionLength==dotfile.Name.Length,"tile F2 uses a real editor and selects the complete dotfile name");
             evidence.Capture((FrameworkElement)main.Content,"files-inline-tiles",new{theme="Light",fixtureOnly=true,view="Medium",sourceName=dotfile.Name});
             editor.Text=".profile-new";SendKey(editor,Key.Escape);Layout(main);Assert(operations.Exists("/srv/fixture/.bashrc")&&!operations.Exists("/srv/fixture/.profile-new"),"tile Escape preserves source and does not submit the edited name");
@@ -128,7 +136,7 @@ internal static class FileInteractionTests
             hiddenRename.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Pump();overflow.IsOpen=false;Layout(main);
             Assert(dotfile.Edit?.IsActive==true&&Editor(files,dotfile).IsVisible,"overflow rename invokes the same inline action rather than a second dialog");files.CancelNameEdit();commandBar.Width=double.NaN;Layout(main);
             // A large model exercises the production lasso geometry without realizing all containers.
-            operations.AddMany(10000);Complete(files.RefreshAsync());Layout(main);var tileScroller=Descendants<ScrollViewer>(tiles).First();tileScroller.ScrollToVerticalOffset(0);Layout(main);
+            Complete(files.RefreshAsync());Layout(main);var tileScroller=Descendants<ScrollViewer>(tiles).First();tileScroller.ScrollToVerticalOffset(0);Layout(main);
             int realizedBefore=Descendants<ListBoxItem>(tiles).Count();files.BeginLasso(tiles,new Point(3,3),false);files.UpdateLasso(new Point(Math.Min(tiles.ActualWidth-3,220),Math.Min(tiles.ActualHeight-3,250)));Layout(main);
             Assert(Field(files,"lassoOwner")==tiles&&tiles.SelectedItems.Count>0&&realizedBefore<250&&Descendants<ListBoxItem>(tiles).Count()<250,"tile lasso selects model items while keeping a ten-thousand-item listing virtualized");
             evidence.Capture((FrameworkElement)main.Content,"files-lasso-tiles",new{theme="Light",fixtureOnly=true,totalItems=model.VisibleEntries.Count,realizedContainers=Descendants<ListBoxItem>(tiles).Count(),selectedItems=tiles.SelectedItems.Count,programmaticController=true});
