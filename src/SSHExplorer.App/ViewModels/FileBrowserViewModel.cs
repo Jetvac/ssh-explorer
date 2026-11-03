@@ -8,26 +8,31 @@ public sealed record BrowserContext(string Path, List<BrowserHistoryItem> Histor
 public sealed class FileBrowserViewModel : ObservableObject
 {
     string currentPath = "", viewMode = "Details", sortKey = "Name", searchQuery = "", message = "", statusText = "Элементов: 0";
-    bool descending, isLoading;
+    bool descending, isLoading, available;
     long navigationGeneration;
     int historyIndex = -1;
     List<FileItemViewModel> entries = [];
     IReadOnlyList<FileItemViewModel> visibleEntries = [];
     List<string> selectedPaths = [];
 
-    public string CurrentPath { get => currentPath; private set => Set(ref currentPath, value); }
+    public string CurrentPath { get => currentPath; private set { if (Set(ref currentPath, value)) RaiseAvailability(); } }
     public string ViewMode { get => viewMode; set => Set(ref viewMode, value); }
     public string SortKey { get => sortKey; set => Set(ref sortKey, value); }
     public bool Descending { get => descending; set => Set(ref descending, value); }
     public string SearchQuery { get => searchQuery; set => Set(ref searchQuery, value); }
     public string Message { get => message; set => Set(ref message, value); }
     public string StatusText { get => statusText; private set => Set(ref statusText, value); }
-    public bool IsLoading { get => isLoading; private set => Set(ref isLoading, value); }
+    public bool IsLoading { get => isLoading; private set { if (Set(ref isLoading, value)) RaiseAvailability(); } }
+    public bool Available { get => available; set { if (Set(ref available, value)) RaiseAvailability(); } }
+    public bool CanCreate => Available && !IsLoading && CurrentPath.Length > 0;
+    public bool HasSelection => CanCreate && SelectedPaths.Count > 0;
+    public bool CanRename => HasSelection && SelectedPaths.Count == 1;
+    public bool CanGoUp => Available && CurrentPath.Length > 0 && CurrentPath != "/";
     public long NavigationGeneration => navigationGeneration;
     public List<BrowserHistoryItem> History { get; } = [];
     public int HistoryIndex { get => historyIndex; private set { Set(ref historyIndex, value); Raise(nameof(CanGoBack)); Raise(nameof(CanGoForward)); } }
-    public bool CanGoBack => HistoryIndex > 0;
-    public bool CanGoForward => HistoryIndex >= 0 && HistoryIndex < History.Count - 1;
+    public bool CanGoBack => Available && !IsLoading && HistoryIndex > 0;
+    public bool CanGoForward => Available && !IsLoading && HistoryIndex >= 0 && HistoryIndex < History.Count - 1;
     public List<FileItemViewModel> Entries { get => entries; private set => Set(ref entries, value); }
     public IReadOnlyList<FileItemViewModel> VisibleEntries { get => visibleEntries; private set => Set(ref visibleEntries, value); }
     public IReadOnlyList<string> SelectedPaths => selectedPaths;
@@ -64,7 +69,9 @@ public sealed class FileBrowserViewModel : ObservableObject
     {
         var available = Entries.Select(r => r.Entry.FullPath).ToHashSet(StringComparer.Ordinal); selectedPaths = paths.Where(available.Contains).Distinct(StringComparer.Ordinal).ToList();
         Raise(nameof(SelectedPaths)); Raise(nameof(SelectedEntries)); UpdateStatus();
+        RaiseAvailability();
     }
+    void RaiseAvailability() { Raise(nameof(CanCreate)); Raise(nameof(HasSelection)); Raise(nameof(CanRename)); Raise(nameof(CanGoUp)); Raise(nameof(CanGoBack)); Raise(nameof(CanGoForward)); }
     public void ApplyFilter(bool showHidden, bool showExtensions)
     {
         var query = SearchQuery; var rows = Entries.Where(r => (showHidden || !r.Entry.Name.StartsWith('.')) && (query.Length == 0 || r.Entry.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase))).ToList();

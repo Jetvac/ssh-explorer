@@ -59,7 +59,7 @@ public sealed class TransferJob : INotifyPropertyChanged
 }
 
 /// <summary>A shared, bounded queue. All streaming work uses dedicated session-owned SFTP clients.</summary>
-public sealed class TransferQueue
+public sealed partial class TransferQueue
 {
     private readonly List<TransferJob> _jobs = [];
     private readonly SemaphoreSlim _parallelism = new(2, 2);

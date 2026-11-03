@@ -17,44 +17,17 @@ public static class Dialogs
     }
     public static ServerProfile? Profile(ServerProfile? old = null)
     {
-        var w = Window(old is null ? "Добавить сервер" : "Изменить сервер");
-        var p = new StackPanel { Margin = new Thickness(24) };
-        p.Children.Add(Ui.Text("Подключение по SSH", 22, true));
-        var name = Field(p, "Название", old?.Name ?? "");
-        var host = Field(p, "DNS-имя, IPv4 или IPv6", old?.Host ?? "");
-        var port = Field(p, "Порт", (old?.Port ?? 22).ToString());
-        var user = Field(p, "Пользователь Linux", old?.Username ?? "");
-        p.Children.Add(Ui.Text("Способ входа"));
-        var auth = new ComboBox { ItemsSource = new[] { "Пароль", "Приватный ключ", "Keyboard-interactive" }, SelectedIndex = (int)(old?.Authentication ?? AuthenticationKind.Password), Margin = new Thickness(0, 6, 0, 0) }; p.Children.Add(auth);
-        var key = Field(p, "Приватный ключ (локальный файл)", old?.PrivateKeyPath ?? "");
-        var choose = Ui.Button("Выбрать ключ…", () => { var f = new OpenFileDialog { Title = "Приватный ключ SSH", CheckFileExists = true }; if (f.ShowDialog(w) == true) key.Text = f.FileName; }); choose.HorizontalAlignment = HorizontalAlignment.Left; p.Children.Add(choose);
-        void KeyState() { key.IsEnabled = choose.IsEnabled = auth.SelectedIndex == 1; }
-        auth.SelectionChanged += (_, _) => KeyState(); KeyState();
-        var initial = Field(p, "Стартовая папка", old?.InitialPath ?? "~");
-        var timeout = Field(p, "Таймаут подключения, секунд", (old?.TimeoutSeconds ?? 20).ToString());
-        var save = new CheckBox { Content = "Сохранять пароль / passphrase с защитой Windows", IsChecked = old?.SaveSecret ?? false, Margin = new Thickness(0, 14, 0, 12) }; p.Children.Add(save);
-        ServerProfile? result = null;
-        var ok = Ui.Button("Сохранить", () =>
-        {
-            try
-            {
-                result = new ServerProfile { Id = old?.Id ?? Guid.NewGuid(), Name = name.Text.Trim(), Host = host.Text.Trim().Trim('[', ']'), Port = int.Parse(port.Text), Username = user.Text.Trim(), Authentication = (AuthenticationKind)auth.SelectedIndex, PrivateKeyPath = key.Text.Trim(), InitialPath = initial.Text.Trim(), TimeoutSeconds = Math.Clamp(int.Parse(timeout.Text), 3, 300), SaveSecret = save.IsChecked == true, Bookmarks = old?.Bookmarks.ToList() ?? [] };
-                result.Validate(); w.DialogResult = true;
-            }
-            catch (Exception ex) { MessageBox.Show(w, ex.Message, "Проверьте профиль", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        }); ok.IsDefault = true;
-        var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true;
-        var row = Ui.Row(ok, cancel); row.HorizontalAlignment = HorizontalAlignment.Right; p.Children.Add(row);
-        w.Content = new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; w.Loaded += (_, _) => name.Focus();
-        return w.ShowDialog() == true ? result : null;
+        var dialog=new ProfileDialog(new ProfilePersistence(App.Store),old,Application.Current.MainWindow);
+        return dialog.ShowDialog()==true?dialog.SavedProfile:null;
     }
+    public static Task<ServerProfile?> ProfileAsync(ServerProfile? old=null)=>Task.FromResult(Profile(old));
     public static SessionCredentials? Credentials(ServerProfile profile, string? saved)
     {
         var w = Window("Вход — " + profile.Name, 480); var p = new StackPanel { Margin = new Thickness(24) };
         p.Children.Add(Ui.Text(profile.Username + "@" + profile.Endpoint, 18, true));
         p.Children.Add(Ui.Text(profile.Authentication == AuthenticationKind.PrivateKey ? "Passphrase приватного ключа (может быть пустой)" : "Пароль", 14));
-        var password = new PasswordBox { Password = saved ?? "", Margin = new Thickness(0, 14, 0, 16) }; p.Children.Add(password);
-        var info = Ui.Text("Секрет передаётся только после проверки ключа сервера.", 12); info.TextWrapping = TextWrapping.Wrap; info.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(info);
+        var password = new PasswordBox { Password = saved ?? "", Margin = new Thickness(0, 10, 0, 12) }; System.Windows.Automation.AutomationProperties.SetName(password,profile.Authentication==AuthenticationKind.PrivateKey?"Парольная фраза приватного ключа":"Пароль SSH"); p.Children.Add(password);
+        var info = Ui.Text("Секрет передаётся только после проверки ключа сервера.\n"+(profile.SaveSecret?"В профиле включено сохранение с защитой Windows.":"Секрет не сохраняется. Эту настройку можно изменить в профиле."), 12); info.TextWrapping = TextWrapping.Wrap; info.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(info);
         var ok = Ui.Button("Подключиться", () => w.DialogResult = true); ok.IsDefault = true;
         var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true;
         var row = Ui.Row(ok, cancel); row.HorizontalAlignment = HorizontalAlignment.Right; row.Margin = new Thickness(0, 18, 0, 0); p.Children.Add(row); w.Content = p; w.Loaded += (_, _) => password.Focus();

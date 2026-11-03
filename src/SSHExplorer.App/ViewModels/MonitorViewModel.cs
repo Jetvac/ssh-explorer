@@ -15,10 +15,13 @@ public sealed class MonitorViewModel : ObservableObject
     public bool IsActive { get => isActive; set => Set(ref isActive, value); }
     public bool IsBusy { get => isBusy; set => Set(ref isBusy, value); }
     public IReadOnlyList<ProcessItemViewModel> Processes { get => processes; private set => Set(ref processes, value); }
-    public ProcessIdentity? SelectedIdentity { get => selectedIdentity; set => Set(ref selectedIdentity, value); }
+    public ProcessIdentity? SelectedIdentity { get => selectedIdentity; set { if (Set(ref selectedIdentity, value)) Raise(nameof(CanSignalSelected)); } }
+    public bool CanSignalSelected => SelectedIdentity is not null && Processes.Any(p => p.Metric.Identity == SelectedIdentity && p.Metric.CanSignal);
     public string Summary => Snapshot is null ? "" : $"ЦП: {Percent(Snapshot.System.CpuPercent)}    Память: {Percent(Snapshot.System.MemoryPercent)}";
     public string CpuText => Percent(Snapshot?.System.CpuPercent);
     public string MemoryText => Percent(Snapshot?.System.MemoryPercent);
+    public string CpuHeader => Snapshot?.System.CpuPercent is null ? "—" : CpuText;
+    public string MemoryHeader => Snapshot?.System.MemoryPercent is null ? "—" : MemoryText;
     public string Limitations => Snapshot is null ? "" : string.Join(" · ", Snapshot.Limitations);
     public string SystemInfo
     {
@@ -41,7 +44,7 @@ public sealed class MonitorViewModel : ObservableObject
         Disks = value.Disks.Select(x => new DiskRow(x.Name, Speed(x.ReadBytesPerSecond), Speed(x.WriteBytesPerSecond))).ToList();
         Storage = value.Storage.Select(x => new StorageRow(x.FileSystem, x.MountPoint, Ui.Size(x.TotalBytes), Ui.Size(x.AvailableBytes))).ToList();
         var points = history.ToArray(); CpuHistory = points.Select(h => h.CpuPercent).ToArray(); MemoryHistory = points.Select(h => h.MemoryPercent).ToArray();
-        foreach (var name in new[] { nameof(Summary), nameof(CpuText), nameof(MemoryText), nameof(Limitations), nameof(SystemInfo), nameof(Networks), nameof(Disks), nameof(Storage), nameof(CpuHistory), nameof(MemoryHistory) }) Raise(name);
+        foreach (var name in new[] { nameof(Summary), nameof(CpuText), nameof(MemoryText), nameof(CpuHeader), nameof(MemoryHeader), nameof(Limitations), nameof(SystemInfo), nameof(Networks), nameof(Disks), nameof(Storage), nameof(CpuHistory), nameof(MemoryHistory) }) Raise(name);
         RebuildProcesses();
     }
     public void ReportFailure(string reason) => Freshness = "Данные устарели. " + (Snapshot is null ? "Успешных замеров нет. " : $"Последний замер {Snapshot.Timestamp.LocalDateTime:HH:mm:ss}. ") + reason;
@@ -50,7 +53,8 @@ public sealed class MonitorViewModel : ObservableObject
         if (Snapshot is null) { Processes = []; return; } var query = SearchQuery;
         var priorIdentity = SelectedIdentity;
         Processes = Snapshot.Processes.Where(x => query.Length == 0 || (x.Name + " " + x.Pid + " " + x.User).Contains(query, StringComparison.CurrentCultureIgnoreCase)).Select(x => new ProcessItemViewModel(x, Snapshot.System.MemoryTotalBytes)).ToList();
-        SelectedIdentity = priorIdentity is not null && Snapshot.Processes.Any(p => p.Identity == priorIdentity) ? priorIdentity : null;
+        SelectedIdentity = priorIdentity is not null && Processes.Any(p => p.Metric.Identity == priorIdentity) ? priorIdentity : null;
+        Raise(nameof(CanSignalSelected));
     }
     public static string Percent(double? v) => v is { } n ? $"{n:0.0}%" : "Недоступно";
     public static string Number(double? v) => v is { } n ? $"{n:0.00}" : "Недоступно";

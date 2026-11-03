@@ -20,6 +20,7 @@ public partial class App : Application
             Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) => Dispatcher.BeginInvoke(() => Theme.Apply(Store.Settings.Theme));
             Transfers.ResolveConflict = conflict => Dispatcher.InvokeAsync(() => Dialogs.Conflict(conflict)).Task;
             MainWindow = new MainWindow(); MainWindow.Show();
+            await LocalDiagnostics.RecordAsync("app.started");
             await TestSessionHarness.StartAsync(this, e.Args);
         }
         catch (Exception ex) { MessageBox.Show(ex.Message, "SSH Explorer — запуск", MessageBoxButton.OK, MessageBoxImage.Error); Shutdown(1); }

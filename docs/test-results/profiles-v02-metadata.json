@@ -1,0 +1,13 @@
+{
+  "Date": "2026-11-03",
+  "OS": "10.0.26200.0",
+  "AppVersion": "0.2.0-beta.1+f15c2cda5f3c939b31c49446eb6eab00edbd356e",
+  "AppDllSha256": "305A8C776FB63C06B3A2765CFF49869454FB43AD3D494BEC317CC67C08A82365",
+  "TestKind": "Working-tree Release build, isolated STA component/dialog tests; not the final published EXE acceptance",
+  "StaChecks": 65,
+  "CoreRegressions": 34,
+  "HeadlessWithFreshSshChecks": 60,
+  "AdditionalFreshSshChecks": 6,
+  "LiveModalInput": "Not fully verified: CUA owned modal input/cache limitation",
+  "BaselineProof": "profile-crash-baseline.json"
+}

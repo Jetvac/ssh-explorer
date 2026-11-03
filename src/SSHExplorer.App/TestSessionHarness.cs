@@ -25,15 +25,25 @@ internal static class TestSessionHarness
         public string? Theme { get; set; }
         public double? WindowWidth { get; set; }
         public double? WindowHeight { get; set; }
+        public List<Configuration>? Nodes { get; set; }
     }
     private static Configuration? _configuration;
     public static string? TryGetStoreDirectory(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--settings-dir")
+        {
+            if (!Path.IsPathFullyQualified(args[1])) throw new ArgumentException("Укажите абсолютную папку настроек.");
+            return args[1];
+        }
         if (args.Length == 0 || args[0] != "--test-session") return null;
         if (args.Length != 2) throw new ArgumentException("Испытательный режим: --test-session <config.json>");
         var c = JsonSerializer.Deserialize<Configuration>(File.ReadAllText(args[1])) ?? throw new InvalidDataException("Пустая конфигурация стенда.");
-        if (c.Host != "127.0.0.1" && c.Host != "::1") throw new ArgumentException("Испытательный режим разрешён только для изолированного loopback-стенда.");
-        if (string.IsNullOrWhiteSpace(c.Directory) || !Path.IsPathFullyQualified(c.Directory) || !c.Fingerprint.StartsWith("SHA256:", StringComparison.Ordinal)) throw new ArgumentException("Укажите отдельную абсолютную папку настроек и ожидаемый SHA256-отпечаток стенда.");
+        foreach (var node in c.Nodes ?? [c])
+        {
+            if (node.Host != "127.0.0.1" && node.Host != "::1") throw new ArgumentException("Испытательный режим разрешён только для изолированного loopback-стенда.");
+            if (!node.Fingerprint.StartsWith("SHA256:", StringComparison.Ordinal)) throw new ArgumentException("Укажите ожидаемый SHA256-отпечаток стенда.");
+        }
+        if (string.IsNullOrWhiteSpace(c.Directory) || !Path.IsPathFullyQualified(c.Directory)) throw new ArgumentException("Укажите отдельную абсолютную папку настроек.");
         _configuration = c; return c.Directory;
     }
     public static async Task StartAsync(App app, string[] args)
@@ -43,9 +53,13 @@ internal static class TestSessionHarness
         if (c.Theme is "Light" or "Dark" or "System") { App.Store.Settings.Theme = c.Theme; Theme.Apply(c.Theme); }
         if (c.WindowWidth is { } width) main.Width = Math.Clamp(width, 860, 2000);
         if (c.WindowHeight is { } height) main.Height = Math.Clamp(height, 560, 1200);
-        var profile = new ServerProfile { Name = c.Name, Host = c.Host, Port = c.Port, Username = c.Username, InitialPath = c.InitialPath };
-        App.Store.Profiles.Add(profile); await App.Store.SaveAsync();
-        await main.OpenServer(profile, suppliedCredentials: new SessionCredentials(c.Secret), trustOverride: key => Task.FromResult(key.Fingerprint == c.Fingerprint && !key.Changed ? TrustDecision.Permanent : TrustDecision.Reject));
+        foreach (var node in c.Nodes ?? [c])
+        {
+            var profile = App.Store.Profiles.FirstOrDefault(p => p.Host == node.Host && p.Port == node.Port && p.Username == node.Username && p.Name == node.Name)
+                ?? new ServerProfile { Name = node.Name, Host = node.Host, Port = node.Port, Username = node.Username, InitialPath = node.InitialPath };
+            if (!App.Store.Profiles.Contains(profile)) await App.Store.SaveProfileAsync(profile, null);
+            await main.OpenServer(profile, suppliedCredentials: new SessionCredentials(node.Secret), trustOverride: key => Task.FromResult(key.Fingerprint == node.Fingerprint && !key.Changed ? TrustDecision.Permanent : TrustDecision.Reject));
+        }
         if (c.RunFileLoadProbe) await main.RunFileLoadProbeAsync();
         if (c.RunClipboardProbe) await main.RunClipboardProbeAsync();
         if (c.RunTerminalProbe) await main.RunTerminalProbeAsync();

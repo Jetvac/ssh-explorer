@@ -15,7 +15,7 @@ public sealed class FileItemViewModel(RemoteEntry entry) : ObservableObject
     public double Opacity => IsCut ? .45 : 1;
     public string DisplayName => ShowExtensions || entry.IsDirectory || entry.IsSymbolicLink ? entry.Name : Path.GetFileNameWithoutExtension(entry.Name);
     public string Glyph => entry.IsSymbolicLink ? "\uE71B" : entry.IsDirectory ? "\uE8B7" : IsImage(entry) ? "\uEB9F" : "\uE8A5";
-    public Brush IconBrush => entry.IsDirectory ? Brushes.Goldenrod : entry.IsSymbolicLink ? Brushes.MediumPurple : Brushes.SteelBlue;
+    public Brush IconBrush => System.Windows.SystemParameters.HighContrast ? System.Windows.SystemColors.WindowTextBrush : entry.IsDirectory ? Brushes.Goldenrod : entry.IsSymbolicLink ? Brushes.MediumPurple : Brushes.SteelBlue;
     public string Type => entry.TypeName;
     public string Size => entry.SizeText;
     public DateTime? Modified => entry.LastWriteTimeUtc == DateTime.MinValue ? null : entry.LastWriteTimeUtc.ToLocalTime();

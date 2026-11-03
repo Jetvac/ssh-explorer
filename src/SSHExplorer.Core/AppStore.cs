@@ -8,11 +8,13 @@ namespace SSHExplorer.Core;
 public sealed class AppStore
 {
     private readonly SemaphoreSlim _saveGate = new(1, 1);
+    private Dictionary<Guid,Guid> _secretReferences = [];
     internal static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
     public string DirectoryPath { get; }
     public List<ServerProfile> Profiles { get; private set; } = [];
     public AppSettings Settings { get; private set; } = new();
     public HostTrustStore Trust { get; }
+    public string? LastProfileCleanupWarning { get; private set; }
     public AppStore(string? directory = null)
     {
         DirectoryPath = directory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SSHExplorer");
@@ -24,7 +26,7 @@ public sealed class AppStore
             {
                 var data = JsonSerializer.Deserialize<StoreDocument>(File.ReadAllText(path), JsonOptions) ?? throw new InvalidDataException("Пустой файл настроек.");
                 if (data.SchemaVersion != 1) throw new InvalidDataException($"Неизвестная версия настроек {data.SchemaVersion}.");
-                Profiles = data.Profiles; Settings = data.Settings;
+                Profiles = data.Profiles; Settings = data.Settings; _secretReferences = data.SecretReferences;
             }
             catch (JsonException ex) { throw new InvalidDataException($"Повреждены настройки {path}. Сохраните копию файла и восстановите его из резервной копии .bak.", ex); }
         }
@@ -33,8 +35,67 @@ public sealed class AppStore
     public async Task SaveAsync(CancellationToken ct = default)
     {
         await _saveGate.WaitAsync(ct).ConfigureAwait(false);
-        try { await AtomicWriteAsync(Path.Combine(DirectoryPath, "settings.json"), JsonSerializer.Serialize(new StoreDocument { Profiles = Profiles, Settings = Settings }, JsonOptions), ct).ConfigureAwait(false); }
+        try { await WriteSettingsAsync(Profiles,_secretReferences,ct).ConfigureAwait(false); }
         finally { _saveGate.Release(); }
+    }
+    private Task WriteSettingsAsync(List<ServerProfile> profiles,Dictionary<Guid,Guid> references,CancellationToken ct) =>
+        AtomicWriteAsync(Path.Combine(DirectoryPath,"settings.json"),JsonSerializer.Serialize(new StoreDocument{Profiles=profiles,Settings=Settings,SecretReferences=references},JsonOptions),ct);
+    /// <summary>
+    /// Commits a profile and its optional encrypted secret as one visible transaction.
+    /// A new secret is staged under an immutable random reference; settings.json is the
+    /// commit point. Until it succeeds neither Profiles nor the old secret reference changes.
+    /// </summary>
+    public async Task<ProfileCommitResult> SaveProfileAsync(ServerProfile profile,string? secret,CancellationToken ct=default)
+    {
+        profile.Validate();
+        if(profile.TimeoutSeconds is <3 or >120)throw new ArgumentException("Таймаут подключения должен быть от 3 до 120 секунд.");
+        await _saveGate.WaitAsync(ct).ConfigureAwait(false);
+        string? stagedPath=null;
+        bool committed=false;
+        try
+        {
+            var profiles=Profiles.ToList();int index=profiles.FindIndex(x=>x.Id==profile.Id);
+            if(index<0)profiles.Add(profile);else profiles[index]=profile;
+            var references=new Dictionary<Guid,Guid>(_secretReferences);
+            string oldSecretPath=SecretPath(profile.Id);
+            if(profile.SaveSecret)
+            {
+                if(secret is null)
+                {
+                    if(!File.Exists(oldSecretPath))throw new InvalidOperationException("Введите секрет перед включением его сохранения.");
+                }
+                else
+                {
+                    Guid reference=Guid.NewGuid();stagedPath=SecretFilePath(reference);
+                    string protectedSecret=ProtectSecret(profile.Id,secret);
+                    await AtomicWriteAsync(stagedPath,protectedSecret,ct).ConfigureAwait(false);
+                    references[profile.Id]=reference;
+                }
+            }
+            else references.Remove(profile.Id);
+            await WriteSettingsAsync(profiles,references,ct).ConfigureAwait(false);
+            Profiles=profiles;_secretReferences=references;
+            committed=true;LastProfileCleanupWarning=null;
+            string? cleanupWarning=null;
+            string? activePath=profile.SaveSecret?SecretPath(profile.Id):null;
+            if(oldSecretPath!=activePath&&File.Exists(oldSecretPath))
+            {
+                try{File.Delete(oldSecretPath);if(File.Exists(oldSecretPath+".bak"))File.Delete(oldSecretPath+".bak");}
+                catch(Exception ex)when(ex is IOException or UnauthorizedAccessException)
+                {cleanupWarning="Профиль сохранён, но не удалось удалить прежнюю защищённую копию секрета. Новые подключения её не используют. Проверьте права папки настроек.";}
+            }
+            LastProfileCleanupWarning=cleanupWarning;
+            return new(profile,cleanupWarning);
+        }
+        catch
+        {
+            // Only our unreferenced staged secret may be removed. The committed settings
+            // and old encrypted secret remain intact on encryption/write/replace failure.
+            if(!committed&&stagedPath is not null&&File.Exists(stagedPath))
+                try{File.Delete(stagedPath);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException){}
+            throw;
+        }
+        finally{_saveGate.Release();}
     }
     internal static async Task AtomicWriteAsync(string path, string text, CancellationToken ct)
     {
@@ -53,32 +114,52 @@ public sealed class AppStore
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
-    private string SecretPath(Guid profileId) => Path.Combine(DirectoryPath, $"secret-{profileId:N}.dpapi");
+    private string SecretFilePath(Guid reference) => Path.Combine(DirectoryPath, $"secret-{reference:N}.dpapi");
+    private string SecretPath(Guid profileId) => SecretFilePath(_secretReferences.GetValueOrDefault(profileId,profileId));
+    private static string ProtectSecret(Guid profileId,string secret)
+    {
+        if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("Хранилище секретов использует Windows DPAPI CurrentUser.");
+        byte[] raw=Encoding.UTF8.GetBytes(secret);
+        try{return Convert.ToBase64String(ProtectedData.Protect(raw,profileId.ToByteArray(),DataProtectionScope.CurrentUser));}
+        finally{CryptographicOperations.ZeroMemory(raw);}
+    }
     public async Task SaveSecretAsync(Guid profileId, string secret, CancellationToken ct = default)
     {
-        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Хранилище секретов использует Windows DPAPI CurrentUser.");
-        byte[] raw = Encoding.UTF8.GetBytes(secret);
-        try
-        {
-            byte[] encrypted = ProtectedData.Protect(raw, profileId.ToByteArray(), DataProtectionScope.CurrentUser);
-            await AtomicWriteAsync(SecretPath(profileId), Convert.ToBase64String(encrypted), ct).ConfigureAwait(false);
-        }
-        finally { CryptographicOperations.ZeroMemory(raw); }
+        string encrypted=ProtectSecret(profileId,secret);
+        await _saveGate.WaitAsync(ct).ConfigureAwait(false);
+        try{await AtomicWriteAsync(SecretPath(profileId),encrypted,ct).ConfigureAwait(false);}
+        finally{_saveGate.Release();}
     }
     public async Task<string?> ReadSecretAsync(Guid profileId, CancellationToken ct = default)
     {
-        if (!File.Exists(SecretPath(profileId))) return null;
-        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Хранилище секретов использует Windows DPAPI CurrentUser.");
-        byte[] encrypted = Convert.FromBase64String(await File.ReadAllTextAsync(SecretPath(profileId), ct).ConfigureAwait(false));
-        byte[] raw = ProtectedData.Unprotect(encrypted, profileId.ToByteArray(), DataProtectionScope.CurrentUser);
-        try { return Encoding.UTF8.GetString(raw); }
-        finally { CryptographicOperations.ZeroMemory(raw); }
+        await _saveGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if(Profiles.FirstOrDefault(x=>x.Id==profileId) is {SaveSecret:false})return null;
+            string path=SecretPath(profileId);if(!File.Exists(path))return null;
+            if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("Хранилище секретов использует Windows DPAPI CurrentUser.");
+            byte[] encrypted=Convert.FromBase64String(await File.ReadAllTextAsync(path,ct).ConfigureAwait(false));
+            byte[] raw=ProtectedData.Unprotect(encrypted,profileId.ToByteArray(),DataProtectionScope.CurrentUser);
+            try{return Encoding.UTF8.GetString(raw);}finally{CryptographicOperations.ZeroMemory(raw);}
+        }
+        finally{_saveGate.Release();}
     }
     public async Task DeleteProfileAsync(Guid profileId, CancellationToken ct = default)
     {
-        Profiles.RemoveAll(x => x.Id == profileId);
-        await SaveAsync(ct).ConfigureAwait(false);
-        if (File.Exists(SecretPath(profileId))) File.Delete(SecretPath(profileId));
+        await _saveGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var profiles=Profiles.Where(x=>x.Id!=profileId).ToList();
+            var references=new Dictionary<Guid,Guid>(_secretReferences);references.Remove(profileId);
+            string secret=SecretPath(profileId);
+            await WriteSettingsAsync(profiles,references,ct).ConfigureAwait(false);
+            Profiles=profiles;_secretReferences=references;
+            LastProfileCleanupWarning=null;
+            try{if(File.Exists(secret))File.Delete(secret);if(File.Exists(secret+".bak"))File.Delete(secret+".bak");}
+            catch(Exception ex)when(ex is IOException or UnauthorizedAccessException)
+            {LastProfileCleanupWarning="Профиль удалён, но не удалось удалить защищённую копию секрета. Проверьте права папки настроек.";}
+        }
+        finally{_saveGate.Release();}
     }
     public void DeleteSecret(Guid profileId) { if (File.Exists(SecretPath(profileId))) File.Delete(SecretPath(profileId)); }
     private sealed class StoreDocument
@@ -86,8 +167,11 @@ public sealed class AppStore
         public int SchemaVersion { get; set; } = 1;
         public List<ServerProfile> Profiles { get; set; } = [];
         public AppSettings Settings { get; set; } = new();
+        public Dictionary<Guid,Guid> SecretReferences { get; set; } = [];
     }
 }
+
+public sealed record ProfileCommitResult(ServerProfile Profile,string? CleanupWarning=null);
 
 public sealed class TrustedHostKey
 {

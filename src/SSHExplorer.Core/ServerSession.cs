@@ -5,7 +5,7 @@ using Renci.SshNet.Common;
 
 namespace SSHExplorer.Core;
 
-public sealed class ServerSession : IAsyncDisposable
+public sealed partial class ServerSession : IAsyncDisposable
 {
     private readonly AppStore _store;
     private readonly CancellationTokenSource _lifetime = new();

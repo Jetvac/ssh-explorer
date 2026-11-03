@@ -19,7 +19,19 @@ internal static class LocalDiagnostics
                 var path = Path.Combine(directory, "diagnostics.log");
                 if (File.Exists(path) && new FileInfo(path).Length >= 1024 * 1024) File.Move(path, path + ".1", true);
                 var safeCategory = new string(category.Where(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-').Take(80).ToArray());
-                var line = $"{DateTimeOffset.Now:O}\t{safeCategory}\t{error?.GetType().FullName ?? "ok"}\t{error?.HResult.ToString("X8") ?? "0"}\n";
+                var line = $"{DateTimeOffset.Now:O}\t{safeCategory}\t{BuildInfo.EnvironmentDescription}\n";
+                // Messages can include hostnames, remote output or credentials. Record types,
+                // HRESULTs and method names only, including inner exceptions; no file paths.
+                for (var current = error; current is not null; current = current.InnerException)
+                {
+                    line += $"{current.GetType().FullName}\t{current.HResult:X8}\n";
+                    var frames = new System.Diagnostics.StackTrace(current, false).GetFrames() ?? [];
+                    foreach (var frame in frames.Take(100))
+                    {
+                        var method = frame.GetMethod();
+                        line += $"  at {method?.DeclaringType?.FullName}.{method?.Name}\n";
+                    }
+                }
                 await File.AppendAllTextAsync(path, line, Encoding.UTF8);
             }
             finally { Gate.Release(); }

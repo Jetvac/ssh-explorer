@@ -1,0 +1,66 @@
+PASS offline DNS and Cyrillic display name save without network access
+PASS valid host accepted: 127.0.0.1
+PASS valid host accepted: 2001:db8::1
+PASS valid host accepted: [2001:db8::1]
+PASS valid host accepted: localhost
+PASS valid host accepted: пример.рф
+PASS invalid host stays inline: empty
+PASS invalid host stays inline: https://example.com
+PASS invalid host stays inline: host:22
+PASS invalid host stays inline: 999.1.1.1
+PASS invalid host stays inline: [broken
+PASS invalid host stays inline: name/path
+PASS invalid host stays inline: bad host
+PASS empty name stays inline
+PASS empty username stays inline
+PASS invalid port is rejected without clamp: 0
+PASS invalid port is rejected without clamp: 65536
+PASS invalid port is rejected without clamp: abc
+PASS invalid port is rejected without clamp: -1
+PASS invalid port is rejected without clamp: 999999999999
+PASS invalid timeout is rejected without clamp: 2
+PASS invalid timeout is rejected without clamp: 121
+PASS invalid timeout is rejected without clamp: -1
+PASS invalid timeout is rejected without clamp: abc
+PASS invalid timeout is rejected without clamp: 999999999999
+PASS relative initial path is rejected inline
+PASS missing key file is rejected without connecting
+PASS existing key path with empty passphrase can be saved offline
+PASS password-save opt-in requires a password
+PASS explicit password-save opt-in accepts entered secret
+PASS transaction commits one in-memory profile
+PASS profile and DPAPI secret survive restart
+PASS settings, backup and encrypted files never contain plaintext secret
+PASS real Windows sharing violation rejects atomic settings commit
+PASS failed edit preserves existing in-memory profile and original secret
+PASS failed settings replacement leaves exact original JSON bytes
+PASS failed settings commit removes only its staged encrypted secret
+PASS failed profile deletion preserves in-memory and persisted profile
+PASS disabling secret persistence removes the saved encrypted secret
+PASS edit preserves stable profile ID after restart
+PASS successful deletion survives restart
+PASS legacy profile-ID DPAPI file remains readable
+PASS legacy profile migrates to transactional secret reference
+PASS real settings write error is reported inline
+PASS failed save retains all input and creates no partial profile
+PASS same form input saves successfully after storage is repaired
+PASS real denied secret-file write creates no partial profile
+PASS secret storage failure preserves input and re-enables save
+PASS rapid double-save performs exactly one persistence operation
+PASS original save completes after duplicate click is ignored
+PASS advanced connection fields start collapsed
+PASS private-key block occupies no layout in password mode
+PASS dialog exposes correct Enter and Escape default actions
+PASS actual Dialogs.Profile opens, atomically saves and ignores double click
+PASS actual modal save persists offline profile after restart
+PASS cancel button leaves profiles unchanged
+PASS window close leaves profiles unchanged and dialog can reopen
+PASS actual modal validation preserves input without closing
+PASS same modal dialog saves corrected port without reopening
+PASS actual modal persistence failure retains input without a partial profile
+PASS modal remains usable and saves after write failure is repaired
+PASS actual edit modal updates the existing profile without duplication
+PASS full MainWindow AddProfile refreshes server list, iteration 1
+PASS full MainWindow AddProfile refreshes server list, iteration 2
+PASS full MainWindow AddProfile persistence survives restart with current selection
+RESULT: 65 profile validation, persistence and STA dialog checks passed

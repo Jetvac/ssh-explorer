@@ -6,8 +6,9 @@ using SSHExplorer.App;
 internal static class Program
 {
     [STAThread]
-    static int Main()
+    static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--resources-only") return ThemeResourceTests.Run();
         try
         {
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
