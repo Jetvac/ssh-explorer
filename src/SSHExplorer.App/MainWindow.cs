@@ -20,7 +20,7 @@ public sealed partial class MainWindow : Window
     readonly Dictionary<Guid, int> sessionNumbers = [];
     readonly TextBlock homeStatus = Ui.Text("");
     readonly HomeViewModel viewModel = new();
-    bool closing;
+    bool closing, refreshingHome;
     TransfersWindow? transferWindow;
     public MainWindow()
     {
@@ -31,7 +31,7 @@ public sealed partial class MainWindow : Window
         var actions = Ui.Row(Ui.Button("＋", AddMenu, "Открыть сервер"), Ui.Button("⇄", ShowTransfers, "Очередь передач"), Ui.Button("⚙", Dialogs.Settings, "Параметры"));
         actions.VerticalAlignment = VerticalAlignment.Top; actions.HorizontalAlignment = HorizontalAlignment.Right; actions.Margin = new Thickness(0, 5, 8, 0); actions.SetResourceReference(BackgroundProperty, "Surface"); root.Children.Add(tabs); root.Children.Add(actions); Content = root;
         home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
-        tabs.SelectionChanged += (_, _) => { foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); if (tabs.SelectedItem is TabItem item) (item.Header as FrameworkElement)?.BringIntoView(); RefreshHome(); };
+        tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); if (tabs.SelectedItem is TabItem item) (item.Header as FrameworkElement)?.BringIntoView(); RefreshHome(); };
         tabs.PreviewDragOver += (_, e) => { if (e.Data.GetDataPresent("SSHExplorer.Tab")) { e.Effects = DragDropEffects.Move; e.Handled = true; } };
         tabs.AllowDrop = true;
         PreviewKeyDown += OnKey;
@@ -61,7 +61,10 @@ public sealed partial class MainWindow : Window
     }
     void RefreshHome()
     {
-        viewModel.Refresh(App.Store.Profiles, sessions.Values.Select(v => (v.Session.Profile.Id, v.Session.State)));
+        if (refreshingHome) return;
+        refreshingHome = true;
+        try { viewModel.Refresh(App.Store.Profiles, sessions.Values.Select(v => (v.Session.Profile.Id, v.Session.State))); }
+        finally { refreshingHome = false; }
     }
     async Task AddProfile()
     {

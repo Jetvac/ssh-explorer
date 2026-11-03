@@ -1,0 +1,13 @@
+{
+  "ArtifactVersion": "0.1.0",
+  "ImportedBaselineCommit": "f15c2cd",
+  "ExeSha256": "433CBB4167AD9BB72DE8374DA69CF156955716BD27C402EF858A46270444F935",
+  "DllSha256": "769ACEC50C113E5DE5236F08400809EE9696078C7B50DEF68C496F1DC3C09A62",
+  "ProbeExitCode": -1073741571,
+  "ProbeExitHex": "0xC00000FD",
+  "Failure": "Stack overflow",
+  "Probe": "Unshown real WPF MainWindow, one persisted profile, actual DataGrid selection",
+  "InnerException": "Not applicable: fatal stack overflow, no catchable managed exception",
+  "ShownWindows": 0,
+  "Date": "2026-11-03"
+}

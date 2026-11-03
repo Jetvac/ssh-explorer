@@ -1,0 +1,31 @@
+BASELINE_DLL=D:\Проекты\SG\.tools\profiles-baseline\SSHExplorer.dll
+BASELINE_DLL_SHA256=769ACEC50C113E5DE5236F08400809EE9696078C7B50DEF68C496F1DC3C09A62
+BASELINE_ROWS=1
+BASELINE selecting saved row without showing any window
+Stack overflow.
+   at System.Collections.Generic.List`1[[System.__Canon, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]].System.Collections.Generic.IEnumerable<T>.GetEnumerator()
+   at System.Windows.Data.CollectionView+<>c__DisplayClass1_0.<.ctor>b__0()
+   at MS.Internal.Data.SynchronizationInfo.AccessCollection(System.Collections.IEnumerable, System.Action, Boolean)
+   at System.Windows.Data.BindingOperations.AccessCollection(System.Collections.IEnumerable, System.Action, Boolean)
+   at System.Windows.Data.CollectionView..ctor(System.Collections.IEnumerable, Int32)
+   at System.Windows.Data.ListCollectionView..ctor(System.Collections.IList)
+   at MS.Internal.Data.ViewManager.GetViewRecord(System.Object, System.Windows.Data.CollectionViewSource, System.Type, Boolean, System.Func`2<System.Object,System.Object>)
+   at MS.Internal.Data.DataBindEngine.GetViewRecord(System.Object, System.Windows.Data.CollectionViewSource, System.Type, Boolean, System.Func`2<System.Object,System.Object>)
+   at System.Windows.Data.CollectionViewSource.GetDefaultCollectionView(System.Object, Boolean, System.Func`2<System.Object,System.Object>)
+   at System.Windows.Data.CollectionViewSource.GetDefaultCollectionView(System.Object, System.Windows.DependencyObject, System.Func`2<System.Object,System.Object>)
+   at System.Windows.Controls.ItemCollection.SetItemsSource(System.Collections.IEnumerable, System.Func`2<System.Object,System.Object>)
+   at System.Windows.Controls.ItemsControl.OnItemsSourceChanged(System.Windows.DependencyObject, System.Windows.DependencyPropertyChangedEventArgs)
+   at System.Windows.FrameworkElement.OnPropertyChanged(System.Windows.DependencyPropertyChangedEventArgs)
+--- bounded repeated cycle excerpt ---
+   at SSHExplorer.App.ViewModels.HomeViewModel.Rebuild()
+   at SSHExplorer.App.MainWindow.RefreshHome()
+   at SSHExplorer.App.MainWindow.<.ctor>b__14_0(System.Object, System.Windows.Controls.SelectionChangedEventArgs)
+   at SSHExplorer.App.ViewModels.HomeViewModel.Rebuild()
+   at SSHExplorer.App.MainWindow.RefreshHome()
+   at SSHExplorer.App.MainWindow.<.ctor>b__14_0(System.Object, System.Windows.Controls.SelectionChangedEventArgs)
+   at SSHExplorer.App.ViewModels.HomeViewModel.Rebuild()
+   at SSHExplorer.App.MainWindow.RefreshHome()
+   at SSHExplorer.App.MainWindow.<.ctor>b__14_0(System.Object, System.Windows.Controls.SelectionChangedEventArgs)
+   at SSHExplorer.App.ViewModels.HomeViewModel.Rebuild()
+   at SSHExplorer.App.MainWindow.RefreshHome()
+   at SSHExplorer.App.MainWindow.<.ctor>b__14_0(System.Object, System.Windows.Controls.SelectionChangedEventArgs)
