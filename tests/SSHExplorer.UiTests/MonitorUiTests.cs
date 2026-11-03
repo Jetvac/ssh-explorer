@@ -88,6 +88,7 @@ internal static class MonitorUiTests
             evidence.Capture((FrameworkElement)main.Content,"processes-wide",new{theme="Light",fixtureOnly=true,processCount=160,sampleTimestamp=Now,selectedPid=103,verticalOffset=scroll.VerticalOffset,sort="fixture order",metricCellDip=captureCell.ActualWidth,metricSurfaceDip=captureSurface.ActualWidth,metricCellHeightDip=captureCell.ActualHeight,metricSurfaceHeightDip=captureSurface.ActualHeight,metricPadding=captureSurface.Padding.Right});
             main.Width=760;Layout(main);CheckHeader(monitor,Assert);
             Assert(table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Name))&&table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Cpu)),"narrow viewport retains process name and CPU instead of only secondary columns");
+            CheckNarrowColumns(table,Assert);
             evidence.Capture((FrameworkElement)main.Content,"processes-narrow",new{theme="Light",fixtureOnly=true});
             main.Width=1320;Layout(main);
             object originalFont=Application.Current.Resources["UIFontSize"]??throw new Exception("UI font role is unavailable.");
@@ -97,6 +98,7 @@ internal static class MonitorUiTests
                 var largeRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromItem(model.Processes[3])!;
                 var largeLabels=Descendants<DataGridCell>(largeRow).Where(c=>c.IsVisible).SelectMany(c=>Descendants<TextBlock>(c)).Where(t=>t.IsVisible&&t.FontSize>=22).ToArray();
                 Assert(largeLabels.Length>0&&largeLabels.All(t=>t.ActualHeight+.5>=NaturalTextHeight(t)),"large UI font role keeps measured process cell text within an expanded row");
+                CheckStateHeader(table,Assert);
                 evidence.Capture((FrameworkElement)main.Content,"processes-large-text",new{theme="Light",fixtureOnly=true,uiFontRoleDip=22,osTextScaleChanged=false,dpiChanged=false});
             }
             finally{Application.Current.Resources["UIFontSize"]=originalFont;Layout(main);}
@@ -152,6 +154,32 @@ internal static class MonitorUiTests
     static double NaturalTextHeight(TextBlock actual)
     {
         var probe=new TextBlock{Text=actual.Text,FontFamily=actual.FontFamily,FontSize=actual.FontSize,FontWeight=actual.FontWeight,FontStyle=actual.FontStyle,FontStretch=actual.FontStretch};probe.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));return probe.DesiredSize.Height;
+    }
+    static void CheckNarrowColumns(DataGrid table,Action<bool,string> assert)
+    {
+        var name=table.Columns.Single(column=>column.SortMemberPath==nameof(ProcessItemViewModel.Name));
+        var viewer=Descendants<ScrollViewer>(table).First();
+        var viewport=Descendants<ScrollContentPresenter>(viewer).First(presenter=>presenter.Name=="PART_ScrollContentPresenter");
+        double available=viewport.ActualWidth-(((int)table.HeadersVisibility&(int)DataGridHeadersVisibility.Row)!=0?table.RowHeaderActualWidth:0);
+        double occupied=table.Columns.Where(column=>column.Visibility==Visibility.Visible).Sum(column=>column.ActualWidth);
+        var headers=Descendants<DataGridColumnHeadersPresenter>(table).Single();
+        double filler=Descendants<DataGridColumnHeader>(headers).Where(header=>header.Column is null&&header.IsVisible).Select(header=>header.ActualWidth).DefaultIfEmpty(0).Max();
+        Console.WriteLine("NARROW_COLUMN_GEOMETRY "+System.Text.Json.JsonSerializer.Serialize(new{nameIsStar=name.Width.IsStar,viewportDip=available,visibleColumnsDip=occupied,fillerDip=filler,verticalScrollTrackDip=Descendants<ScrollBar>(viewer).Where(bar=>bar.Orientation==Orientation.Vertical&&bar.IsVisible).Select(bar=>bar.ActualWidth).DefaultIfEmpty(0).Max()}));
+        assert(!name.Width.IsStar||(available>0&&Math.Abs(available-occupied)<=1&&filler<=1),"default star name column consumes the measured narrow viewport without an unused filler; pixel user widths remain respected");
+    }
+    static void CheckStateHeader(DataGrid table,Action<bool,string> assert)
+    {
+        var column=table.Columns.Single(column=>column.SortMemberPath==nameof(ProcessItemViewModel.State));
+        if(column.Visibility!=Visibility.Visible){assert(true,"large UI font hides an optional state column instead of displaying a clipped caption");return;}
+        var header=Descendants<DataGridColumnHeader>(table).Single(element=>ReferenceEquals(element.Column,column));
+        string caption=column.Header.ToString()??throw new Exception("State header caption is unavailable.");
+        var text=Descendants<TextBlock>(header).Single(element=>element.Text==caption);
+        var probe=new TextBlock{Text=caption,FontFamily=text.FontFamily,FontSize=text.FontSize,FontWeight=text.FontWeight,FontStyle=text.FontStyle,FontStretch=text.FontStretch};probe.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));
+        string? Tooltip(object? value)=>value switch{ToolTip tooltip=>tooltip.Content?.ToString(),TextBlock block=>block.Text,_=>value?.ToString()};
+        bool fits=probe.DesiredSize.Width<=text.ActualWidth+.5;
+        bool accessibleEllipsis=text.TextTrimming==TextTrimming.CharacterEllipsis&&(Tooltip(text.ToolTip)==caption||Tooltip(header.ToolTip)==caption);
+        Console.WriteLine("STATE_HEADER_GEOMETRY "+System.Text.Json.JsonSerializer.Serialize(new{actualDip=text.ActualWidth,naturalDip=probe.DesiredSize.Width,trimming=text.TextTrimming.ToString(),fullCaptionTooltip=Tooltip(text.ToolTip)==caption||Tooltip(header.ToolTip)==caption}));
+        assert(fits||accessibleEllipsis,"large UI font state caption fits its actual text area or uses ellipsis with a full-caption tooltip instead of raw clipping");
     }
     static string? Value(string[] args,string name){int i=Array.IndexOf(args,name);return i<0?null:i+1<args.Length?args[i+1]:throw new ArgumentException(name+" needs a value");}
     static void Check(bool condition,string name){if(!condition)throw new Exception("FAIL "+name);Console.WriteLine("PASS "+name);}

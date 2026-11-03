@@ -39,7 +39,8 @@ public sealed class MonitorView : UserControl, IDisposable
     readonly Dictionary<string, DataGridColumn> columns = [];
     readonly HashSet<string> userColumns = [], userOverrides = [];
     readonly HashSet<Window> ownedWindows = [];
-    bool applyingSelection, disposed, active, pausedByUser, compactCommands, searchSecondRow;
+    bool applyingSelection, disposed, active, pausedByUser, compactCommands, searchSecondRow, nameReflowQueued;
+    double responsiveWidth = double.NaN;
     long pollEpoch, pageEpoch;
     double processOffset, performanceOffset;
     MonitorPage page;
@@ -115,11 +116,18 @@ public sealed class MonitorView : UserControl, IDisposable
         AddTextColumn("Read", "Чтение", nameof(ProcessItemViewModel.ReadText), 118, false, nameof(ProcessItemViewModel.ReadBytesPerSecond), nameof(ProcessItemViewModel.ReadReason));
         AddTextColumn("Write", "Запись", nameof(ProcessItemViewModel.WriteText), 118, false, nameof(ProcessItemViewModel.WriteBytesPerSecond), nameof(ProcessItemViewModel.WriteReason));
         processes.SelectionChanged += (_, _) => { if (!applyingSelection) viewModel.SelectedIdentity = (processes.SelectedItem as ProcessItemViewModel)?.Metric.Identity; };
+        processes.SizeChanged += (_, args) => { if (args.WidthChanged) ReflowNameColumnAfterLayout(); };
+        processes.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler((_, args) => { if (args.ViewportWidthChange != 0) ReflowNameColumnAfterLayout(); }));
         Ui.AttachContextMenu(processes, BuildProcessMenu);
     }
 
     void AddColumn(string key, DataGridColumn column, bool visible)
     {
+        if (column.Header is string)
+        {
+            var caption = new FrameworkElementFactory(typeof(TextBlock)); caption.SetBinding(TextBlock.TextProperty, new Binding()); caption.SetBinding(ToolTipProperty, new Binding()); caption.SetBinding(AutomationProperties.NameProperty, new Binding()); caption.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); caption.SetValue(TextBlock.TextWrappingProperty, TextWrapping.NoWrap); caption.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Stretch); caption.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
+            column.HeaderTemplate = new DataTemplate { VisualTree = caption };
+        }
         column.HeaderStyle = (Style)FindResource("ProcessColumnHeaderStyle"); columns[key] = column; processes.Columns.Add(column); if (visible) userColumns.Add(key); column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
     void AddTextColumn(string key, string caption, string text, double width, bool visible, string? numericSort = null, string? reason = null)
@@ -187,7 +195,9 @@ public sealed class MonitorView : UserControl, IDisposable
     }
     void UpdateResponsive()
     {
+        if (disposed) return;
         var width = ActualWidth > 0 ? ActualWidth : 1000;
+        var columnsChanged = false;
         compactCommands = width < 780;
         terminate.Visibility = page == MonitorPage.Processes && !compactCommands ? Visibility.Visible : Visibility.Collapsed;
         var second = width < 500 && page == MonitorPage.Processes;
@@ -197,7 +207,27 @@ public sealed class MonitorView : UserControl, IDisposable
         }
         resources.Columns = width < 680 ? 1 : 2;
         foreach (var key in new[] { "Pid", "User", "State", "Read", "Write" })
-            columns[key].Visibility = userColumns.Contains(key) && (userOverrides.Contains(key) || width >= (key is "Pid" or "State" ? 650 : 900)) ? Visibility.Visible : Visibility.Collapsed;
+        {
+            var visibility = userColumns.Contains(key) && (userOverrides.Contains(key) || width >= (key is "Pid" or "State" ? 650 : 900)) ? Visibility.Visible : Visibility.Collapsed;
+            if (columns[key].Visibility != visibility) { columns[key].Visibility = visibility; columnsChanged = true; }
+        }
+        if (columnsChanged || responsiveWidth != width) { responsiveWidth = width; ReflowNameColumnAfterLayout(); }
+    }
+    void ReflowNameColumnAfterLayout()
+    {
+        if (disposed || nameReflowQueued || !columns.TryGetValue("Name", out var name) || !name.Width.IsStar) return;
+        nameReflowQueued = true;
+        // Column visibility and the cells viewport settle in this dispatcher turn.
+        // Recreate only the star width cache, without a timer, row reset or refresh.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            nameReflowQueued = false;
+            if (disposed || processes.ActualWidth <= 0 || !name.Width.IsStar) return;
+            var weight = name.Width.Value;
+            name.Width = DataGridLength.Auto;
+            name.Width = new DataGridLength(weight, DataGridLengthUnitType.Star);
+            processes.InvalidateMeasure();
+        });
     }
 
     ContextMenu BuildOverflow()
@@ -331,7 +361,7 @@ public sealed class MonitorView : UserControl, IDisposable
     }
     public void Dispose()
     {
-        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); pollCancellation?.Cancel(); lifetime.Cancel(); viewModel.IsActive = false;
+        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); resizeSettled.Stop(); pollCancellation?.Cancel(); lifetime.Cancel(); viewModel.IsActive = false;
         viewModel.PropertyChanged -= ModelChanged; viewModel.ProcessesUpdated -= ApplyProcesses; viewModel.Processes.CollectionChanged -= ProcessesChanged; Theme.Changed -= PaletteChanged;
         foreach (var window in ownedWindows.ToArray()) if (window.IsLoaded) window.Close(); ownedWindows.Clear(); lifetime.Dispose();
     }

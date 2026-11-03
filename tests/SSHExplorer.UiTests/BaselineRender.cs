@@ -33,7 +33,7 @@ internal static class BaselineRender
             Theme.Apply("Light");
             var profile=new ServerProfile{Name="Linux · UI fixture",Host="127.0.0.1",Username="fixture"};
             store.Profiles.Add(profile);var session=new ServerSession(profile,store);var main=new MainWindow{Width=1320,Height=850,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-10000,Top=-10000};
-            using var files=new FileBrowserView(session,main);using var monitor=new MonitorView(session);
+            using var files=new FileBrowserView(session,main);var monitor=new MonitorView(session);
             var fileModel=(FileBrowserViewModel)files.DataContext;
             var entries=Enumerable.Range(0,180).Select(i=>new RemoteEntry{Name=$"document-{i:000}.txt",FullPath=$"/srv/fixture/document-{i:000}.txt",IsRegularFile=true,Length=4096+i}).ToArray();
             fileModel.CommitNavigation(fileModel.BeginNavigation(),"/srv/fixture",entries,true,[],0);fileModel.ApplyFilter(true,true);Invoke(files,"ApplyItems");Invoke(files,"UpdateBreadcrumbs");
