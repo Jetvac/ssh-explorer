@@ -351,7 +351,7 @@ internal static class Program
         var store=NewStore("dialog-save");SetStore(store);
         ServerProfile? saved=RunStaticDialog(dialog=>
         {
-            Fill(dialog);Check(Logical<Expander>(dialog).Single().IsExpanded==false,"advanced connection fields start collapsed");
+            Fill(dialog);Check(Logical<Expander>(dialog).Single(x=>Equals(x.Header,"Дополнительные параметры")).IsExpanded==false&&Logical<Expander>(dialog).Single(x=>Equals(x.Header,"Подробнее о сохранении секрета")).IsExpanded==false,"advanced connection fields and optional secret details start collapsed");
             var key=Logical<TextBox>(dialog).Single(x=>AutomationProperties.GetName(x)=="Приватный ключ");Check(!key.IsVisible,"private-key block occupies no layout in password mode");
             var save=FindButton(dialog,"Сохранить");var cancel=FindButton(dialog,"Отмена");Check(save.IsDefault&&cancel.IsCancel,"dialog exposes correct Enter and Escape default actions");
             save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
