@@ -1,0 +1,17 @@
+{
+  "Type": "Integrated development build, not the published release",
+  "Version": "0.2.0-beta.1+62e85c45cd974ea205bf8a6c540ccb3bb9677ada",
+  "ExeSha256": "8C0A07B07E0F500938924D055F41366EA157244DCB5E07A17D1F255174EDEE96",
+  "DllSha256": "7C16BA2F973C1098C7EEA41BB7EF4E24DBF5615B066939956778E413620E6E11",
+  "Source": "Uncommitted integrated source before 8800aa9; native cancellation fixes were added after these live checks",
+  "OS": "Windows 11 build 26200 x64",
+  "Live": [
+    "Same-session row move",
+    "B to A tab drop",
+    "A to B tab drop",
+    "Native maximize and caption double-click restore",
+    "Alt+Space system menu",
+    "Win+Arrow arrangement"
+  ],
+  "UserAccepted": false
+}

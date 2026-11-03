@@ -1,0 +1,14 @@
+{
+  "commit": "38ee23aec259f0c19f95971d95bab3b2ae54c576",
+  "run": "https://github.com/Jetvac/ssh-explorer/actions/runs/41633232457",
+  "result": "success",
+  "checks": {
+    "Core": 34,
+    "WpfLayout": 6,
+    "MvvmState": 16,
+    "ProfileSta": 65,
+    "NativeComAbi": "passed"
+  },
+  "artifactBytes": 392121732,
+  "scope": "Clean hosted Windows checkout/build/component tests/package. Does not establish live Explorer/DPI/clean user Windows."
+}

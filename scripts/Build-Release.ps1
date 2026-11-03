@@ -35,29 +35,31 @@ if (-not (Test-Path -LiteralPath (Join-Path $runtime 'msedgewebview2.exe'))) {
     & expand.exe $cab '-F:*' $runtimeRoot | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'WebView2 extraction failed.' }
 }
-& $sdk restore SSHExplorer.sln --locked-mode --disable-parallel
+& $sdk restore SSHExplorer.sln --locked-mode --disable-parallel | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'Dependency restore failed.' }
-& $sdk build SSHExplorer.sln -c Release --no-restore -m:1 -nr:false @buildProperties
+& $sdk build SSHExplorer.sln -c Release --no-restore -m:1 -nr:false @buildProperties | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
 if (-not $SkipTests) {
-    & $sdk run --project tests\SSHExplorer.Tests\SSHExplorer.Tests.csproj -c Release --no-build
+    & $sdk run --project tests\SSHExplorer.Tests\SSHExplorer.Tests.csproj -c Release --no-build | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Risk regression tests failed.' }
-    & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build
+    & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Windows virtualization tests failed.' }
+    & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build -- --resources-only | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw 'Theme resource tests failed.' }
     foreach ($project in @('SSHExplorer.ProfileTests','SSHExplorer.NativeDrag.Tests')) {
-        & $sdk restore "tests\$project\$project.csproj" --locked-mode --disable-parallel
+        & $sdk restore "tests\$project\$project.csproj" --locked-mode --disable-parallel | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "$project restore failed." }
-        & $sdk build "tests\$project\$project.csproj" -c Release --no-restore -m:1 -nr:false @buildProperties
+        & $sdk build "tests\$project\$project.csproj" -c Release --no-restore -m:1 -nr:false @buildProperties | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "$project build failed." }
-        if ($project -eq 'SSHExplorer.NativeDrag.Tests') { & $sdk run --project "tests\$project\$project.csproj" -c Release --no-build -- --abi-only }
-        else { & $sdk run --project "tests\$project\$project.csproj" -c Release --no-build }
+        if ($project -eq 'SSHExplorer.NativeDrag.Tests') { & $sdk run --project "tests\$project\$project.csproj" -c Release --no-build -- --abi-only | Out-Host }
+        else { & $sdk run --project "tests\$project\$project.csproj" -c Release --no-build | Out-Host }
         if ($LASTEXITCODE -ne 0) { throw "$project failed." }
     }
 }
 $packageName = "SSHExplorer-$version-win-x64"
 $destination = Join-Path $root "artifacts\$packageName"
 if (Test-Path -LiteralPath $destination) { throw "Output already exists; choose an unused version or move the previous test output: $destination" }
-& $sdk publish src\SSHExplorer.App\SSHExplorer.App.csproj -c Release -r win-x64 --self-contained true --no-restore -m:1 -nr:false @buildProperties -p:PublishTrimmed=false -p:PublishSingleFile=false -o $destination
+& $sdk publish src\SSHExplorer.App\SSHExplorer.App.csproj -c Release -r win-x64 --self-contained true --no-restore -m:1 -nr:false @buildProperties -p:PublishTrimmed=false -p:PublishSingleFile=false -o $destination | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'Self-contained publish failed.' }
 $runtimeDestination = Join-Path $destination 'WebView2Runtime'
 New-Item -ItemType Directory -Force -Path $runtimeDestination | Out-Null
@@ -71,6 +73,9 @@ Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination $destination -Recur
 $files = Get-ChildItem -LiteralPath $destination -File -Recurse | Where-Object Name -ne 'SHA256SUMS.txt'
 $manifest = foreach ($file in $files) { '{0}  {1}' -f (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $file.FullName.Substring($destination.Length + 1).Replace('\','/') }
 $manifest | Set-Content -LiteralPath (Join-Path $destination 'SHA256SUMS.txt') -Encoding utf8
+if($RequireClean){
+    & (Join-Path $PSScriptRoot 'Verify-Portable.ps1') -Directory $destination -ExpectedCommit $commit -ExpectedVersion $version -Report (Join-Path $root 'artifacts\portable-verification.json')
+}
 if (-not $NoZip) {
     $archive = Join-Path $root "artifacts\$packageName.zip"
     Compress-Archive -LiteralPath $destination -DestinationPath $archive -CompressionLevel Optimal -Force

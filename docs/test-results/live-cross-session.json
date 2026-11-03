@@ -1,0 +1,19 @@
+{
+  "method": "Two native mouse gestures onto the other server tab, no clipboard",
+  "default": "Copy; both sources preserved",
+  "AandB": {
+    "a": {
+      "gui-a-cross-session.txt": "be33e9ceff258ac8a46bec50c0be6bd840bdc5b81e12986f598f1b5e373a9bfd",
+      "gui-b-cross-session.txt": "2c62c59efa018d3f07a880eccde7ee224d5083745be1798731a88b4ebc85209b"
+    },
+    "b": {
+      "gui-a-cross-session.txt": "be33e9ceff258ac8a46bec50c0be6bd840bdc5b81e12986f598f1b5e373a9bfd",
+      "gui-b-cross-session.txt": "2c62c59efa018d3f07a880eccde7ee224d5083745be1798731a88b4ebc85209b"
+    }
+  },
+  "sameSessionRowMove": {
+    "sourceRemoved": true,
+    "destination": "Target/README.txt",
+    "sha256": "64a75a904e5be4035604e8a5cbd88189713a560179a0f0888de934d44d1d9f56"
+  }
+}

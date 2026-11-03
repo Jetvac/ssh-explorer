@@ -1,0 +1,9 @@
+{
+  "scenario": "Real native Windows Explorer destination, remote README.txt, empty TransferCache",
+  "length": 47,
+  "remoteSha256": "64a75a904e5be4035604e8a5cbd88189713a560179a0f0888de934d44d1d9f56",
+  "localSha256": "64a75a904e5be4035604e8a5cbd88189713a560179a0f0888de934d44d1d9f56",
+  "localCreatedUtc": "2026-11-03T11:54:44.112368+00:00",
+  "queueResult": "1 Completed 47/47; repeated target interrupted 0/47",
+  "gestureToolResult": "Both attempts reported outside window bounds despite transfer; complete gesture matrix remains open"
+}
