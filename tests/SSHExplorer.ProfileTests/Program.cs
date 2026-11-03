@@ -84,6 +84,10 @@ internal static class Program
     static async Task<bool> Complete(Task task){await task;return true;}
     static void ValidateFields()
     {
+        var corrected=new ProfileViewModel(new ProfilePersistence(NewStore("corrected-summary")));corrected.Validate("");corrected.ProfileName="Исправленное имя";
+        Check(corrected.Status.Length>0&&corrected.FirstInvalidField is not null,"correcting one field retains the validation summary while other marked fields remain");
+        corrected.Host="corrected.example.invalid";corrected.Username="tester";
+        Check(corrected.Status.Length==0&&corrected.FirstInvalidField is null,"correcting the last marked field clears only its obsolete validation summary without resubmitting");
         var model=ValidModel();Check(model.Validate(""),"offline DNS and Cyrillic display name save without network access");
         foreach(var host in new[]{"127.0.0.1","2001:db8::1","[2001:db8::1]","localhost","пример.рф"}){model.Host=host;Check(model.Validate(""),"valid host accepted: "+host);}
         foreach(var host in new[]{"","https://example.com","host:22","999.1.1.1","[broken","name/path","bad host"}){model.Host=host;Check(!model.Validate("")&&!string.IsNullOrEmpty(model.HostError),"invalid host stays inline: "+(host.Length==0?"empty":host));}
@@ -130,6 +134,7 @@ internal static class Program
         Directory.CreateDirectory(Path.Combine(store.DirectoryPath,"settings.json"));
         Check(!Pump(model.SaveAsync(""))&&model.Status.Contains("Введённые значения сохранены",StringComparison.Ordinal),"real settings write error is reported inline");
         Check(model.ProfileName=="Тестовый сервер"&&model.Host=="offline.example.invalid"&&store.Profiles.Count==0&&!model.IsSaving,"failed save retains all input and creates no partial profile");
+        var storageWarning=model.Status;model.ProfileName="Исправленное имя после ошибки диска";Check(model.Status==storageWarning,"editing an otherwise valid field preserves a real persistence failure message");
         Directory.Delete(Path.Combine(store.DirectoryPath,"settings.json"));Check(Pump(model.SaveAsync(""))&&store.Profiles.Count==1,"same form input saves successfully after storage is repaired");
         var denyStore=NewStore("secret-write-denied");var directory=new DirectoryInfo(denyStore.DirectoryPath);var original=directory.GetAccessControl();
         var denied=directory.GetAccessControl();var sid=WindowsIdentity.GetCurrent().User!;

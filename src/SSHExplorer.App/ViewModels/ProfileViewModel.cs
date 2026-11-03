@@ -9,6 +9,7 @@ namespace SSHExplorer.App.ViewModels;
 
 public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChanged
 {
+    private const string ValidationSummary="Проверьте отмеченные поля. Введённые значения сохранены.";
     private readonly IProfilePersistence _persistence;
     private readonly Guid _id;
     private readonly List<string> _bookmarks;
@@ -58,7 +59,12 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public string TimeoutError=>Error(nameof(Timeout));public string SecretError=>Error("Secret");
     public string? FirstInvalidField=>_errors.Keys.FirstOrDefault();
     string Error(string name)=>_errors.GetValueOrDefault(name,"");
-    void ClearError(string name){if(_errors.Remove(name))RaiseErrors();}
+    void ClearError(string name)
+    {
+        if(!_errors.Remove(name))return;
+        RaiseErrors();
+        if(_errors.Count==0&&Status==ValidationSummary)Status="";
+    }
     void RaiseErrors(){foreach(var name in new[]{nameof(NameError),nameof(HostError),nameof(PortError),nameof(UserError),nameof(KeyError),nameof(InitialPathError),nameof(TimeoutError),nameof(SecretError)})Changed(name);}
     public void SecretChanged()=>ClearError("Secret");
     public bool Validate(string secret)
@@ -78,7 +84,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         try{_ = PosixPath.Normalize(string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim());}
         catch(ArgumentException){_errors[nameof(InitialPath)]="Используйте абсолютный POSIX-путь или ~ домашней папки.";}
         if(SaveSecret&&!IsKeyAuthentication&&string.IsNullOrEmpty(secret)&&!_hasStoredSecret&&!deferSecretUntilAuthentication)_errors["Secret"]="Введите пароль для сохранения или отключите сохранение секрета.";
-        RaiseErrors();Status=_errors.Count==0?"":"Проверьте отмеченные поля. Введённые значения сохранены.";return _errors.Count==0;
+        RaiseErrors();Status=_errors.Count==0?"":ValidationSummary;return _errors.Count==0;
     }
     public async Task<string?> LoadSecretAsync(CancellationToken ct=default)
     {
