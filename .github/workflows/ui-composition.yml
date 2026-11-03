@@ -42,9 +42,10 @@ jobs:
         with:
           name: UI-composition-${{ github.sha }}
           path: |
-            artifacts/ui-beta3-*.log
-            artifacts/ui-beta3-before/**
-            artifacts/ui-beta3-after/**
+            artifacts/ui-beta4-*.log
+            artifacts/ui-beta4-before/**
+            artifacts/ui-beta4-after/**
+            artifacts/ui-beta4-interactions/**
             artifacts/*ui-evidence.zip
           if-no-files-found: warn
           retention-days: 14

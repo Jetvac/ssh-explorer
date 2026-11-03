@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -16,7 +17,7 @@ using SSHExplorer.Monitoring;
 
 internal static class MonitorUiTests
 {
-    static readonly DateTimeOffset Now=new(2026,11,3,12,0,0,TimeSpan.Zero);
+    static readonly DateTimeOffset Now=CompositionFixtures.Timestamp;
     public static int GraphOnly()
     {
         try{int count=GraphChecks(Check);Console.WriteLine($"RESULT: {count} timestamp/gap geometry checks passed; no Application, Window, HWND or SSH created");return 0;}
@@ -28,15 +29,16 @@ internal static class MonitorUiTests
         try
         {
             var app=TestApplication.Create();Theme.Apply("Light");int checks=0;
+            CultureInfo.CurrentCulture=CultureInfo.GetCultureInfo("ru-RU");CultureInfo.CurrentUICulture=CultureInfo.GetCultureInfo("ru-RU");
             void Assert(bool value,string text){Check(value,text);checks++;}
-            var evidence=new CiVisualEvidence(Value(args,"--render-dir")??"artifacts/ui-beta3-after");
+            var evidence=new CiVisualEvidence(Value(args,"--render-dir")??"artifacts/ui-beta4-after");
             checks+=GraphChecks(Check);
             var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","monitor-ui-store",Guid.NewGuid().ToString("N")));
-            typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);
+            typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);store.Settings.ShowHidden=true;
             var profile=new ServerProfile{Name="Linux · UI fixture",Host="127.0.0.1",Username="fixture"};
             store.Profiles.Add(profile);var session=new ServerSession(profile,store);var main=new MainWindow{Width=1320,Height=850,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-10000,Top=-10000};
             using var files=new FileBrowserView(session,main);var fileModel=(FileBrowserViewModel)files.DataContext;
-            var entries=Enumerable.Range(0,180).Select(i=>new RemoteEntry{Name=$"document-{i:000}.txt",FullPath=$"/srv/fixture/document-{i:000}.txt",IsRegularFile=true,Length=4096+i}).ToArray();
+            var entries=CompositionFixtures.Files();
             fileModel.CommitNavigation(fileModel.BeginNavigation(),"/srv/fixture",entries,true,[],0);fileModel.ApplyFilter(true,true);Invoke(files,"ApplyItems");Invoke(files,"UpdateBreadcrumbs");
             var tree=(TreeView)Field(files,"tree");tree.Items.Clear();var root=Node(files,"Корень /","/");var folder=Node(files,"fixture","/srv/fixture");root.Items.Clear();folder.Items.Clear();Ui.SetIsCurrentFolder(folder,true);root.Items.Add(folder);tree.Items.Add(root);root.IsExpanded=folder.IsExpanded=true;
             var model=new MonitorViewModel(()=>Now);using var accentProbe=new AccentProbe();using var monitor=new MonitorView(model);model.ApplySnapshot(Sample(),History());
@@ -80,7 +82,7 @@ internal static class MonitorUiTests
             Assert(values.Zip(values.Skip(1),(a,b)=>a>=b).All(x=>x),"process CPU ordering is numeric in the actual collection view");
             // Restore the exact published-baseline fixture before comparable renders:
             // original timestamp/values, original ordering, top viewport, long-name row selected.
-            collection.SortDescriptions.Clear();model.ApplySnapshot(Sample(),History());model.IsBusy=false;
+            monitor.SetSort(null,ListSortDirection.Ascending);collection.SortDescriptions.Clear();model.ApplySnapshot(Sample(),History());model.IsBusy=false;
             table.SelectedItem=model.Processes[3];scroll.ScrollToVerticalOffset(0);Layout(main);SetGraphTime(monitor);
             var captureRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromItem(model.Processes[3])!;
             var captureCell=Descendants<DataGridCell>(captureRow).Single(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.MemoryBytes));
@@ -117,6 +119,8 @@ internal static class MonitorUiTests
             evidence.Capture((FrameworkElement)main.Content,"processes-stale",new{theme="Light",fixtureOnly=true});
             Theme.Apply("Dark");Layout(main);evidence.Capture((FrameworkElement)main.Content,"processes-dark",new{theme="Dark",fixtureOnly=true});Theme.Apply("Light");
             view.ShowSection("files");Layout(main);evidence.CaptureRelatedScenes(main,files,store,Assert,includeNarrowValidation:true);
+            checks+=MonitorRefinementTests.RunUiWindow(main,Check);
+            CaptureCultures(main,evidence,Assert);
             Close(main,app);app.Shutdown();Console.WriteLine($"RESULT: {checks} monitor/shell actual WPF UI and graph checks passed; CI-only HWNDs, offline fixture, no SSH or process signals");return 0;
         }
         catch(Exception ex){Console.WriteLine(ex);return 1;}
@@ -145,12 +149,24 @@ internal static class MonitorUiTests
         assert(!overlap&&bounds.All(b=>b.Left>=-.5&&b.Right<=header.ActualWidth+.5),"measured monitor header title, search and commands stay inside the viewport without overlap");
     }
     static MonitorSnapshot Sample()
-    {
-        var rows=Enumerable.Range(0,160).Select(i=>new ProcessMetric(new ProcessIdentity(100+i,(ulong)(8000+i),1000),i==3?"long-service-name-with-readable-context-and-worker-arguments":"service-"+i,"fixture","S",i%23,32L*1024*1024+i*1048576,i%4==0?null:2048+i*512,i%5==0?null:1024,"/usr/bin/service --fixture")).ToArray();
-        return new(Now,new(46,4,8L<<30,5L<<30,3L<<30,0,0,TimeSpan.FromDays(3),.7,.9,1.1,100,false),rows,[new("eth0",4096,8192,2048,1024)],[new("vda",4096,8192,1024,2048)],[new("ext4","/",16L<<30,4L<<30,12L<<30)],["Детерминированный UI fixture; I/O недоступен для части процессов."]);
-    }
-    static IReadOnlyList<HistoryPoint> History()=>[new(Now.AddSeconds(-120),10,35,0,0),new(Now.AddSeconds(-119),30,36,0,0),new(Now.AddSeconds(-60),20,37,0,0),new(Now.AddSeconds(-59),50,38,0,0),new(Now,46,37.5,0,0)];
+        =>CompositionFixtures.Snapshot();
+    static IReadOnlyList<HistoryPoint> History()=>CompositionFixtures.History();
     static void SetGraphTime(MonitorView monitor){foreach(var graph in Descendants<MetricGraph>(monitor))graph.Now=Now;}
+    static void CaptureCultures(MainWindow main,CiVisualEvidence evidence,Action<bool,string> assert)
+    {
+        var oldContent=main.Content;var oldCulture=CultureInfo.CurrentCulture;var oldUiCulture=CultureInfo.CurrentUICulture;
+        try
+        {
+            foreach(string name in new[]{"ru-RU","en-US"})
+            {
+                CultureInfo.CurrentCulture=CultureInfo.GetCultureInfo(name);CultureInfo.CurrentUICulture=CultureInfo.GetCultureInfo(name);
+                var model=new MonitorViewModel(()=>Now);using var monitor=new MonitorView(model);model.ApplySnapshot(Sample(),History());main.Content=monitor;Layout(main);SetGraphTime(monitor);
+                assert(model.CpuHeader=="46%"&&model.Processes.Single(row=>row.Pid==103).CpuText==(name=="ru-RU"?"86,8%":"86.8%"),name+" actual production monitor uses whole aggregate and fractional process display roles");
+                evidence.Capture(monitor,"monitor-culture-"+name,new{theme="Light",fixtureOnly=true,composition="standalone production MonitorView within existing CI HWND; not a shell comparison frame",processCount=160,sampleTimestamp=Now,sort="fixture order"});
+            }
+        }
+        finally{main.Content=oldContent;CultureInfo.CurrentCulture=oldCulture;CultureInfo.CurrentUICulture=oldUiCulture;Layout(main);}
+    }
     static double NaturalTextHeight(TextBlock actual)
     {
         var probe=new TextBlock{Text=actual.Text,FontFamily=actual.FontFamily,FontSize=actual.FontSize,FontWeight=actual.FontWeight,FontStyle=actual.FontStyle,FontStretch=actual.FontStretch};probe.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));return probe.DesiredSize.Height;

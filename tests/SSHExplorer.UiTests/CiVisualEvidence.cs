@@ -1,11 +1,14 @@
 using System.IO;
+using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using SSHExplorer.App;
@@ -19,7 +22,9 @@ internal sealed class CiVisualEvidence
     readonly List<object> captures=[];
     public static void RequireCi()
     {
-        if(!string.Equals(Environment.GetEnvironmentVariable("CI"),"true",StringComparison.OrdinalIgnoreCase))
+        if(!string.Equals(Environment.GetEnvironmentVariable("CI"),"true",StringComparison.OrdinalIgnoreCase)||
+           !string.Equals(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"),"true",StringComparison.OrdinalIgnoreCase)||
+           !long.TryParse(Environment.GetEnvironmentVariable("GITHUB_RUN_ID"),out _))
             throw new InvalidOperationException("Actual-window visual checks are CI-only; no host windows are permitted.");
     }
     public CiVisualEvidence(string outputDirectory)
@@ -53,6 +58,8 @@ internal sealed class CiVisualEvidence
             scope=window is null?"actual WPF popup visual":"actual WPF client visual",settleMilliseconds=300,
             clientDip=new{width=visual.ActualWidth,height=visual.ActualHeight},pixels=new{width,height},
             windowGeometry=window is null?null:new{actualWidth=Finite(window.ActualWidth),actualHeight=Finite(window.ActualHeight),requestedWidth=Finite(window.Width),requestedHeight=Finite(window.Height),sizeToContent=window.SizeToContent.ToString()},
+            culture=CultureInfo.CurrentCulture.Name,uiCulture=CultureInfo.CurrentUICulture.Name,
+            windowActive=window?.IsActive,keyboardFocusType=Keyboard.FocusedElement?.GetType().Name,keyboardFocusElement=(Keyboard.FocusedElement as FrameworkElement)?.Name,
             dpi=new{x=96*dpi.DpiScaleX,y=96*dpi.DpiScaleY},systemHighContrast=SystemParameters.HighContrast,
             systemClientAreaAnimation=SystemParameters.ClientAreaAnimation,
             uiFontSize=visual.TryFindResource("UIFontSize"),measurements
@@ -87,8 +94,24 @@ internal sealed class CiVisualEvidence
             Descendants<Button>(dialog).Single(b=>Equals(b.Content,"Сохранить и подключиться")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();dialog.UpdateLayout();
             assert?.Invoke(dialog.Model.NameError.Length>0&&dialog.Model.HostError.Length>0,"actual profile validation keeps the window open with inline errors");
             Capture((FrameworkElement)dialog.Content,"profile-validation",new{theme="Light",fixtureOnly=true});
+            var authentication=Descendants<ComboBox>(dialog).Single(combo=>AutomationProperties.GetName(combo)=="Способ входа");
+            authentication.Focus();SendKey(authentication,Key.F4);Pump();dialog.UpdateLayout();
+            var popup=authentication.Template.FindName("PART_Popup",authentication) as Popup??throw new InvalidOperationException("The applied authentication ComboBox has no PART_Popup.");
+            if(!authentication.IsDropDownOpen||popup.Child is not FrameworkElement popupVisual||!popupVisual.IsVisible)throw new InvalidOperationException("F4 did not open the actual authentication popup.");
+            var items=Descendants<ComboBoxItem>(popupVisual).Where(item=>item.IsVisible).ToArray();
+            assert?.Invoke(items.Length==3&&popupVisual.ActualWidth+1>=authentication.ActualWidth&&items.All(item=>item.ActualHeight>20),"applied authentication popup exposes all three real selectable rows at the field width");
+            Capture(popupVisual,"profile-auth-popup",new{theme="Light",fixtureOnly=true,openedBy="routed F4 KeyDown",physicalKeyboardInput=false,selectedIndex=authentication.SelectedIndex,fieldWidthDip=authentication.ActualWidth,realizedItems=items.Length});
+            SendKey(authentication,Key.Escape);Pump();
+            assert?.Invoke(!authentication.IsDropDownOpen&&dialog.IsVisible,"Escape closes the actual ComboBox popup without cancelling its owner dialog");
+            var name=Descendants<TextBox>(dialog).Single(input=>AutomationProperties.GetName(input)=="Название");
+            var host=Descendants<TextBox>(dialog).Single(input=>AutomationProperties.GetName(input)=="Адрес сервера");
+            var user=Descendants<TextBox>(dialog).Single(input=>AutomationProperties.GetName(input)=="Пользователь Linux");
+            name.Text="Лаборатория · тестовый сервер";host.Text="lab.example.invalid";user.Text="fixture";name.Focus();Pump();dialog.UpdateLayout();
+            Capture((FrameworkElement)dialog.Content,"profile-filled",new{theme="Light",fixtureOnly=true,syntheticFields=true,authentication="Password",secretProvided=false});
             if(includeNarrowValidation)
             {
+                name.Clear();host.Clear();user.Clear();
+                Descendants<Button>(dialog).Single(button=>Equals(button.Content,"Сохранить и подключиться")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
                 dialog.Width=430;dialog.UpdateLayout();Pump();var content=(FrameworkElement)dialog.Content;
                 var actions=Descendants<Button>(dialog).Where(button=>button.IsVisible&&button.Content is string name&&name is "Отмена" or "Сохранить" or "Сохранить и подключиться").ToArray();
                 var bounds=actions.Select(button=>button.TransformToAncestor(content).TransformBounds(new Rect(button.RenderSize))).ToArray();bool overlap=false;
@@ -98,6 +121,11 @@ internal sealed class CiVisualEvidence
             }
         }
         finally{dialog.Close();Pump();}
+    }
+    static void SendKey(UIElement target,Key key)
+    {
+        var source=PresentationSource.FromVisual(target)??throw new InvalidOperationException("Key handler evidence requires a CI presentation source.");
+        target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,source,Environment.TickCount,key){RoutedEvent=Keyboard.KeyDownEvent});
     }
     static void Pump(){var frame=new System.Windows.Threading.DispatcherFrame();System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,()=>frame.Continue=false);System.Windows.Threading.Dispatcher.PushFrame(frame);}
     static double? Finite(double value)=>double.IsFinite(value)?value:null;

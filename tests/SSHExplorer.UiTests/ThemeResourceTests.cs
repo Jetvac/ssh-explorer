@@ -32,13 +32,14 @@ internal static class ThemeResourceTests
                     role.Seal();MaterializeTemplates(role,templates);
                 }
                 MaterializeMonitorMetricTemplate();
+                MaterializeInputs();
                 foreach (var key in new[] { "Paper", "Surface", "NavigationSurface", "CaptionSurface", "Accent", "DropTarget", "Hover", "Selected", "DisabledInk", "FocusStroke", "SelectedFocusStroke", "PrimaryFocusStroke" })
                     if (app.FindResource(key) is not Brush) throw new Exception("Theme brush missing: " + key);
                 foreach (var key in new[] { "UIFontSize", "UICaptionSize", "UIHeadingSize", "ControlMinHeight", "CommandHeight", "RowHeight", "IconSize", "TreeIndent" })
                     if (app.FindResource(key) is not double) throw new Exception("Metric token missing: " + key);
                 foreach (var key in new[] { "ControlRadius", "FlyoutRadius" }) if (app.FindResource(key) is not CornerRadius) throw new Exception("Radius token missing: " + key);
                 foreach (var key in new[] { "MotionFast", "MotionSurface", "MotionSlow" }) if (app.FindResource(key) is not TimeSpan) throw new Exception("Motion token missing: " + key);
-                Console.WriteLine("PASS actual application Fluent styles, 22 explicit role styles, materialized templates and metric namescopes: " + mode);
+                Console.WriteLine("PASS actual application Fluent styles, 22 explicit role styles, applied input templates and metric namescopes: " + mode);
             }
             var contrast = new ResourceDictionary { Source = new Uri("/PresentationFramework.Fluent;component/Themes/Fluent.HC.xaml", UriKind.Relative) };
             if (contrast[typeof(ComboBox)] is not Style contrastStyle) throw new Exception("Native High Contrast style missing."); contrastStyle.Seal();
@@ -96,4 +97,25 @@ internal static class ThemeResourceTests
         // This is a template materialization/name contract, not evidence of
         // DataGrid cell width or a visible UI; that boundary is measured in CI.
     }
+    static void MaterializeInputs()
+    {
+        var text=new TextBox{Text="fixture"};var password=new PasswordBox{Password=" fixture "};var combo=new ComboBox{ItemsSource=new[]{"one","two"},SelectedIndex=0};var check=new CheckBox{Content="fixture",IsThreeState=true};
+        foreach(var control in new Control[]{text,password,combo,check}){control.Style=(Style)Application.Current.FindResource(control.GetType());control.ApplyTemplate();control.Measure(new Size(280,60));control.Arrange(new Rect(0,0,280,60));control.UpdateLayout();}
+        foreach(var control in new Control[]{text,password})
+        {
+            _=Part<ScrollViewer>(control,"PART_ContentHost");_=Part<Border>(control,"FieldChrome");_=Part<Border>(control,"FocusUnderline");
+            Ui.SetHasValidationError(control,true);
+            if(!Equals(Part<Border>(control,"FieldChrome").BorderBrush,control.FindResource("ValidationInk")))throw new Exception("Applied input validation trigger did not update its chrome.");
+        }
+        var popup=Part<Popup>(combo,"PART_Popup");_=Part<TextBox>(combo,"PART_EditableTextBox");_=Part<Border>(combo,"FieldChrome");
+        if(popup.IsOpen||PresentationSource.FromVisual(combo)is not null)throw new Exception("Headless input materialization unexpectedly acquired a presentation source.");
+        combo.IsEditable=true;if(Part<TextBox>(combo,"PART_EditableTextBox").Visibility!=Visibility.Visible)throw new Exception("Editable input template did not expose its standard edit part.");
+        check.IsChecked=true;if(Part<System.Windows.Shapes.Path>(check,"CheckGlyph").Visibility!=Visibility.Visible)throw new Exception("Applied checkbox did not render its checked state.");
+        check.IsChecked=null;if(Part<Border>(check,"IndeterminateGlyph").Visibility!=Visibility.Visible)throw new Exception("Applied checkbox did not render its indeterminate state.");
+        var secret=new SecretEntry();secret.ApplyTemplate();secret.Measure(new Size(280,60));secret.Arrange(new Rect(0,0,280,60));secret.UpdateLayout();secret.Password=" fixture ";int revision=secret.EditRevision;var toggle=Descendants<ToggleButton>(secret).Single();toggle.IsChecked=true;
+        if(!secret.IsRevealed||secret.Password!=" fixture "||secret.EditRevision!=revision)throw new Exception("Reveal changed the secret or edit revision during headless template materialization.");
+        toggle.IsChecked=false;secret.Clear();
+        static T Part<T>(Control control,string name)where T:DependencyObject=>control.Template.FindName(name,control)as T??throw new Exception($"Applied {control.GetType().Name} template is missing {name}.");
+    }
+    static IEnumerable<T> Descendants<T>(DependencyObject root)where T:DependencyObject{for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T match)yield return match;foreach(var nested in Descendants<T>(child))yield return nested;}}
 }
