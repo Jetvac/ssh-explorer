@@ -145,10 +145,10 @@ internal static class FileInteractionTests
             {
             var start=new Point(1,1);var startHit=tiles.InputHitTest(start)as DependencyObject;if(startHit is null){start=new Point(Math.Min(90,tiles.ActualWidth/2),1);startHit=tiles.InputHitTest(start)as DependencyObject;}if(startHit is null||FileBrowserView.IsFileObjectHit(startHit))throw new InvalidOperationException("CI tile lasso start is not a real blank-space input target.");
             int realizedBefore=Descendants<ListBoxItem>(tiles).Count();pointer.MoveTo(tiles,start);pointer.Down();pointer.MoveTo(tiles,new Point(Math.Min(tiles.ActualWidth-3,220),Math.Min(tiles.ActualHeight-3,250)));Layout(main);
-            var lassoDiagnostic=new{theme="Light",fixtureOnly=true,inputLevel="software SendInput mouse",physicalMouseTested=false,actualLeftButton=Mouse.LeftButton.ToString(),ownerMatches=ReferenceEquals(Field(files,"lassoOwner"),tiles),lassoOwnerType=Field(files,"lassoOwner")?.GetType().Name,lastEndReason=files.LastLassoEndReason,hasAdorner=Field(files,"lassoAdorner")is not null,hasLayer=Field(files,"lassoLayer")is not null,hasTimer=Field(files,"lassoTimer")is not null,discoveredAdornerLayer=AdornerLayer.GetAdornerLayer(tiles)is not null,mouseCaptured=tiles.IsMouseCaptured,mouseCaptureWithin=tiles.IsMouseCaptureWithin,capturedType=Mouse.Captured?.GetType().Name,selectedCount=tiles.SelectedItems.Count,realizedBefore,realizedAfter=Descendants<ListBoxItem>(tiles).Count(),panelOffset=tilePanel.VerticalOffset,width=tiles.ActualWidth,height=tiles.ActualHeight,panelWidth=tilePanel.ViewportWidth,panelHeight=tilePanel.ViewportHeight};
-            Console.WriteLine("DIAGNOSTIC tile lasso "+System.Text.Json.JsonSerializer.Serialize(lassoDiagnostic));evidence.Capture((FrameworkElement)main.Content,"files-lasso-before-assert",lassoDiagnostic);
+            var lassoDiagnostic=new{theme="Light",fixtureOnly=true,captureIncludesActualAdorner=true,measurementsAtRequestBeforeSettle=true,inputLevel="software SendInput mouse",physicalMouseTested=false,actualLeftButton=Mouse.LeftButton.ToString(),ownerMatches=ReferenceEquals(Field(files,"lassoOwner"),tiles),lassoOwnerType=Field(files,"lassoOwner")?.GetType().Name,lastEndReason=files.LastLassoEndReason,hasAdorner=Field(files,"lassoAdorner")is not null,hasLayer=Field(files,"lassoLayer")is not null,hasTimer=Field(files,"lassoTimer")is not null,discoveredAdornerLayer=AdornerLayer.GetAdornerLayer(tiles)is not null,mouseCaptured=tiles.IsMouseCaptured,mouseCaptureWithin=tiles.IsMouseCaptureWithin,capturedType=Mouse.Captured?.GetType().Name,selectedCount=tiles.SelectedItems.Count,realizedBefore,realizedAfter=Descendants<ListBoxItem>(tiles).Count(),panelOffset=tilePanel.VerticalOffset,width=tiles.ActualWidth,height=tiles.ActualHeight,panelWidth=tilePanel.ViewportWidth,panelHeight=tilePanel.ViewportHeight};
+            Console.WriteLine("DIAGNOSTIC tile lasso "+System.Text.Json.JsonSerializer.Serialize(lassoDiagnostic));evidence.Capture(LassoCaptureVisual(files),"files-lasso-before-assert",lassoDiagnostic);
             Assert(Field(files,"lassoOwner")==tiles&&tiles.SelectedItems.Count>0&&realizedBefore is >0 and <250&&Descendants<ListBoxItem>(tiles).Count() is >0 and <250,"tile lasso selects model items while keeping a ten-thousand-item listing virtualized");
-            evidence.Capture((FrameworkElement)main.Content,"files-lasso-tiles",new{theme="Light",fixtureOnly=true,totalItems=model.VisibleEntries.Count,realizedContainers=Descendants<ListBoxItem>(tiles).Count(),selectedItems=tiles.SelectedItems.Count,inputLevel="software SendInput mouse",physicalMouseTested=false});
+            evidence.Capture(LassoCaptureVisual(files),"files-lasso-tiles",new{theme="Light",fixtureOnly=true,captureIncludesActualAdorner=true,measurementsAtRequestBeforeSettle=true,totalItems=model.VisibleEntries.Count,realizedContainers=Descendants<ListBoxItem>(tiles).Count(),selectedItems=tiles.SelectedItems.Count,inputLevel="software SendInput mouse",physicalMouseTested=false});
             tiles.ReleaseMouseCapture();Pump();Assert(Field(files,"lassoOwner") is null&&Field(files,"lassoAdorner") is null,"lost mouse capture removes tile lasso state and its adorner");
             }
             Invoke(files,"SetMode","Details",false);Layout(main);var scroller=Descendants<ScrollViewer>(table).First();scroller.ScrollToVerticalOffset(0);Layout(main);
@@ -159,7 +159,7 @@ internal static class FileInteractionTests
             if(FileBrowserView.IsFileObjectHit(table.InputHitTest(origin)as DependencyObject))throw new InvalidOperationException("CI Details lasso start is not blank Name-cell space.");
             pointer.MoveTo(table,origin);pointer.Down();pointer.MoveTo(table,new Point(table.ActualWidth-8,table.ActualHeight-2));WaitFor(()=>scroller.VerticalOffset>0);Layout(main);
             Assert(table.SelectedItems.Count>0&&Descendants<DataGridRow>(table).Count() is >0 and <250,"Details lasso edge scrolling selects rows across the virtualized model without realizing every row");
-            evidence.Capture((FrameworkElement)main.Content,"files-lasso-details",new{theme="Light",fixtureOnly=true,inputLevel="software SendInput mouse",physicalMouseTested=false,selectedItems=table.SelectedItems.Count,scrollOffset=scroller.VerticalOffset,realizedRows=Descendants<DataGridRow>(table).Count()});
+            evidence.Capture(LassoCaptureVisual(files),"files-lasso-details",new{theme="Light",fixtureOnly=true,captureIncludesActualAdorner=true,measurementsAtRequestBeforeSettle=true,inputLevel="software SendInput mouse",physicalMouseTested=false,selectedItems=table.SelectedItems.Count,scrollOffset=scroller.VerticalOffset,realizedRows=Descendants<DataGridRow>(table).Count()});
             SendKey(table,Key.Escape);Pump();Assert(Field(files,"lassoOwner") is null&&Field(files,"lassoTimer") is null,"Escape clears Details lasso capture and edge-scroll timer");
             }
             using(var pointer=new CiSoftwarePointer(main))
@@ -201,6 +201,17 @@ internal static class FileInteractionTests
     static Point BlankNamePoint(DataGrid table)
     {
         var row=Descendants<DataGridRow>(table).First(item=>item.IsVisible&&item.GetIndex()==0);var cell=Descendants<DataGridCell>(row).Single(item=>item.Column.SortMemberPath=="Name");return cell.TranslatePoint(new Point(cell.ActualWidth-8,cell.ActualHeight/2),table);
+    }
+    static FrameworkElement LassoCaptureVisual(FileBrowserView files)
+    {
+        var adorner=Field(files,"lassoAdorner")as Adorner??throw new InvalidOperationException("Lasso capture requires the active production adorner.");
+        var layer=Field(files,"lassoLayer")as AdornerLayer??throw new InvalidOperationException("Lasso capture requires its production adorner layer.");
+        if(!adorner.IsVisible||layer.GetAdorners(adorner.AdornedElement)?.Contains(adorner)!=true)throw new InvalidOperationException("The active production lasso is not attached to its visible layer.");
+        // Window's AdornerLayer is a sibling of its content. Rendering only
+        // MainWindow.Content omits the real frame even while capture is active.
+        for(DependencyObject? visual=files;visual is not null;visual=VisualTreeHelper.GetParent(visual))
+            if(visual is AdornerDecorator decorator&&decorator.IsAncestorOf(layer)&&decorator.IsAncestorOf(adorner))return decorator;
+        throw new InvalidOperationException("No actual AdornerDecorator subtree contains the active production lasso.");
     }
     sealed class Operations:IFileBrowserOperations
     {

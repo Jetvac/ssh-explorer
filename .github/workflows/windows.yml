@@ -60,7 +60,7 @@ jobs:
           'CI exercises core regressions, WPF layout/state, motion clocks, profile STA dialogs, ordinary Add/Trust/Connect controls with real loopback SSH/SFTP and a fresh test process, plus native COM ABI.' >> $env:GITHUB_STEP_SUMMARY
           'STA control events are not physical keyboard input or a published EXE restart. Live Explorer gestures, DPI, High Contrast, motion recordings and clean Windows acceptance remain separate; see ACCEPTANCE.md.' >> $env:GITHUB_STEP_SUMMARY
           'Packaged EXE startup/normal close is a separate isolated CI process probe; it does not test password input or clean Windows.' >> $env:GITHUB_STEP_SUMMARY
-          'Current composition renders are actual WPF client visuals from CI HWNDs with offline data. Exact published beta.3 and current source use matching fixtures, measured client sizes, culture, theme and recorded DPI/font role. File/controller and applied-input tests use routed events, not physical gestures. They do not capture native caption buttons or prove motion/physical gestures/accessibility acceptance.' >> $env:GITHUB_STEP_SUMMARY
+          'Current composition renders are actual WPF client visuals from CI HWNDs with offline data. Exact published beta.3 and current source use matching fixtures, measured client sizes, culture, theme and recorded DPI/font role. Checks use routed control events and CI-only guarded software SendInput for held mouse/capture paths. Physical mouse and keyboard input remain NOT RUN. The renders do not capture native caption buttons or prove motion/physical gestures/accessibility acceptance.' >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
