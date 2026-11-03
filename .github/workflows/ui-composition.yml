@@ -1,0 +1,50 @@
+name: UI composition preflight
+on:
+  push:
+    branches: ['codex/**']
+    paths:
+      - 'src/SSHExplorer.App/**'
+      - 'src/SSHExplorer.Monitoring/**'
+      - 'tests/SSHExplorer.UiTests/**'
+      - 'scripts/Test-UiComposition.ps1'
+      - '.github/workflows/ui-composition.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ui-composition-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  composition:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
+        with:
+          global-json-file: global.json
+      - name: Build current WPF components without packaging
+        shell: pwsh
+        run: |
+          $env:DOTNET_CLI_HOME = Join-Path $PWD '.tools/dotnet-home'
+          $env:NUGET_PACKAGES = Join-Path $PWD '.tools/nuget'
+          dotnet restore tests/SSHExplorer.UiTests/SSHExplorer.UiTests.csproj --locked-mode --disable-parallel
+          if ($LASTEXITCODE) { throw 'UI dependency restore failed.' }
+          dotnet build tests/SSHExplorer.UiTests/SSHExplorer.UiTests.csproj -c Release --no-restore -m:1 -nr:false "-p:SourceRevisionId=$env:GITHUB_SHA" -p:ContinuousIntegrationBuild=true
+          if ($LASTEXITCODE) { throw 'UI component build failed.' }
+      - name: Measure and render matching real WPF windows in CI
+        shell: pwsh
+        run: ./scripts/Test-UiComposition.ps1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: UI-composition-${{ github.sha }}
+          path: |
+            artifacts/ui-beta3-*.log
+            artifacts/ui-beta3-before/**
+            artifacts/ui-beta3-after/**
+            artifacts/*ui-evidence.zip
+          if-no-files-found: warn
+          retention-days: 14

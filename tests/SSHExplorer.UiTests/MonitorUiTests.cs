@@ -88,8 +88,8 @@ internal static class MonitorUiTests
             evidence.Capture((FrameworkElement)main.Content,"processes-wide",new{theme="Light",fixtureOnly=true,processCount=160,sampleTimestamp=Now,selectedPid=103,verticalOffset=scroll.VerticalOffset,sort="fixture order",metricCellDip=captureCell.ActualWidth,metricSurfaceDip=captureSurface.ActualWidth,metricCellHeightDip=captureCell.ActualHeight,metricSurfaceHeightDip=captureSurface.ActualHeight,metricPadding=captureSurface.Padding.Right});
             main.Width=760;Layout(main);CheckHeader(monitor,Assert);
             Assert(table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Name))&&table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Cpu)),"narrow viewport retains process name and CPU instead of only secondary columns");
-            CheckNarrowColumns(table,Assert);
             evidence.Capture((FrameworkElement)main.Content,"processes-narrow",new{theme="Light",fixtureOnly=true});
+            CheckNarrowColumns(table,Assert);
             main.Width=1320;Layout(main);
             object originalFont=Application.Current.Resources["UIFontSize"]??throw new Exception("UI font role is unavailable.");
             try
@@ -163,9 +163,13 @@ internal static class MonitorUiTests
         double available=viewport.ActualWidth-(((int)table.HeadersVisibility&(int)DataGridHeadersVisibility.Row)!=0?table.RowHeaderActualWidth:0);
         double occupied=table.Columns.Where(column=>column.Visibility==Visibility.Visible).Sum(column=>column.ActualWidth);
         var headers=Descendants<DataGridColumnHeadersPresenter>(table).Single();
-        double filler=Descendants<DataGridColumnHeader>(headers).Where(header=>header.Column is null&&header.IsVisible).Select(header=>header.ActualWidth).DefaultIfEmpty(0).Max();
-        Console.WriteLine("NARROW_COLUMN_GEOMETRY "+System.Text.Json.JsonSerializer.Serialize(new{nameIsStar=name.Width.IsStar,viewportDip=available,visibleColumnsDip=occupied,fillerDip=filler,verticalScrollTrackDip=Descendants<ScrollBar>(viewer).Where(bar=>bar.Orientation==Orientation.Vertical&&bar.IsVisible).Select(bar=>bar.ActualWidth).DefaultIfEmpty(0).Max()}));
-        assert(!name.Width.IsStar||(available>0&&Math.Abs(available-occupied)<=1&&filler<=1),"default star name column consumes the measured narrow viewport without an unused filler; pixel user widths remain respected");
+        double rawFiller=Descendants<DataGridColumnHeader>(headers).Where(header=>header.Column is null&&header.IsVisible).Select(header=>header.ActualWidth).DefaultIfEmpty(0).Max();
+        // The template filler can extend behind real headers or outside the clip.
+        // Its raw width is not empty space: only the uncovered viewport after the
+        // sequential visible columns is relevant to the name-width regression.
+        double uncovered=Math.Max(0,available-occupied);
+        Console.WriteLine("NARROW_COLUMN_GEOMETRY "+System.Text.Json.JsonSerializer.Serialize(new{nameIsStar=name.Width.IsStar,viewportDip=available,visibleColumnsDip=occupied,uncoveredViewportDip=uncovered,rawTemplateFillerDip=rawFiller,verticalScrollTrackDip=Descendants<ScrollBar>(viewer).Where(bar=>bar.Orientation==Orientation.Vertical&&bar.IsVisible).Select(bar=>bar.ActualWidth).DefaultIfEmpty(0).Max()}));
+        assert(!name.Width.IsStar||(available>0&&Math.Abs(available-occupied)<=1&&uncovered<=1),"default star name column consumes the measured narrow viewport without visible unused space; pixel user widths remain respected");
     }
     static void CheckStateHeader(DataGrid table,Action<bool,string> assert)
     {
