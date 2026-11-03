@@ -243,4 +243,3 @@ internal static class Program
         public async Task<ProfileCommitResult> SaveAsync(ServerProfile profile,string? secret,CancellationToken ct=default){SaveCalls++;await Release.Task.WaitAsync(ct);return await inner.SaveAsync(profile,secret,ct);}
     }
 }
-
