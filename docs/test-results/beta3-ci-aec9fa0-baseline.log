@@ -1,0 +1,2 @@
+SAFETY exact beta.2 App(false) consumed queued startup; desktop starts=0; no windows; isolated store identity unchanged
+RESULT: exact published beta.2 actual-WPF client renders completed; no SSH or process signals; CI-only HWNDs

@@ -1,0 +1,73 @@
+{
+  "status": "PASS",
+  "beforeCommit": "e8424e548e89b8406444d3122157542597c3c33f",
+  "afterCommit": "aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+  "scope": "Matching actual WPF client geometry, DPI, font role and theme; no motion/native caption or physical input claim",
+  "states": [
+    {
+      "state": "processes-wide",
+      "clientDip": {
+        "width": 1044,
+        "height": 788
+      },
+      "dpi": {
+        "x": 96,
+        "y": 96
+      },
+      "uiFontSize": 14,
+      "theme": "Light"
+    },
+    {
+      "state": "processes-narrow",
+      "clientDip": {
+        "width": 760,
+        "height": 788
+      },
+      "dpi": {
+        "x": 96,
+        "y": 96
+      },
+      "uiFontSize": 14,
+      "theme": "Light"
+    },
+    {
+      "state": "performance-gap",
+      "clientDip": {
+        "width": 1044,
+        "height": 788
+      },
+      "dpi": {
+        "x": 96,
+        "y": 96
+      },
+      "uiFontSize": 14,
+      "theme": "Light"
+    },
+    {
+      "state": "files-tree",
+      "clientDip": {
+        "width": 1044,
+        "height": 788
+      },
+      "dpi": {
+        "x": 96,
+        "y": 96
+      },
+      "uiFontSize": 14,
+      "theme": "Light"
+    },
+    {
+      "state": "home",
+      "clientDip": {
+        "width": 1044,
+        "height": 788
+      },
+      "dpi": {
+        "x": 96,
+        "y": 96
+      },
+      "uiFontSize": 14,
+      "theme": "Light"
+    }
+  ]
+}

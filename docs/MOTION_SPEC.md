@@ -54,3 +54,5 @@ SSHExplorer.UiTests.exe --motion-only
 ## Отложенная живая матрица
 
 Частичный позднее разрешённый прогон строки/меню/навигации — [LIVE_BETA2](LIVE_BETA2.md). **NOT RUN:** видео hover/pressed/flyout и быстрых переходов/Esc, все 100/125/150/200% DPI, Dark/High Contrast, системное отключение анимаций во время эффекта, перенос между мониторами и чистая Windows. Скриншоты beta.1 и beta.2 не доказывают движение.
+
+Beta.3 polling/transition boundary: 8 controlled MonitorView checks PASS — hide cancels active request, hidden timer stays quiet, rapid resume is serialized and rejects late epoch, Dispose drains without restarting. Narrow reflow uses a coalesced dispatcher layout callback, not a decorative timer; explicit user pixel width remains intact. [CI evidence](CI_BETA3.md). Visible quality/motion video remain NOT RUN under no-Computer-Use instruction.

@@ -6,15 +6,17 @@
 
 | Проверка | Текущий статус / граница |
 |---|---|
-| Композиция мониторинга/левая панель/общие роли | Реализовано; фактические CI layout/render результаты фиксируются для точного commit |
-| Metric states, independent sources, timestamp/gaps, selection | Новые регрессии; результаты текущего прогона отдельно от исторических |
-| Ordinary auth/retry/cancel/owner/secret/native ABI | Сохраняются, требуют CI изменённого commit |
+| Композиция мониторинга/левая панель/общие роли | PASS — 34 actual WPF UI/graph checks, source aec9fa0, [логи/границы](docs/CI_BETA3.md); UI-приёмка пользователя открыта |
+| Metric states, independent sources, timestamp/gaps, selection | PASS — 49 backend/core + 16 monitor state + 6 graph + actual UI; [checkpoint evidence](docs/test-results/beta3-ci-aec9fa0-evidence.json) |
+| Ordinary auth/retry/cancel/owner/secret/native ABI | PASS — полный CI aec9fa0, включая обычные контролы+SSH и fresh process; не физический ввод |
 | Парольный crash | Пользователь дошёл до рабочего экрана; причина прежнего случая НЕ УСТАНОВЛЕНА |
 | Computer Use / desktop host | NOT RUN по прямому указанию пользователя; временное разрешение beta.2 не продлевается |
-| CI WPF-render снимки | Отдельный изолированный сценарий, не physical input и не пользовательская приёмка |
+| CI WPF-render снимки | PASS своего уровня: одинаковые actual dimensions/DPI/font/fixture и SHA; physical input и пользовательская приёмка отдельно |
 | Полные Explorer gestures, live auth, DPI/HC, motion video, clean Windows | NOT RUN в этой итерации; воспроизводимые шаги описаны в матрице |
 
 Финальная beta.2 уже опубликована и скачана: [отчёт](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.2/SSHExplorer-0.2.0-beta.2-verification.json), 816 portable files / 252 source blobs, [финальный CI](https://github.com/Jetvac/ssh-explorer/actions/runs/41651021287). Нижележащие PARTIAL/«ещё не проверен» относятся к историческому checkpoint ab01976, не к итоговому релизу.
+
+[Полный успешный CI beta.3](https://github.com/Jetvac/ssh-explorer/actions/runs/41669051537). Финальные исходники, повторно скачанные ZIP, хеши и tag CI связаны в [релизе](https://github.com/Jetvac/ssh-explorer/releases/tag/v0.2.0-beta.3); исторические результаты ниже не переносятся на него автоматически.
 
 ## Исторические результаты beta.2
 

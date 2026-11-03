@@ -106,3 +106,18 @@ Root обнаружил в реально запущенном CI-комплек
 Минимальное изменение: у настоящих SessionView `screen`, `addressHost`, `commandHost`, `fileStatusHost` установлены `Focusable=false` и `IsTabStop=false`. Декоративная обёртка не становится fallback focus target; кнопки и поля внутри сохраняют собственную клавиатурную доступность. Focus visuals интерактивных элементов не отключались.
 
 В UiComponentTests добавлен настоящий SessionView с четырьмя hosts: отказ direct Focus/tab stop, доступность Button/TextBox, отключение выбранной Back-кнопки, настоящий фокус поля пути. [CI 41649603241](https://github.com/Jetvac/ssh-explorer/actions/runs/41649603241) прошёл: теперь 16 UI component checks. Root повторил тот же живой сценарий на скачанном CI 4895d45: рамка исчезла, Alt+Right работает. [После исправления](screenshots/beta2/nav-focus-fixed-ci-4895d45.png), [бинарные хеши](test-results/beta2-live-focus-4895d45.json).
+
+
+## Наблюдения по сопоставимым CI-кадрам
+
+До — фактический опубликованный e8424e5; предварительные after — 3b8aff8. Обе стороны 96 DPI / UIFont14 / Light, client 1044×788 (narrow760×788). Данные: 160 процессов, selectedPID103, фиксированное время/порядок/top0; файлы180/document005/top0. Все PNG SHA совпали с manifests. Системная область DWM не входит в renderer; её прозрачный участок не закрашивается. Это не native desktop capture.
+
+При этих одинаковых условиях рабочая область показывает примерно 19 вместо 13 полных строк. Удалены внутренние оконные вкладки, duplicate summary и многострочный footer; имя процесса получило больше места, heatmap заполняет ячейку, строка выбора остаётся сплошной. Метка папки при открытом мониторинге спокойнее активной страницы. Графики показывают реальные интервалы, а не кластер точек по индексам.
+
+Независимый просмотр обнаружил два дефекта, не выявленных старым NoOverlap/height test: пустой filler справа при узкой таблице и raw clipping заголовка State при UIFont22. Исправлены star reflow после responsive-collapse и string header ellipsis с tooltip/automation; новые проверки измеряют viewport/filler и фактический текст заголовка. Явный pixel-resize пользователя сохраняется. Эти изменения проходят отдельный CI; не подменяются старыми кадрами.
+
+Финальные [до](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.3/processes-before.png) / [после](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.3/processes-after.png) и [весь набор с commit/hash/geometry](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.3/SSHExplorer-0.2.0-beta.3-ui-evidence.zip) поставляются с новым выпуском. Один popup-crop сам по себе не доказывает anchor: привязка проверяется отдельно на фактическом ContextMenu.PlacementTarget.
+
+Пользовательская приёмка остаётся открытой. Референсы Windows имеют неизвестные DPI/text scale; полное совпадение с ними, native caption/Snap, physical keyboard, Explorer gestures, live motion, HC/OS text-scale и все DPI не объявлены проверенными. UIFont22 — увеличение роли приложения в CI, не изменение настроек Windows.
+
+**Итог проверенного кода aec9fa0:** оба замечания независимого просмотра исправлены, [34 UI checks + exact comparison PASS](https://github.com/Jetvac/ssh-explorer/actions/runs/41669053200), [полный CI SUCCESS](https://github.com/Jetvac/ssh-explorer/actions/runs/41669051537). Narrow viewport500/columns500/uncovered0; большой State-header usesellipsis+полныйtooltip, без raw clipping. Actual matched App DLL SHA — в [evidence](test-results/beta3-ci-aec9fa0-evidence.json). Последующий release commit добавляет документацию, код интерфейса не меняется.

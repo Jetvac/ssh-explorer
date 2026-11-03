@@ -1,0 +1,38 @@
+{
+  "Version": "0.2.0-beta.3",
+  "Commit": "aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+  "Dirty": false,
+  "AssemblyVersion": "0.2.0-beta.3+aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+  "Binaries": [
+    {
+      "File": "SSHExplorer.exe",
+      "FileVersion": "0.2.0.3",
+      "ProductVersion": "0.2.0-beta.3+aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+      "Sha256": "f6e15a25a2deec2b24480fbd111e6c1d28bbbe2ace8423e43d9a03c6fc5c26a0"
+    },
+    {
+      "File": "SSHExplorer.dll",
+      "FileVersion": "0.2.0.3",
+      "ProductVersion": "0.2.0-beta.3+aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+      "Sha256": "e10e2c78f7e4830702b1dd4ce79993789565c1a120ed56a30a96d4d45e8c9233"
+    },
+    {
+      "File": "SSHExplorer.Core.dll",
+      "FileVersion": "0.2.0.3",
+      "ProductVersion": "0.2.0-beta.3+aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+      "Sha256": "f41d60ac1e3c0436c03e7f0490b29db13f854f498369357c1d75f6935593dcd3"
+    },
+    {
+      "File": "SSHExplorer.Monitoring.dll",
+      "FileVersion": "0.2.0.3",
+      "ProductVersion": "0.2.0-beta.3+aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+      "Sha256": "ebda5caa576a618783e1b2aea188b2404afde3c95f3700923c03e29de1283403"
+    }
+  ],
+  "FilesVerified": 832,
+  "Signature": "NotSigned",
+  "Runtime": "10.0.14",
+  "WebView2": "156.0.4314.58",
+  "StaticVerificationPassed": true,
+  "ApplicationLaunchPerformed": false
+}

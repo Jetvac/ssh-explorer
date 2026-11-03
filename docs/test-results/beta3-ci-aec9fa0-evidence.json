@@ -1,0 +1,41 @@
+{
+  "utc": "2026-11-03T16:01:18.427699+00:00",
+  "commit": "aec9fa0f83aa4cf61142647c80abf1dfe79b6ca1",
+  "ci": "https://github.com/Jetvac/ssh-explorer/actions/runs/41669051537",
+  "ciStatus": "SUCCESS",
+  "uiPreflight": "https://github.com/Jetvac/ssh-explorer/actions/runs/41669053200",
+  "actualUiChecks": 34,
+  "renderedAppMatchesPortableApp": true,
+  "appSha256": "e10e2c78f7e4830702b1dd4ce79993789565c1a120ed56a30a96d4d45e8c9233",
+  "files": [
+    {
+      "file": "beta3-ci-aec9fa0-ui.log",
+      "sha256": "adc3122d20baff733798f1d7d6523d147297fc2a510608fc6508201132883830"
+    },
+    {
+      "file": "beta3-ci-aec9fa0-baseline.log",
+      "sha256": "b3a05a1fb9c6d37fb14eee19187f00a2437f8a61275b744f2b64bc38889070c2"
+    },
+    {
+      "file": "beta3-ci-aec9fa0-comparison.json",
+      "sha256": "8c95be8c9e789ec59d50e5d16732e952e844d451be8c85375f38e980abda83bc"
+    },
+    {
+      "file": "beta3-ci-aec9fa0-startup.json",
+      "sha256": "b8eaf1e68e937966cff988b8d8fa7a2c9e052852474626c91e22bc1af161bf00"
+    },
+    {
+      "file": "beta3-ci-aec9fa0-portable.json",
+      "sha256": "4e86d1898f10a62ac960e1b429f796f14732036a598066460ca4ce7427077d85"
+    },
+    {
+      "file": "beta3-ci-aec9fa0-ordinary.log",
+      "sha256": "4cbdbf2ebd2534982388ab819a562957ab53eeda5333abf3aea329472c0a28f3"
+    },
+    {
+      "file": "beta3-ci-aec9fa0-auth-network.log",
+      "sha256": "78a40bbe9ba1b286c217439db485b32ca76f387bde1ad989aecd0a8d64fbc39f"
+    }
+  ],
+  "scope": "Complete source checkpoint; final release tag runs its own CI; no host Computer Use"
+}
