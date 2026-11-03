@@ -38,7 +38,7 @@ internal static class Program
             var host = new Window { Content = list, Width = 820, Height = 550, ShowInTaskbar = false, Left = -10_000, Top = -10_000 }; host.Show();
             Layout(list); var panel = Find<VirtualizingWrapPanel>(list) ?? throw new Exception("Virtualizing panel was not created.");
             Assert(Count<ListBoxItem>(list) is > 0 and < 100, "10,000 items only create visible containers");
-            panel.SetVerticalOffset(90_000); Layout(list); Assert(Count<ListBoxItem>(list) < 100, "scroll recycles containers");
+            panel.SetVerticalOffset(90_000); Layout(list); Assert(Count<ListBoxItem>(list) is > 0 and < 100, "scroll recycles a bounded nonempty set of containers");
             list.ItemsSource = Array.Empty<string>(); Layout(list); Assert(Count<ListBoxItem>(list) == 0, "empty directory clears containers");
             list.ItemsSource = Enumerable.Range(0, 100).Select(i => "replacement-" + i).ToArray(); panel.SetVerticalOffset(0); Layout(list); Assert(Count<ListBoxItem>(list) is > 0 and < 100, "new listing after an empty directory");
             list.Width = 350; list.Height = 250; Layout(list); Assert(Count<ListBoxItem>(list) is > 0 and < 40, "resize limits realized containers");
