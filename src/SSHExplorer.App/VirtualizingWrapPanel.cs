@@ -37,7 +37,15 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
             for (var index = first; index <= last; index++, child++)
             {
                 var element = (UIElement)gen.GenerateNext(out var fresh);
-                if (fresh) { if (child >= InternalChildren.Count) AddInternalChild(element); else InsertInternalChild(child, element); gen.PrepareItemContainer(element); }
+                var visualIndex = InternalChildren.IndexOf(element);
+                // Recycling returns isNewlyRealized=false even though the visual was detached.
+                // The generator map and visual list must have the same order for Arrange/cleanup.
+                if (visualIndex != child)
+                {
+                    if (visualIndex >= 0) RemoveInternalChildRange(visualIndex, 1);
+                    if (child >= InternalChildren.Count) AddInternalChild(element); else InsertInternalChild(child, element);
+                }
+                if (fresh || visualIndex < 0) gen.PrepareItemContainer(element);
                 element.Measure(new Size(ItemWidth, ItemHeight));
             }
         }
