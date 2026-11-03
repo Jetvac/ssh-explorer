@@ -8,11 +8,11 @@ Baseline: опубликованная `v0.2.0-beta.3`, `e8ef6815dd3417dcbda6320
 
 | Граница | Статус и доказательство |
 |---|---|
-| Files: inline rename/create/address/selection/menu/overflow | Реализовано; точные программные WPF-проверки и кадры фиксируются в CI_BETA4 |
+| Files: inline rename/create/address/selection/menu/overflow | PASS указанного уровня: 38 actual WPF checks, controlled executor и CI-only software SendInput; [checkpoint/финальная поставка](docs/CI_BETA4.md) |
 | Создание и конфликт на настоящем SFTP | PASS: 5 новых проверок на изолированном Linux, два независимых клиента; только собственный временный каталог, без установки ПО или сигналов |
-| Сохранение beta.3 | Прежние 34 composition assertions и regressions сохранены; новый CI проверяет актуальную сборку |
-| Общие поля, popup ComboBox, вкладки, мониторинг | Реальные шаблоны и production handlers; применённое состояние проверяет Windows CI, перечень setters не считается визуальной проверкой |
-| Защищённый вход, DPAPI, отмена, обычный auth route | Сохранены; итоговый CI и packaged startup нужны для текущего commit, исторический PASS не переносится автоматически |
+| Сохранение beta.3 | PASS: прежние 34 assertions входят в 48 monitor/shell, точный опубликованный baseline проверен и повторно отрисован |
+| Общие поля, popup ComboBox, вкладки, мониторинг | PASS указанного уровня: 24 actual Forms/Tabs + 48 monitor/shell; измерены применённые templates, собственный lifecycle, header sort и persistent preferences |
+| Защищённый вход, DPAPI, отмена, обычный auth route | PASS full CI checkpoint df85964: 113 profile/STA, auth component/network, ordinary WPF route/fresh child, native ABI и packaged startup; точный tag CI и опубликованные ZIP связаны в release verification |
 | Пользовательский рабочий стол / Computer Use | NOT RUN: прямой запрет сохраняется; host окон не открывали |
 | Физический F2/Enter/Ctrl/Shift, настоящий Explorer OLE, drag-tab/tree | NOT RUN физически; программные события/controller/payload assertions имеют отдельный статус |
 | DWM/caption/Snap, полная DPI/text scale/HC матрица, motion video, чистая Windows | NOT RUN; CI client render/clock tests не доказывают эти свойства |

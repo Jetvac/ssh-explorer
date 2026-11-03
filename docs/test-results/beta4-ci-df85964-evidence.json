@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "commit": "df859649f0b25ad97520795fed4f1c94d22c3c5b",
+  "fullRun": "https://github.com/Jetvac/ssh-explorer/actions/runs/41688865770",
+  "fullJob": 126101795325,
+  "uiRun": "https://github.com/Jetvac/ssh-explorer/actions/runs/41688865620",
+  "uiArtifact": {
+    "id": 13257565622,
+    "sha256": "e18f02c736fe9fd2cc6b89035a1afdce41d056b636c4c6f0104514225dbe807e"
+  },
+  "monitorShellActualWpfChecks": 48,
+  "fileActualWpfChecks": 38,
+  "formsTabsActualWpfChecks": 24,
+  "profileStaChecks": 113,
+  "ordinaryWpfAuthChecks": 8,
+  "freshAuthChild": "PASS",
+  "nativeComAbi": "PASS",
+  "packagedStartupNormalExit": "PASS",
+  "pngHashesVerified": {
+    "baselineBeta3": 9,
+    "current": 16,
+    "files": 12,
+    "forms": 4
+  },
+  "comparablePairs": 5,
+  "baseline": "e8ef6815dd3417dcbda632077ed8408c77576d04",
+  "nativeReferenceDpi": "Unknown; pixel-perfect not claimed",
+  "softwarePointer": "CI-only guarded SendInput; held-button and capture checked against own active HWND",
+  "physicalInputTested": false,
+  "hostWindowsOpened": false,
+  "lassoCaptureBoundary": "Checkpoint PNG omitted the ancestor AdornerLayer; final harness captures the actual shared AdornerDecorator. Not a product rendering diagnosis.",
+  "scope": "Checkpoint, not final release provenance. Final tag CI and published-asset read-back are recorded in the release verification JSON. User visual acceptance remains pending."
+}

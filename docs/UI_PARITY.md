@@ -21,6 +21,8 @@
 
 Серое выделение неактивного сравнения, fixture культура, отсутствие sort arrow после deliberate clear и исключённая DWM-зона не объявлялись дефектами продукта. Новые metadata фиксируют culture, active/focus/sort и source DLL. `R/S/D` в representative fixture проходят production parser: «Выполняется», «Ожидание», «Ожидание I/O». Исторические кадры ниже сохраняют свои commit/версии.
 
+Независимый просмотр actual кадров и [зелёный checkpoint](https://github.com/Jetvac/ssh-explorer/actions/runs/41688865770) подтвердили применение общих полей, правое положение ComboBox chevron, доступный footer, редактор имени в Details/tiles и bounded virtualization. 48 monitor/shell, 38 Files и 24 Forms/Tabs — assertions перечисленных границ, не полные физические маршруты. Финальные исходные PNG/metadata и повторно скачанные assets публикуются с [проверяемой beta.4](https://github.com/Jetvac/ssh-explorer/releases/tag/v0.2.0-beta.4); [точные пределы](CI_BETA4.md). Пользовательская оценка сходства с Windows остаётся открытой.
+
 ## Проверенная композиция beta.3 (история)
 
 [Выбранная структура и роли](UI_COMPOSITION_BETA3.md). Референсы: приложенные Windows 11 Task Manager / Explorer, их физический DPI неизвестен. Доступный before — исторический кадр beta.2 ab01976, не последний пользовательский снимок (в новом сообщении такого файла нет). Сопоставимые реальные WPF-render кадры и проверки выполняются отдельно в Windows CI. Computer Use на host запрещён. Пользовательская визуальная приёмка открыта.

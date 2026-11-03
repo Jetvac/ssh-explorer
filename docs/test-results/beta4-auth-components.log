@@ -1,0 +1,14 @@
+PASS password protocol has no implicit PAM fallback without explicit callback
+PASS explicit callback permits password plus keyboard-interactive MFA
+PASS keyboard-interactive profile never adds password authentication
+PASS every PAM prompt requires explicit response and never guesses saved secret from text
+PASS cancellable callback has priority and response is unmodified
+PASS credentials diagnostic string redacts password
+PASS cancelled attempt never dispatches a queued interactive callback
+PASS operation cancellation reaches pending interactive callback
+PASS legacy callback cannot deliver a late answer after operation cancellation
+PASS interactive dialog cancellation remains cancellation instead of empty OTP
+PASS diagnostic event retains exception type HRESULT and methods without exception message
+PASS pre-cancelled connection has one correlated terminal diagnostic and no network
+PASS concurrent session disposal shares cleanup task and closes once
+13 auth component checks passed (no windows, no network)

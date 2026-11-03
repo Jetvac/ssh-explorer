@@ -20,6 +20,8 @@ SSH/SFTP-клиент для Windows 11 x64 с русским интерфейс
 
 Редакторы имени, ошибка пути, рамка выделения, узкие Files/Home, формы с открытым списком и несколько серверных вкладок входят в новую CI-галерею. [Доказательства beta.4](docs/CI_BETA4.md). [Проверенная галерея beta.3](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.3/SSHExplorer-0.2.0-beta.3-ui-evidence.zip) сохранена отдельно. Render не доказывает физический ввод, DWM, motion video или визуальную приёмку.
 
+[Полный CI checkpoint](https://github.com/Jetvac/ssh-explorer/actions/runs/41688865770): 48 monitor/shell, 38 Files и 24 Forms/Tabs checks; auth/STA/native ABI и packaged startup также прошли. [Проверка опубликованной beta.4](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.4/SSHExplorer-0.2.0-beta.4-verification.json) отдельно связывает итоговый tag/CI с исходниками, комплектом и render DLL; числа не означают полные физические пользовательские маршруты.
+
 ## Запуск
 
 1. На странице выпуска выберите portable-архив `SSHExplorer-0.2.0-beta.4-win-x64.zip`. Исходники доступны отдельно и не предназначены для обычного запуска. Распакуйте новую версионную папку, чтобы не запустить прежнюю версию по старому ярлыку.

@@ -1,0 +1,10 @@
+{
+  "label": "isolated-test-only-vendor-before-CTS-timeout",
+  "coreSha256": "8899290792adb765afedeb9efaa7fc82fa1e3b5cfeea2998b433d75e09c04442",
+  "testOnlyVendorBudgetApplied": true,
+  "callbackEntered": true,
+  "failureType": "Renci.SshNet.Common.SshOperationTimeoutException",
+  "elapsedMilliseconds": 355.531,
+  "callbackCancelled": true,
+  "activeCallbacks": 0
+}

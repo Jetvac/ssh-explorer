@@ -1,0 +1,28 @@
+PASS real password protocol preserves Unicode spaces quotes and never opens unnecessary PAM prompt
+PASS real initial transport authentication probe SFTP stages are correlated
+PASS real diagnostic events contain neither password nor OTP
+PASS independent PTY and native-export SFTP authentication preserve connected session
+PASS wrong password returns authentication failure without process termination
+PASS same failed session permits correct-password retry with clean transports
+PASS caller cancellation during delayed password authentication disposes late vendor transport
+PASS session close during delayed password authentication disposes late vendor transport
+PASS real rejected host key prevents authentication stage
+PASS duplicate Connect is rejected while cancellable host trust is pending and cancellation finishes original attempt
+PASS real password-mfa requires explicit OTP on independent exec and SFTP transports
+PASS real password-mfa repeats legitimate MFA for PTY and transfer connections
+PASS real key-mfa requires explicit OTP on independent exec and SFTP transports
+PASS real key-mfa repeats legitimate MFA for PTY and transfer connections
+PASS explicit keyboard-interactive profile authenticates through actual OTP callback
+PASS one-time password prompt never receives saved secret when no callback exists
+PASS SSH.NET synchronous callback exception returns to Connect task without fatal worker exception
+PASS real cancellable prompt cancellation exits only its connection attempt
+PASS real legacy prompt cancellation exits only its connection attempt
+PASS initial OTP cancellation emits one correlated terminal result and never starts usable SFTP
+PASS auxiliary MFA cancellation preserves established exec SFTP and connected state
+PASS session disposal cancels pending auxiliary MFA and cannot resurrect closed state
+PASS transport authentication timeout cancels pending OTP callback and returns bounded timeout
+INFO expected authentication timeout type: TimeoutException; active callbacks: 0
+PASS real sftp-denied is distinguished from authentication failure and preserves usable subsystem
+PASS real exec-denied is distinguished from authentication failure and preserves usable subsystem
+PASS real both-denied is distinguished from authentication failure and preserves usable subsystem
+26 generated loopback SSH auth checks passed (headless component/network, no application windows)

@@ -1,0 +1,17 @@
+{
+  "scope": "Development-only deterministic transport probe, no WPF/UI or physical input; not a diagnosis of the earlier user crash",
+  "sourceFixCommit": "c410f2b",
+  "forcedVendorBudgetMilliseconds": 250,
+  "ordinaryCoreHandshakeBudgetSeconds": 4,
+  "testOnlyReflection": true,
+  "productionTimeoutChanged": false,
+  "retriesAdded": false,
+  "result": "Same original vendor exception; pending callback cancellation false->true and active callbacks 1->0",
+  "ordinaryChecks": "13 component + 26 loopback network PASS",
+  "hashes": {
+    "beta4-auth-components.log": "a071f38566efa4204bb6bbfb830c23ea16e88a5c8fc5bb691bf2c8bcc63f2224",
+    "beta4-auth-network.log": "0cdfe53b4827031bae9935b7b1787c24748ccd84a00033bcaa903f4d2d98e23f",
+    "beta4-auth-timeout-before.json": "d274d012e6bac2c0de6f855839f91bca6c2c10081d95c1382b090d152f501747",
+    "beta4-auth-timeout-after.json": "2a67a2a95944b9f9a268d6d892cb229cb5d9bab9389ccc478b6a28bf4b4f1d9b"
+  }
+}
