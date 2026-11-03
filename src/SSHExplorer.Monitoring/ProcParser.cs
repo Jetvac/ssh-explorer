@@ -113,7 +113,7 @@ public static partial class ProcParser
             !ulong.TryParse(p[12], Invariant, out var kernel) ||
             !ulong.TryParse(p[19], Invariant, out var start) ||
             !long.TryParse(p[21], Invariant, out var rss)) return null;
-        try { return new ProcessStat(pid, text[(open + 1)..close], StateName(p[0]), checked(user + kernel), start, rss); }
+        try { return new ProcessStat(pid, text[(open + 1)..close], MetricFormatter.ProcessState(p[0]), checked(user + kernel), start, rss); }
         catch (OverflowException) { return null; }
     }
 
@@ -164,13 +164,6 @@ public static partial class ProcParser
         try { long total = 0; foreach (var value in values) total = checked(total + value); return total; }
         catch (OverflowException) { return null; }
     }
-    private static string StateName(string state) => state switch
-    {
-        "R" => "Выполняется", "S" => "Ожидание", "D" => "Ожидание I/O", "Z" => "Зомби",
-        "T" => "Остановлен", "t" => "Отладка", "I" => "Бездействие", "X" or "x" => "Завершён",
-        _ => state
-    };
-
     [GeneratedRegex("^[a-z0-9_/-]+$", RegexOptions.CultureInvariant)]
     private static partial Regex KeyPattern();
     [GeneratedRegex("^([^\\s]+)\\s+([0-9]+)\\s+([0-9]+)\\s+([0-9]+)\\s+([0-9]+)%\\s+(.+)$", RegexOptions.CultureInvariant)]

@@ -53,6 +53,7 @@ public sealed class AppSettings
     public int PreviewParallelism { get; set; } = 2;
     public long PreviewCacheBytes { get; set; } = 128 * 1024 * 1024;
     public List<ColumnSetting> Columns { get; set; } = [];
+    public MonitorPreferences Monitor { get; set; } = new();
 }
 public sealed record InteractivePrompt(string Instruction, string Prompt, bool Echo);
 public sealed record SessionCredentials(string Secret, Func<InteractivePrompt, Task<string?>>? Prompt = null,

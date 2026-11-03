@@ -39,7 +39,7 @@ internal static class MonitorStateTests
         now=now.AddSeconds(3);model.IsActive=false;
         Check(model.StatusText.StartsWith("Пауза")&&model.History[^1].IsGap&&model.History[^1].Timestamp==now&&!model.CanSignalSelected,"MVVM pause keeps actual time and disables actions against paused data");
         model.IsActive=true;Check(model.StatusText.Contains("Собираем"),"MVVM resumed section requests a new baseline instead of calling paused data current");
-        model.IsBusy=true;Check(!model.CanSignalSelected&&model.SignalDisabledReason.Contains("замера"),"MVVM busy collection explains why signalling is temporarily disabled");model.IsBusy=false;
+        model.ApplySnapshot(recovered,model.History);model.IsBusy=true;Check(model.CanSignalSelected&&!model.IsCommandRunning,"MVVM background collection preserves an eligible process command");model.IsBusy=false;
         foreach(var blocked in new[]{new ProcessIdentity(1,123,1000),new ProcessIdentity(42,0,1000),new ProcessIdentity(42,123,uint.MaxValue)})
         { model.ApplySnapshot(Snapshot(blocked,now),[]);model.SelectedIdentity=blocked;Check(!model.CanSignalSelected&&!string.IsNullOrWhiteSpace(model.SignalDisabledReason),"MVVM signal policy rejects protected or unverifiable identity "+blocked.Pid+"/"+blocked.StartTimeTicks+"/"+blocked.UserId); }
         var history=new HistoryPoint[]{new(now,10,40,null,null),new(now.AddSeconds(2),null,null,null,null){IsGap=true,Reason="пауза"},new(now.AddSeconds(23),20,45,null,null)};

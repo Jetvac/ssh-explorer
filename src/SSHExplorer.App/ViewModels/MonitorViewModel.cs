@@ -10,7 +10,7 @@ public sealed class MonitorViewModel : ObservableObject
     readonly Dictionary<ProcessIdentity, ProcessItemViewModel> processRows = [];
     readonly Func<DateTimeOffset> clock;
     ProcessIdentity? selectedIdentity;
-    bool isActive, isBusy, isStale;
+    bool isActive, isBusy, isStale, isCommandRunning, requiresFreshSnapshot;
     public MonitorViewModel(Func<DateTimeOffset>? clock = null) => this.clock = clock ?? (() => DateTimeOffset.UtcNow);
     public MonitorSnapshot? Snapshot { get => snapshot; private set => Set(ref snapshot, value); }
     public string SearchQuery { get => searchQuery; set { if (Set(ref searchQuery, value)) RebuildProcesses(); } }
@@ -20,11 +20,12 @@ public sealed class MonitorViewModel : ObservableObject
         set
         {
             if (!Set(ref isActive, value)) return;
-            if (!value && Snapshot is not null) AppendGap(clock(), "Сбор приостановлен: раздел скрыт.");
+            if (!value && Snapshot is not null) { requiresFreshSnapshot=true;AppendGap(clock(), "Сбор приостановлен: раздел скрыт."); }
             RaiseStatus();
         }
     }
     public bool IsBusy { get => isBusy; set { if(Set(ref isBusy,value)) RaiseStatus(); } }
+    public bool IsCommandRunning => isCommandRunning;
     public bool IsStale => isStale;
     public bool HasError => failure.Length > 0;
     public string StatusText
@@ -33,19 +34,19 @@ public sealed class MonitorViewModel : ObservableObject
         {
             string state = HasError ? (Snapshot is null ? "Ошибка сбора" : "Данные устарели")
                 : !IsActive ? (Snapshot is null ? "Ещё нет замера" : "Пауза")
-                : Snapshot is null || Snapshot.System.CpuStatus.State is MetricState.Initial or MetricState.Reset || History.LastOrDefault()?.IsGap == true ? "Собираем данные…"
+                : IsCommandRunning ? "Выполняем команду…" : Snapshot is null || Snapshot.System.CpuStatus.State is MetricState.Initial or MetricState.Reset || History.LastOrDefault()?.IsGap == true ? "Собираем данные…"
                 : IsBusy ? "Обновляем…" : "Обновлено";
-            return Snapshot is null ? state : $"{state} · {Snapshot.Timestamp.LocalDateTime:HH:mm:ss} · {Snapshot.Processes.Count} процессов";
+            return Snapshot is null ? state : $"{state} · {MetricFormatter.Time(Snapshot.Timestamp)} · {Snapshot.Processes.Count} процессов";
         }
     }
     public string Freshness => StatusText;
-    public string StatusDetails => (Snapshot is null ? "Успешных замеров пока нет." : $"Последний успешный замер: {Snapshot.Timestamp.LocalDateTime:HH:mm:ss}.")
+    public string StatusDetails => (Snapshot is null ? "Успешных замеров пока нет." : $"Последний успешный замер: {MetricFormatter.Time(Snapshot.Timestamp)}.")
         + (HasError ? " " + failure : !IsActive && Snapshot is not null ? " Сбор приостановлен; значения сохранены, новые точки не добавляются." : "")
         + (Snapshot is null ? "" : $" CPU: {CpuReason} Память: {MemoryReason}");
     public string DataDetails => SystemMetric.ObservationScope + ". " + SystemMetric.CpuScale + ".\n"
         + "CPU: /proc/stat и /proc/PID/stat. Память: /proc/meminfo и /proc/PID/status/stat. Скорости: разности счётчиков и /proc/uptime.\n"
         + "Чтение /proc/PID/io зависит от прав. Сеть измеряется по интерфейсам, не по процессам.\n"
-        + (Snapshot is null ? "Успешных замеров пока нет." : $"Длительность последнего сбора: {Snapshot.CollectionDuration.TotalSeconds:0.000} с.\n{SystemInfo}\n{string.Join("\n",Snapshot.Limitations)}");
+        + (Snapshot is null ? "Успешных замеров пока нет." : $"Длительность последнего сбора: {MetricFormatter.Seconds(Snapshot.CollectionDuration)}.\n{SystemInfo}\n{string.Join("\n",Snapshot.Limitations)}");
     public bool HasDataDetails => true;
     public string CpuReason => Reason(Snapshot?.System.CpuStatus, Snapshot?.System.CpuPercent.HasValue == true);
     public string MemoryReason => Reason(Snapshot?.System.MemoryStatus, Snapshot?.System.MemoryPercent.HasValue == true);
@@ -53,15 +54,16 @@ public sealed class MonitorViewModel : ObservableObject
     public ObservableCollection<ProcessItemViewModel> Processes { get; } = [];
     public event Action? ProcessesUpdated;
     public ProcessIdentity? SelectedIdentity { get => selectedIdentity; set { if (Set(ref selectedIdentity, value)) { Raise(nameof(CanSignalSelected)); Raise(nameof(SignalDisabledReason)); } } }
-    public bool CanSignalSelected => IsActive && !IsBusy && !IsStale && SelectedIdentity is not null && Processes.Any(p => p.Metric.Identity == SelectedIdentity && ProcessSignalPolicy.CanSignal(p.Metric.Identity));
+    public bool CanSignalSelected => IsActive && !IsCommandRunning && !IsStale && !requiresFreshSnapshot && SelectedIdentity is not null && Processes.Any(p => p.Metric.Identity == SelectedIdentity && ProcessSignalPolicy.CanSignal(p.Metric.Identity));
     public string SignalDisabledReason => !IsActive ? "Сбор приостановлен. Вернитесь к актуальным данным перед отправкой сигнала."
-        : IsBusy ? "Дождитесь завершения текущего замера." : IsStale ? "Данные устарели. Обновите список перед отправкой сигнала."
+        : IsCommandRunning ? "Дождитесь завершения команды над процессом." : IsStale ? "Данные устарели. Обновите список перед отправкой сигнала."
+        : requiresFreshSnapshot ? "После паузы дождитесь нового успешного замера."
         : SelectedIdentity is null ? "Выберите процесс." : ProcessSignalPolicy.DisabledReason(SelectedIdentity) ?? "Права и идентичность будут повторно проверены сервером; автоматического sudo нет.";
     public string Summary => Snapshot is null ? "" : $"ЦП: {CpuText}    Память: {MemoryText}";
-    public string CpuText => Percent(Snapshot?.System.CpuPercent);
-    public string MemoryText => Percent(Snapshot?.System.MemoryPercent);
-    public string CpuHeader => CpuText;
-    public string MemoryHeader => MemoryText;
+    public string CpuText => MetricFormatter.AggregatePercent(Snapshot?.System.CpuPercent);
+    public string MemoryText => MetricFormatter.AggregatePercent(Snapshot?.System.MemoryPercent);
+    public string CpuHeader => MetricFormatter.AggregatePercent(Snapshot?.System.CpuPercent);
+    public string MemoryHeader => MetricFormatter.AggregatePercent(Snapshot?.System.MemoryPercent);
     public string Limitations => Snapshot is null ? "" : string.Join(" · ", Snapshot.Limitations);
     public string SystemInfo
     {
@@ -69,7 +71,7 @@ public sealed class MonitorViewModel : ObservableObject
         {
             if (Snapshot is null) return ""; var s = Snapshot.System;
             return $"CPU: {(s.CpuCount > 0 ? s.CpuCount.ToString() : "—")} · Память: {Size(s.MemoryUsedBytes)} / {Size(s.MemoryTotalBytes)}" + (s.MemoryIsEstimate ? " (оценка)" : "")
-                + $"\nSwap: {Size(s.SwapUsedBytes)} / {Size(s.SwapTotalBytes)} · Uptime: {(s.Uptime is { } t ? $"{(int)t.TotalDays} дн. {t:hh\\:mm\\:ss}" : "—")}\nLoad average: {Number(s.Load1)}  {Number(s.Load5)}  {Number(s.Load15)}";
+                + $"\nSwap: {Size(s.SwapUsedBytes)} / {Size(s.SwapTotalBytes)} · Uptime: {MetricFormatter.Duration(s.Uptime)}\nLoad average: {Number(s.Load1)}  {Number(s.Load5)}  {Number(s.Load15)}";
         }
     }
     public ObservableCollection<NetworkRow> Networks { get; } = [];
@@ -80,7 +82,7 @@ public sealed class MonitorViewModel : ObservableObject
     public double?[] MemoryHistory => History.Select(p => p.MemoryPercent).ToArray();
     public void ApplySnapshot(MonitorSnapshot value, IEnumerable<HistoryPoint> history)
     {
-        Snapshot = value; failure = ""; isStale = false;
+        Snapshot = value; failure = ""; isStale = false;requiresFreshSnapshot=false;
         Reconcile(Networks, value.Networks.Select(x => new NetworkRow(x.Name, Speed(x.ReceiveBytesPerSecond), Speed(x.SendBytesPerSecond), x.ReceiveStatus.Reason, x.SendStatus.Reason)).ToArray());
         Reconcile(Disks, value.Disks.Select(x => new DiskRow(x.Name, Speed(x.ReadBytesPerSecond), Speed(x.WriteBytesPerSecond),x.ReadStatus.Reason,x.WriteStatus.Reason)).ToArray());
         Reconcile(Storage, value.Storage.Select(x => new StorageRow(x.FileSystem, x.MountPoint, Size(x.TotalBytes), Size(x.AvailableBytes))).ToArray());
@@ -100,7 +102,27 @@ public sealed class MonitorViewModel : ObservableObject
     { History=History.Append(new HistoryPoint(timestamp,null,null,null,null){IsGap=true,Reason=reason}).TakeLast(120).ToArray(); RaiseHistory(); }
     void RaiseHistory() { Raise(nameof(History)); Raise(nameof(CpuHistory)); Raise(nameof(MemoryHistory)); }
     void RaiseStatus()
-    { foreach(var name in new[]{nameof(StatusText),nameof(Freshness),nameof(StatusDetails),nameof(DataDetails),nameof(HasError),nameof(IsStale),nameof(CpuReason),nameof(MemoryReason),nameof(CanSignalSelected),nameof(SignalDisabledReason)}) Raise(name); }
+    { foreach(var name in new[]{nameof(StatusText),nameof(Freshness),nameof(StatusDetails),nameof(DataDetails),nameof(HasError),nameof(IsStale),nameof(CpuReason),nameof(MemoryReason),nameof(CanSignalSelected),nameof(SignalDisabledReason),nameof(IsCommandRunning)}) Raise(name); }
+    public async Task<bool> SignalSelectedAsync(int signal,Func<ProcessMetric,CancellationToken,Task<bool>> confirm,
+        Func<ProcessIdentity,int,CancellationToken,Task> send,CancellationToken ct=default)
+    {
+        if(signal is not (9 or 15))throw new ArgumentOutOfRangeException(nameof(signal));
+        ct.ThrowIfCancellationRequested();
+        if(!CanSignalSelected)return false;
+        var target=Snapshot?.Processes.FirstOrDefault(p=>p.Identity==SelectedIdentity);
+        if(target is null)return false;
+        isCommandRunning=true;RaiseStatus();
+        try
+        {
+            if(!await confirm(target,ct).WaitAsync(ct))return false;
+            ct.ThrowIfCancellationRequested();
+            if(!IsActive||IsStale||requiresFreshSnapshot||Snapshot?.Processes.Any(p=>p.Identity==target.Identity&&ProcessSignalPolicy.CanSignal(p.Identity))!=true)
+                throw new ProcessChangedException("Процесс завершился, изменился или данные больше не актуальны. Сигнал не отправлен.");
+            await send(target.Identity,signal,ct);return true;
+        }
+        catch(ProcessChangedException){if(SelectedIdentity==target.Identity)SelectedIdentity=null;throw;}
+        finally { isCommandRunning=false;RaiseStatus(); }
+    }
     void RebuildProcesses()
     {
         if (Snapshot is null) { Processes.Clear(); return; } var query = SearchQuery;
@@ -128,10 +150,10 @@ public sealed class MonitorViewModel : ObservableObject
             var existing = target.IndexOf(desired[i]); if (existing >= 0) target.Move(existing, i); else target.Insert(i, desired[i]);
         }
     }
-    public static string Percent(double? v) => v is { } n && double.IsFinite(n) ? $"{n:0.0}%" : "—";
-    public static string Number(double? v) => v is { } n && double.IsFinite(n) ? $"{n:0.00}" : "—";
-    public static string Speed(double? v) => v is { } n && double.IsFinite(n) && n >= 0 && n <= long.MaxValue ? Ui.Size((long)n) + "/с" : "—";
-    static string Size(long? value) => value is { } n ? Ui.Size(n) : "—";
+    public static string Percent(double? v) => MetricFormatter.ProcessPercent(v);
+    public static string Number(double? v) => MetricFormatter.Number(v);
+    public static string Speed(double? v) => MetricFormatter.Speed(v);
+    static string Size(long? value) => MetricFormatter.Size(value);
 }
 
 public sealed record NetworkRow(string Name, string Receive, string Send, string ReceiveReason = "", string SendReason = "");
@@ -154,7 +176,7 @@ public sealed class ProcessItemViewModel(ProcessMetric metric, long? totalMemory
     public double? WriteBytesPerSecond => current.WriteBytesPerSecond;
     public string CpuText => MonitorViewModel.Percent(Cpu);
     public double? MemoryFraction => memoryTotal is > 0 && current.MemoryBytes is { } n ? n * 100d / memoryTotal.Value : null;
-    public string MemoryText => current.MemoryBytes is { } b ? Ui.Size(b) : "—";
+    public string MemoryText => MetricFormatter.Size(current.MemoryBytes);
     public string ReadText => MonitorViewModel.Speed(ReadBytesPerSecond);
     public string WriteText => MonitorViewModel.Speed(WriteBytesPerSecond);
     public string CpuReason => Reason(current.CpuStatus);

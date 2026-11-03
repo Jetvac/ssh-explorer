@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -27,6 +28,10 @@ public sealed class MonitorView : UserControl, IDisposable
     readonly CancellationTokenSource lifetime;
     CancellationTokenSource? pollCancellation;
     readonly DispatcherTimer timer = new();
+    readonly DispatcherTimer preferenceSaveTimer = new() { Interval=TimeSpan.FromMilliseconds(350) };
+    readonly MonitorTablePreferences preferences;
+    readonly Action<MonitorPreferences>? publishPreferences;
+    readonly List<Action> removeColumnObservers=[];
     readonly Grid header = new(), pages = new();
     readonly TextBlock title = Ui.Text("Процессы", 18, true), status = Ui.Text("", 12), empty = Ui.Text("");
     readonly TextBox search = new() { MinWidth = 150, ToolTip = "Имя, пользователь или PID" };
@@ -37,9 +42,8 @@ public sealed class MonitorView : UserControl, IDisposable
     readonly MetricGraph cpuGraph = new() { Height = 160, Metric = GraphMetric.Cpu }, memoryGraph = new() { Height = 160, Metric = GraphMetric.Memory };
     readonly Button terminate, overflow;
     readonly Dictionary<string, DataGridColumn> columns = [];
-    readonly HashSet<string> userColumns = [], userOverrides = [];
     readonly HashSet<Window> ownedWindows = [];
-    bool applyingSelection, disposed, active, pausedByUser, compactCommands, searchSecondRow, nameReflowQueued;
+    bool applyingSelection, applyingPreferences, preferencesChanged, disposed, active, pausedByUser, compactCommands, searchSecondRow, nameReflowQueued;
     double responsiveWidth = double.NaN;
     long pollEpoch, pageEpoch;
     double processOffset, performanceOffset;
@@ -49,12 +53,14 @@ public sealed class MonitorView : UserControl, IDisposable
     internal Grid Header => header;
     internal MonitorViewModel Model => viewModel;
 
-    public MonitorView(ServerSession session) : this(new MonitorViewModel(), session) { }
+    public MonitorView(ServerSession session) : this(new MonitorViewModel(), session, App.Store.Settings.Monitor, value=>App.Store.Settings.Monitor=value) { }
     // CI rendering uses the same composition with public data, no SSH or normal settings.
     internal MonitorView(MonitorViewModel model) : this(model, (ServerSession?)null) { }
     internal MonitorView(MonitorViewModel model, LinuxMonitor fixtureMonitor) : this(model, (ServerSession?)null) { monitor = fixtureMonitor; }
-    MonitorView(MonitorViewModel model, ServerSession? owner)
+    internal MonitorView(MonitorViewModel model, MonitorPreferences saved, Action<MonitorPreferences> persist) : this(model,(ServerSession?)null,saved,persist) { }
+    MonitorView(MonitorViewModel model, ServerSession? owner, MonitorPreferences? saved=null, Action<MonitorPreferences>? persist=null)
     {
+        preferences=new(saved);publishPreferences=persist;
         session = owner; viewModel = model; DataContext = model;
         lifetime = owner is null ? new CancellationTokenSource() : CancellationTokenSource.CreateLinkedTokenSource(owner.Lifetime);
         if (owner is not null) monitor = new LinuxMonitor(async (command, ct) => { var result = await owner.ExecuteAsync(command, ct); return new ExecResult(result.Output, result.Error, result.ExitStatus); });
@@ -66,6 +72,7 @@ public sealed class MonitorView : UserControl, IDisposable
         overflow = Ui.FlyoutButton(Ui.MoreGlyph, "", BuildOverflow, "Дополнительные действия");
         BuildHeader();
         BuildProcessTable();
+        RestorePreferences();
         BuildPerformance();
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var commandBar = new Border { Child = header }; commandBar.SetResourceReference(StyleProperty, "CommandBarStyle"); root.Children.Add(commandBar);
@@ -79,6 +86,7 @@ public sealed class MonitorView : UserControl, IDisposable
         viewModel.PropertyChanged += ModelChanged; viewModel.ProcessesUpdated += ApplyProcesses; viewModel.Processes.CollectionChanged += ProcessesChanged;
         Theme.Changed += PaletteChanged;
         timer.Tick += async (_, _) => await Poll();
+        preferenceSaveTimer.Tick += async (_,_) => { preferenceSaveTimer.Stop();await SavePreferencesAsync(); };
         SizeChanged += (_, _) => UpdateResponsive();
         PreviewKeyDown += OnKey;
         ApplyPage(); ApplyProcesses(); UpdateEmpty(); UpdateResponsive();
@@ -116,6 +124,21 @@ public sealed class MonitorView : UserControl, IDisposable
         AddTextColumn("Read", "Чтение", nameof(ProcessItemViewModel.ReadText), 118, false, nameof(ProcessItemViewModel.ReadBytesPerSecond), nameof(ProcessItemViewModel.ReadReason));
         AddTextColumn("Write", "Запись", nameof(ProcessItemViewModel.WriteText), 118, false, nameof(ProcessItemViewModel.WriteBytesPerSecond), nameof(ProcessItemViewModel.WriteReason));
         processes.SelectionChanged += (_, _) => { if (!applyingSelection) viewModel.SelectedIdentity = (processes.SelectedItem as ProcessItemViewModel)?.Metric.Identity; };
+        processes.Sorting += OnSorting;
+        processes.ColumnDisplayIndexChanged += (_,_) => { if(!applyingPreferences){preferences.SetOrder(columns.OrderBy(p=>p.Value.DisplayIndex).Select(p=>p.Key));CommitPreferences();} };
+        foreach(var (key,column) in columns)
+        {
+            var descriptor=DependencyPropertyDescriptor.FromProperty(DataGridColumn.WidthProperty,typeof(DataGridColumn));
+            EventHandler changed=(_,_)=>
+            {
+                if(applyingPreferences||disposed)return;
+                var width=column.Width;var mode=width.IsStar?MonitorColumnWidthMode.Star:width.IsAuto?MonitorColumnWidthMode.Auto:MonitorColumnWidthMode.Pixel;
+                double value=width.IsAuto?1:width.Value;
+                if(preferences[key].WidthMode==mode&&preferences[key].Width==value)return;
+                preferences.SetWidth(key,value,mode);CommitPreferences();
+            };
+            descriptor.AddValueChanged(column,changed);removeColumnObservers.Add(()=>descriptor.RemoveValueChanged(column,changed));
+        }
         processes.SizeChanged += (_, args) => { if (args.WidthChanged) ReflowNameColumnAfterLayout(); };
         processes.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler((_, args) => { if (args.ViewportWidthChange != 0) ReflowNameColumnAfterLayout(); }));
         Ui.AttachContextMenu(processes, BuildProcessMenu);
@@ -128,7 +151,7 @@ public sealed class MonitorView : UserControl, IDisposable
             var caption = new FrameworkElementFactory(typeof(TextBlock)); caption.SetBinding(TextBlock.TextProperty, new Binding()); caption.SetBinding(ToolTipProperty, new Binding()); caption.SetBinding(AutomationProperties.NameProperty, new Binding()); caption.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); caption.SetValue(TextBlock.TextWrappingProperty, TextWrapping.NoWrap); caption.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Stretch); caption.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
             column.HeaderTemplate = new DataTemplate { VisualTree = caption };
         }
-        column.HeaderStyle = (Style)FindResource("ProcessColumnHeaderStyle"); columns[key] = column; processes.Columns.Add(column); if (visible) userColumns.Add(key); column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        column.HeaderStyle = (Style)FindResource("ProcessColumnHeaderStyle"); columns[key] = column; processes.Columns.Add(column); column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
     void AddTextColumn(string key, string caption, string text, double width, bool visible, string? numericSort = null, string? reason = null)
     {
@@ -208,7 +231,7 @@ public sealed class MonitorView : UserControl, IDisposable
         resources.Columns = width < 680 ? 1 : 2;
         foreach (var key in new[] { "Pid", "User", "State", "Read", "Write" })
         {
-            var visibility = userColumns.Contains(key) && (userOverrides.Contains(key) || width >= (key is "Pid" or "State" ? 650 : 900)) ? Visibility.Visible : Visibility.Collapsed;
+            var visibility = preferences.EffectiveVisible(key,width) ? Visibility.Visible : Visibility.Collapsed;
             if (columns[key].Visibility != visibility) { columns[key].Visibility = visibility; columnsChanged = true; }
         }
         if (columnsChanged || responsiveWidth != width) { responsiveWidth = width; ReflowNameColumnAfterLayout(); }
@@ -224,10 +247,70 @@ public sealed class MonitorView : UserControl, IDisposable
             nameReflowQueued = false;
             if (disposed || processes.ActualWidth <= 0 || !name.Width.IsStar) return;
             var weight = name.Width.Value;
-            name.Width = DataGridLength.Auto;
-            name.Width = new DataGridLength(weight, DataGridLengthUnitType.Star);
+            applyingPreferences=true;
+            try { name.Width = DataGridLength.Auto;name.Width = new DataGridLength(weight, DataGridLengthUnitType.Star); }
+            finally { applyingPreferences=false; }
             processes.InvalidateMeasure();
         });
+    }
+
+    void RestorePreferences()
+    {
+        applyingPreferences=true;
+        try
+        {
+            foreach(var key in MonitorTablePreferences.Keys)
+            {
+                var setting=preferences[key];var column=columns[key];
+                column.Width=setting.WidthMode switch{MonitorColumnWidthMode.Star=>new DataGridLength(setting.Width,DataGridLengthUnitType.Star),MonitorColumnWidthMode.Auto=>DataGridLength.Auto,_=>new DataGridLength(setting.Width)};
+            }
+            foreach(var setting in preferences.Snapshot().Columns)columns[setting.Key].DisplayIndex=setting.Order;
+            ApplySortIndicators();
+        }
+        finally { applyingPreferences=false; }
+    }
+    void CommitPreferences()
+    {
+        if(disposed||applyingPreferences)return;
+        preferencesChanged=true;
+        publishPreferences?.Invoke(preferences.Snapshot());
+        if(session is not null){preferenceSaveTimer.Stop();preferenceSaveTimer.Start();}
+    }
+    async Task SavePreferencesAsync()
+    {
+        if(session is null)return;
+        try { await App.Store.SaveAsync(); }
+        catch(Exception error)when(error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        { await LocalDiagnostics.RecordAsync("monitor.preferences.save.failed",error); }
+    }
+    void OnSorting(object sender,DataGridSortingEventArgs args)
+    {
+        args.Handled=true;
+        string? key=columns.FirstOrDefault(p=>ReferenceEquals(p.Value,args.Column)).Key;
+        if(key is null)return;
+        var direction=preferences.SortColumn==key&&preferences.SortDirection==ListSortDirection.Ascending?ListSortDirection.Descending:ListSortDirection.Ascending;
+        SetSort(key,direction);
+    }
+    internal void SetSort(string? key,ListSortDirection direction)
+    { if(disposed)return;preferences.SetSort(key,direction);ApplySortIndicators();ApplyProcesses();CommitPreferences(); }
+    void ApplySortIndicators()
+    { foreach(var (key,column) in columns)column.SortDirection=key==preferences.SortColumn?preferences.SortDirection:null; }
+    MenuItem BuildSortMenu()
+    {
+        var menu=new MenuItem{Header="Сортировать",Icon=Ui.Icon("\uE8CB",16,false)};
+        foreach(var key in MonitorTablePreferences.Keys)
+        {
+            var item=new MenuItem{Header=MonitorTablePreferences.Caption(key),IsCheckable=true,IsChecked=preferences.SortColumn==key};
+            item.Click+=(_,_)=>SetSort(key,preferences.SortDirection);menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        foreach(var direction in new[]{ListSortDirection.Ascending,ListSortDirection.Descending})
+        {
+            var item=new MenuItem{Header=direction==ListSortDirection.Ascending?"По возрастанию":"По убыванию",IsCheckable=true,IsChecked=preferences.SortColumn is not null&&preferences.SortDirection==direction};
+            item.Click+=(_,_)=>SetSort(preferences.SortColumn??"Name",direction);menu.Items.Add(item);
+        }
+        menu.Items.Add(Ui.Menu("Исходный порядок",()=>SetSort(null,ListSortDirection.Ascending)));
+        return menu;
     }
 
     ContextMenu BuildOverflow()
@@ -240,12 +323,14 @@ public sealed class MonitorView : UserControl, IDisposable
             var choose = new MenuItem { Header = "Выбрать столбцы", Icon = Ui.Icon(Ui.ViewGlyph, 16, false) };
             foreach (var (key, column) in columns)
             {
-                var item = new MenuItem { Header = key switch { "Cpu" => "ЦП", "Memory" => "Память", _ => column.Header }, IsCheckable = true, IsChecked = column.Visibility == Visibility.Visible, IsEnabled = key is not "Name" and not "Cpu" and not "Memory" };
-                item.Click += (_, _) => { userOverrides.Add(key); if (item.IsChecked) userColumns.Add(key); else userColumns.Remove(key); UpdateResponsive(); }; choose.Items.Add(item);
+                bool autoHidden=preferences[key].Visible&&column.Visibility!=Visibility.Visible;
+                var item = new MenuItem { Header = MonitorTablePreferences.Caption(key), IsCheckable = true, IsChecked = preferences[key].Visible, IsEnabled = key is not "Name" and not "Cpu" and not "Memory", InputGestureText=autoHidden?"Скрыт в узком окне":"" };
+                item.ToolTip=autoHidden?"Столбец выбран; временно скрыт при узком окне.":null;
+                item.Click += (_, _) => { preferences.SetVisible(key,item.IsChecked);CommitPreferences();UpdateResponsive(); }; choose.Items.Add(item);
             }
-            menu.Items.Add(choose); var details = Ui.Menu("Сведения о выбранном процессе", ShowProcessDetails, "Alt+Enter", Ui.PropertiesGlyph); details.IsEnabled = viewModel.SelectedIdentity is not null; menu.Items.Add(details); menu.Items.Add(new Separator());
+            menu.Items.Add(choose);menu.Items.Add(BuildSortMenu()); var details = Ui.Menu("Сведения о выбранном процессе", ShowProcessDetails, "Alt+Enter", Ui.PropertiesGlyph); details.IsEnabled = viewModel.SelectedIdentity is not null; menu.Items.Add(details); menu.Items.Add(new Separator());
         }
-        var refresh = Ui.AsyncMenu("Обновить сейчас", Poll, "F5", Ui.RefreshGlyph); refresh.IsEnabled = monitor is not null && viewModel.IsActive && !viewModel.IsBusy; menu.Items.Add(refresh);
+        var refresh = Ui.AsyncMenu("Обновить сейчас", Poll, "F5", Ui.RefreshGlyph); refresh.IsEnabled = monitor is not null && viewModel.IsActive && !viewModel.IsBusy && !viewModel.IsCommandRunning; menu.Items.Add(refresh);
         var pause = Ui.Menu(pausedByUser ? "Продолжить обновление" : "Приостановить обновление", () => { pausedByUser = !pausedByUser; ApplyPolling(); }, glyph: pausedByUser ? "\uE768" : "\uE769"); pause.IsEnabled = monitor is not null; menu.Items.Add(pause);
         var top = Ui.AsyncMenu("Открыть htop / top в терминале", OpenTop, glyph: Ui.TerminalGlyph); top.IsEnabled = session?.ShellAvailable == true; menu.Items.Add(top);
         menu.Items.Add(Ui.Menu("Сведения о данных", ShowDataDetails, "F1", Ui.PropertiesGlyph)); return menu;
@@ -272,7 +357,7 @@ public sealed class MonitorView : UserControl, IDisposable
     }
     async Task Poll()
     {
-        if (disposed || monitor is null || !viewModel.IsActive || pollCancellation is not null || viewModel.IsBusy) return;
+        if (disposed || monitor is null || !viewModel.IsActive || pollCancellation is not null || viewModel.IsBusy || viewModel.IsCommandRunning) return;
         var epoch = pollEpoch; var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); pollCancellation = request; viewModel.IsBusy = true;
         try
         {
@@ -298,9 +383,17 @@ public sealed class MonitorView : UserControl, IDisposable
         try
         {
             var view = CollectionViewSource.GetDefaultView(processes.ItemsSource);
-            if (view is ICollectionViewLiveShaping { CanChangeLiveSorting: true } live) live.IsLiveSorting = true;
+            double offset=FindScroll(processes)?.VerticalOffset??processOffset;
+            if(view is ListCollectionView sortable)
+            {
+                sortable.IsLiveSorting=false;
+                if(preferences.SortColumn is { } key)sortable.CustomSort=new ProcessSortComparer(key,preferences.SortDirection);
+                else if(sortable.CustomSort is ProcessSortComparer)sortable.CustomSort=null;
+                else sortable.Refresh();
+            }
             var selected = viewModel.Processes.FirstOrDefault(x => x.Metric.Identity == viewModel.SelectedIdentity);
             if (!ReferenceEquals(processes.SelectedItem, selected)) processes.SelectedItem = selected;
+            FindScroll(processes)?.ScrollToVerticalOffset(offset);
         }
         finally { applyingSelection = false; }
         UpdateEmpty();
@@ -320,9 +413,13 @@ public sealed class MonitorView : UserControl, IDisposable
 
     async Task Signal(int signal)
     {
-        if (monitor is null || !viewModel.CanSignalSelected || processes.SelectedItem is not ProcessItemViewModel row) return;
-        if (!Ui.Confirm($"{(signal == 9 ? "Принудительно завершить (SIGKILL)" : "Завершить (SIGTERM)")} процесс «{row.Name}», PID {row.Pid}, пользователь {row.User}?\n\nСервер: {session!.Profile.Name}\nИдентичность и права будут повторно проверены сервером. Автоматического sudo нет.")) return;
-        await monitor.SignalAsync(row.Metric.Identity, signal, lifetime.Token); await Poll();
+        if (disposed || monitor is null || session is null) return;
+        try
+        {
+            await viewModel.SignalSelectedAsync(signal,(target,ct)=>Task.FromResult(Ui.Confirm($"{(signal == 9 ? "Принудительно завершить (SIGKILL)" : "Завершить (SIGTERM)")} процесс «{target.Name}», PID {target.Pid}, пользователь {target.User}?\n\nСервер: {session.Profile.Name}\nИдентичность и права будут повторно проверены сервером. Автоматического sudo нет.")),
+                async(identity,number,ct)=> { pollCancellation?.Cancel();await monitor.SignalAsync(identity,number,ct); },lifetime.Token);
+        }
+        finally { if(!disposed&&viewModel.IsActive)await Poll(); }
     }
     void ShowDataDetails() => ShowReadOnly("Сведения о данных", viewModel.StatusDetails + "\n\n" + viewModel.DataDetails + "\n\nИстория: " + cpuGraph.IntervalLabel + ". Пустые интервалы обозначают отсутствие измерений.");
     void ShowProcessDetails()
@@ -361,7 +458,11 @@ public sealed class MonitorView : UserControl, IDisposable
     }
     public void Dispose()
     {
-        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); pollCancellation?.Cancel(); lifetime.Cancel(); viewModel.IsActive = false;
+        if(disposed)return;
+        preferenceSaveTimer.Stop();
+        disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); pollCancellation?.Cancel(); lifetime.Cancel(); viewModel.IsActive = false;
+        foreach(var remove in removeColumnObservers)remove();removeColumnObservers.Clear();
+        if(session is not null&&preferencesChanged)_=SavePreferencesAsync();
         viewModel.PropertyChanged -= ModelChanged; viewModel.ProcessesUpdated -= ApplyProcesses; viewModel.Processes.CollectionChanged -= ProcessesChanged; Theme.Changed -= PaletteChanged;
         foreach (var window in ownedWindows.ToArray()) if (window.IsLoaded) window.Close(); ownedWindows.Clear(); lifetime.Dispose();
     }
