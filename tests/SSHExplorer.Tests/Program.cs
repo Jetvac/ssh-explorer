@@ -3,6 +3,10 @@ using SSHExplorer.Monitoring;
 
 var suite = new TestSuite();
 #if CORE_TESTS
+if (args.Length == 2 && args[0] == "--collector-encoding-check")
+    return await CollectorEncodingChecks.RunAsync(args[1]);
+if (args.Length is 2 or 3 && args[0] == "--monitor-benchmark")
+    return await MonitorBenchmark.RunAsync(args[1],args.Length==3?args[2]:null);
 if (args.Length == 2 && args[0] == "--linux-capabilities")
 {
     await LinuxIntegration.RunCapabilitiesOnlyAsync(suite, args[1]);
@@ -17,12 +21,13 @@ if (args.Length == 2 && args[0] == "--network-failure")
 }
 #endif
 await MonitorTests.RunAsync(suite);
+await MetricStateTests.RunAsync(suite);
 #if CORE_TESTS
 await CoreTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);
 else if (args.Length != 0)
-    throw new ArgumentException("Usage: SSHExplorer.Tests [--linux-integration|--linux-capabilities|--network-failure isolated-config.json]");
+    throw new ArgumentException("Usage: SSHExplorer.Tests [--linux-integration|--linux-capabilities|--network-failure|--monitor-benchmark isolated-config.json [report.json]]");
 #endif
 Console.WriteLine($"RESULT: {suite.Passed} passed, {suite.Failed} failed");
 return suite.Failed == 0 ? 0 : 1;

@@ -388,7 +388,7 @@ internal static class LinuxIntegration
         });
     }
 
-    private static async Task<LinuxTestConfiguration> LoadConfiguration(string file)
+    internal static async Task<LinuxTestConfiguration> LoadConfiguration(string file)
     {
         var config = JsonSerializer.Deserialize<LinuxTestConfiguration>(await File.ReadAllTextAsync(file),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } })

@@ -7,22 +7,32 @@ public static class CollectorCommand
     public static string Create(int maxProcesses)
     {
         if (maxProcesses is < 1 or > 4096) throw new ArgumentOutOfRangeException(nameof(maxProcesses));
-        return Script.Replace("__MAX_PROCESSES__", maxProcesses.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        return Script.Replace("__MAX_PROCESSES__", maxProcesses.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("__ENCODER_SETUP__", EncoderSetup, StringComparison.Ordinal);
     }
+
+    internal const string EncoderSetup = """
+        if printf x | base64 -w0 >/dev/null 2>&1; then
+          encode() { base64 -w0; }
+        else
+          encode() { base64 | tr -d '\n'; }
+        fi
+        """;
 
     private const string Script = """
         LC_ALL=C; export LC_ALL
         for x in dd base64 tr; do
           if ! command -v "$x" >/dev/null 2>&1; then printf 'SSHXERROR:missing:%s\n' "$x"; exit 72; fi
         done
-        if [ ! -r /proc/stat ]; then printf 'SSHXERROR:proc-unavailable\n'; exit 73; fi
+        if [ ! -d /proc ]; then printf 'SSHXERROR:proc-unavailable\n'; exit 73; fi
+        __ENCODER_SETUP__
         printf 'SSHXMON1\n'
         frame() {
           printf '%s\t' "$1"
-          if [ -r "$2" ]; then dd if="$2" bs="$3" count=1 2>/dev/null | base64 | tr -d '\n'; else printf '!'; fi
+          if [ -r "$2" ]; then dd if="$2" bs="$3" count=1 2>/dev/null | encode; else printf '!'; fi
           printf '\n'
         }
-        meta() { printf '%s\t' "$1"; printf '%s' "$2" | base64 | tr -d '\n'; printf '\n'; }
+        meta() { printf '%s\t' "$1"; printf '%s' "$2" | encode; printf '\n'; }
         frame sys/stat /proc/stat 65536
         frame sys/meminfo /proc/meminfo 16384
         frame sys/uptime /proc/uptime 1024
@@ -36,7 +46,7 @@ public static class CollectorCommand
         meta meta/ticks "$ticks"
         meta meta/pages "$pages"
         printf 'sys/df\t'
-        if command -v df >/dev/null 2>&1; then df -Pk 2>/dev/null | dd bs=131072 count=1 2>/dev/null | base64 | tr -d '\n'; else printf '!'; fi
+        if command -v df >/dev/null 2>&1; then df -Pk 2>/dev/null | dd bs=131072 count=1 2>/dev/null | encode; else printf '!'; fi
         printf '\n'
         n=0; limited=0
         for d in /proc/[0-9]*; do
