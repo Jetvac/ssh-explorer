@@ -1,0 +1,11 @@
+PASS independent host fingerprint
+PASS fixture uploaded via real SFTP
+PASS creating native drag data does not start download or queue job
+PASS remote source never advertises nonexistent CF_HDROP paths
+PASS FILEDESCRIPTOR high/low preserves >4 GiB lengths
+PASS raw in-process COM metadata call executed on actual STA caller
+PASS STA descriptor calls never wait on recursive network enumeration
+STA_METADATA pending=1, maxGetData=1,29ms
+PASS pending STA metadata query does not fail or cancel the drag
+PASS metadata preparation transfers no file content
+PASS raw in-process STA IDataObject metadata with background preparation and nonfatal E_PENDING

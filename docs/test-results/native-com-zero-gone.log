@@ -1,0 +1,11 @@
+PASS independent host fingerprint
+PASS fixture uploaded via real SFTP
+PASS creating native drag data does not start download or queue job
+PASS remote source never advertises nonexistent CF_HDROP paths
+PASS FILEDESCRIPTOR high/low preserves >4 GiB lengths
+PASS native QI negotiates IDataObjectAsyncCapability
+PASS native descriptor group has entries
+DESCRIPTOR_COUNT 1
+PASS descriptor target contained in dedicated directory
+PASS native target rejects zero-byte source removed after selection
+PASS missing zero-byte source is failed, never completed as an empty copy

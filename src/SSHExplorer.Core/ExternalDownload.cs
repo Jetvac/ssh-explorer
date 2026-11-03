@@ -24,20 +24,27 @@ public sealed class ExternalTransferOperation
     private readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource running = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource cancellation;
+    private readonly CancellationToken token;
+    private readonly CancellationTokenRegistration cancellationRegistration;
     internal Task Completion => completion.Task;
     public TransferJob Job { get; }
-    public CancellationToken Cancellation => cancellation.Token;
+    public CancellationToken Cancellation => token;
     internal void MarkRunning() => running.TrySetResult();
     public Task WaitUntilRunningAsync(CancellationToken ct) => running.Task.WaitAsync(ct);
     internal ExternalTransferOperation(TransferJob job, CancellationToken sessionLifetime)
     {
         Job = job; cancellation = CancellationTokenSource.CreateLinkedTokenSource(job.Cancellation, sessionLifetime);
-        cancellation.Token.Register(() => completion.TrySetCanceled(cancellation.Token));
+        token = cancellation.Token;
+        cancellationRegistration = token.Register(() => completion.TrySetCanceled(token));
+        // Every terminal state unlinks source lifetime and callbacks, including failed/cancelled Shell targets.
+        _ = completion.Task.ContinueWith(_ => { cancellationRegistration.Dispose(); cancellation.Dispose(); },
+            CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
     public void SetTotal(long bytes) { Job.TotalBytes = bytes; Job.Notify(); }
+    public void SetSkipped(int count) { Job.SkippedItems = count; Job.Notify(); }
     public void AddBytes(int bytes) { Cancellation.ThrowIfCancellationRequested(); Job.AddBytes(bytes); }
     public void Complete(int completed, int skipped = 0)
-    { Job.CompletedItems = completed; Job.SkippedItems = skipped; completion.TrySetResult(); cancellation.Dispose(); }
+    { Job.CompletedItems = completed; Job.SkippedItems = skipped; completion.TrySetResult(); }
     public void Fail(Exception error) => completion.TrySetException(error);
     public void Cancel() => Job.Cancel();
 }
@@ -100,7 +107,12 @@ public sealed class RemoteExportSource : IDisposable
             if (count == 0) return 0;
             lock (owner.gate)
             {
-                EnsureOpen(); var read = input!.Read(buffer, offset, (int)Math.Min(count, Math.Max(0, Length - position)));
+                EnsureOpen();
+                // SSH.NET's synchronous Read explicitly uses CancellationToken.None. Keep COM synchronous
+                // on its MTA worker while the actual SFTP request remains cancellation-aware.
+                var readLimit = Length == 0 ? Math.Min(count, 1) : (int)Math.Min(count, Math.Max(0, Length - position));
+                var read = input!.ReadAsync(buffer.AsMemory(offset, readLimit), owner.cancellation.Token).AsTask().GetAwaiter().GetResult();
+                if (Length == 0 && read != 0) throw new IOException("Источник сообщает нулевой размер, но содержит данные. Пустой файл не будет выдан за успешную копию.");
                 position += read; owner.Check();
                 if (position >= Length || read == 0)
                 {

@@ -12,7 +12,7 @@ namespace SSHExplorer.App.NativeDragDrop;
 public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComTypes.IDataObject, IDataObjectAsyncCapability, ICustomQueryInterface
 {
     public sealed record VirtualEntry(string Name, RemoteEntry? Remote, bool Directory, byte[]? Inline = null)
-    { public long Length => Inline?.LongLength ?? Remote?.Length ?? 0; }
+    { public long Length => Directory ? 0 : Inline?.LongLength ?? Remote?.Length ?? 0; }
     private readonly ServerSession session;
     private readonly RemoteEntry[] selected;
     private readonly string token;
@@ -28,7 +28,11 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
     private bool asyncMode = true, inOperation, dragReturned, ended, faulted;
     private IntPtr marshaler;
     private int readersClosed;
+    private int manifestSkipped;
     private static readonly ConcurrentDictionary<Guid, ShellVirtualDataObject> active = new();
+    private static int hosts;
+    internal static int ActiveCount => active.Count;
+    internal static int MtaHostCount => Volatile.Read(ref hosts);
     private readonly Guid id = Guid.NewGuid();
     public Guid SourceSessionId => session.Id;
     public bool IsExtracting { get { lock (gate) return inOperation; } }
@@ -45,10 +49,25 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
     {
         this.session = session; this.selected = selected; this.token = token; this.queue = queue; hostStopped = stop;
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(session.Lifetime);
-        cancellation.Token.Register(() => { if (!faulted) operation?.Cancel(); active.TryRemove(id, out _); hostStopped.Set(); _ = Task.Run(CloseReaders); });
+        cancellation.Token.Register(() =>
+        {
+            if (!faulted) operation?.Cancel();
+            // Keep the COM apartment alive until the target receives E_ABORT and sends EndOperation.
+            // Uninitializing the last MTA while an out-of-process Read is in flight can strand that RPC.
+            lock (gate) if (!inOperation) { active.TryRemove(id, out _); hostStopped.Set(); }
+            _ = Task.Run(CloseReaders);
+            // A crashed/non-cooperating target may never call EndOperation. Retain its apartment only
+            // for a short cancellation grace period; all SSH transports are already closed above.
+            _ = Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(completed =>
+            { lock (gate) if (inOperation && !ended) { active.TryRemove(id, out _); hostStopped.Set(); } }, TaskScheduler.Default);
+        });
         var outer = Marshal.GetIUnknownForObject(this);
         try { Marshal.ThrowExceptionForHR(ShellInterop.CoCreateFreeThreadedMarshaler(outer, out marshaler)); }
         finally { Marshal.Release(outer); }
+        // A file-only selection already has complete descriptors; metadata queries never need a UI wait.
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (selected.All(e => e.IsRegularFile && !e.IsSymbolicLink && e.Name.Length < 260 && WindowsNames.SafeName(e.Name) == e.Name && names.Add(e.Name)))
+            manifest = Task.FromResult(selected.Select(e => new VirtualEntry(e.Name, e, false)).ToArray());
     }
 
     public static Task<ShellVirtualDataObject> CreateAsync(ServerSession source, IReadOnlyList<RemoteEntry> selected,
@@ -58,8 +77,11 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
         var ready = new TaskCompletionSource<ShellVirtualDataObject>(TaskCreationOptions.RunContinuationsAsynchronously);
         var stop = new ManualResetEventSlim();
         var snapshot = selected.Select(Clone).ToArray();
+        if (snapshot.Any(e => e.IsRegularFile && !e.IsSymbolicLink && e.Length < 0))
+            throw new IOException("Сервер не предоставил достоверный размер обычного файла. Перетаскивание в Windows остановлено.");
         var host = new Thread(() =>
         {
+            Interlocked.Increment(ref hosts);
             var hr = ShellInterop.CoInitializeEx(IntPtr.Zero, 0);
             try
             {
@@ -68,7 +90,7 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
                 ready.SetResult(data); stop.Wait(); GC.KeepAlive(data);
             }
             catch (Exception e) { ready.TrySetException(e); }
-            finally { if (hr >= 0) ShellInterop.CoUninitialize(); }
+            finally { if (hr >= 0) ShellInterop.CoUninitialize(); Interlocked.Decrement(ref hosts); }
         }) { IsBackground = true, Name = "SSH Explorer OLE source" };
         host.SetApartmentState(ApartmentState.MTA); host.Start(); return ready.Task;
     }
@@ -82,6 +104,7 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
             if (operation is not null) return operation;
             cancellation.Token.ThrowIfCancellationRequested();
             operation = queue.BeginExternalDownload(session, selected.Select(x => x.FullPath));
+            if (manifest?.IsCompletedSuccessfully == true) operation.SetTotal(manifest.Result.Where(e => !e.Directory).Sum(e => e.Length));
             operation.Cancellation.Register(() => { if (!cancellation.IsCancellationRequested) cancellation.Cancel(); });
             return operation;
         }
@@ -96,20 +119,27 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
         var output = new List<VirtualEntry>(); var mappings = new List<object>();
         var topNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var task = EnsureOperation();
-        async Task Visit(RemoteEntry entry, string name, int depth)
+        async Task Visit(RemoteEntry entry, string name, int depth, string? originalRelative = null)
         {
             cancellation.Token.ThrowIfCancellationRequested();
             if (depth > 128 || output.Count >= 100000) throw new IOException("Превышен предел дерева перетаскивания (128 уровней / 100000 объектов).");
             if (name.Length >= 260) throw new IOException("Относительный путь превышает ограничение Windows Shell FILEDESCRIPTORW (259 символов): " + name);
             if (entry.IsSymbolicLink || (!entry.IsDirectory && !entry.IsRegularFile))
                 throw new IOException("Символические ссылки и специальные объекты не передаются в Windows без явного выбора цели: " + entry.FullPath);
+            if (entry.IsRegularFile && entry.Length < 0) throw new IOException("Сервер не предоставил достоверный размер файла: " + entry.FullPath);
             output.Add(new VirtualEntry(name, entry, entry.IsDirectory));
+            var original = originalRelative ?? entry.Name;
+            if (name != original) mappings.Add(new { Remote = entry.FullPath, Local = name });
             if (!entry.IsDirectory) return;
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var child in await session.Files.ListAsync(entry.FullPath, cancellation.Token).ConfigureAwait(false))
-                await Visit(child, name + "\\" + await SafeName(child, names).ConfigureAwait(false), depth + 1).ConfigureAwait(false);
+            {
+                var safe = await SafeName(child, names).ConfigureAwait(false);
+                if (safe is null) { manifestSkipped++; continue; }
+                await Visit(child, name + "\\" + safe, depth + 1, original + "\\" + child.Name).ConfigureAwait(false);
+            }
         }
-        async Task<string> SafeName(RemoteEntry entry, HashSet<string> used)
+        async Task<string?> SafeName(RemoteEntry entry, HashSet<string> used)
         {
             var name = WindowsNames.SafeName(entry.Name); var proposed = name;
             var n = 2; while (!used.Add(proposed)) proposed = name + $" ({n++})";
@@ -118,25 +148,30 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
                 var conflict = new TransferConflict(entry.FullPath, proposed, entry.IsDirectory, entry.IsDirectory, entry.IsRegularFile ? entry.Length : null, null,
                     "Имя Linux несовместимо с Windows или конфликтует без учёта регистра. «Сохранить оба» передаст безопасное имя и файл соответствия.", task.Job.Id, task.Job.Attempt);
                 var decision = queue.ResolveConflict is null ? ConflictDecision.Cancel : await queue.ResolveConflict(conflict).WaitAsync(cancellation.Token).ConfigureAwait(false);
+                if (decision == ConflictDecision.Skip) { used.Remove(proposed); return null; }
                 if (decision != ConflictDecision.KeepBoth) throw new OperationCanceledException("Преобразование имени для Windows не подтверждено.");
-                mappings.Add(new { Remote = entry.FullPath, Local = proposed });
             }
             return proposed;
         }
-        foreach (var entry in selected) await Visit(entry, await SafeName(entry, topNames).ConfigureAwait(false), 0).ConfigureAwait(false);
+        foreach (var entry in selected)
+        {
+            var safe = await SafeName(entry, topNames).ConfigureAwait(false);
+            if (safe is null) { manifestSkipped++; continue; }
+            await Visit(entry, safe, 0).ConfigureAwait(false);
+        }
         if (mappings.Count > 0)
         {
             var mappingName = ".sshexplorer-name-map.jsonl"; while (!topNames.Add(mappingName)) mappingName = "_" + mappingName;
             output.Add(new VirtualEntry(mappingName, null, false, Encoding.UTF8.GetBytes(string.Join('\n', mappings.Select(x => System.Text.Json.JsonSerializer.Serialize(x))) + "\n")));
         }
-        task.SetTotal(output.Where(x => !x.Directory).Sum(x => x.Length)); return output.ToArray();
+        task.SetTotal(output.Where(x => !x.Directory).Sum(x => x.Length)); task.SetSkipped(manifestSkipped); return output.ToArray();
     }
 
     private VirtualEntry[] GetManifest()
     {
         var task = ManifestTask();
         if (!task.IsCompleted && Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
-            throw new COMException("Подготовка удалённого дерева выполняется вне UI-потока. Требуется асинхронный Windows Shell target.", ShellInterop.WrongThread);
+            throw new COMException("Метаданные дерева подготавливаются в фоне; повторите запрос после подготовки.", unchecked((int)0x8000000A));
         return task.GetAwaiter().GetResult();
     }
     internal Stream OpenStream(VirtualEntry entry)
@@ -160,6 +195,7 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
     }
     internal void Failed(Exception error)
     {
+        NativeTrace.Write("Failed " + error.GetType().Name);
         Failure = ErrorMessages.Describe(error);
         if (error is OperationCanceledException || session.Lifetime.IsCancellationRequested) { Cancel(); return; }
         faulted = true; operation?.Fail(error); cancellation.Cancel();
@@ -169,17 +205,44 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
     {
         lock (gate) dragReturned = true;
         if (!accepted) { Cancel(); return; }
-        lock (gate) if (!inOperation) { if (!ended && operation is not null) operation.Cancel(); hostStopped.Set(); _ = Task.Run(CloseReaders); }
+        lock (gate)
+        {
+            if (!inOperation)
+            {
+                if (!ended && operation is not null)
+                {
+                    // IDataObjectAsyncCapability is optional. A synchronous target has finished
+                    // extraction before Drop/DoDragDrop returns, so its accepted effect is final.
+                    ended = true;
+                    if (!faulted && !cancellation.IsCancellationRequested)
+                    {
+                        var entries = manifest?.IsCompletedSuccessfully == true ? manifest.Result : [];
+                        operation.Complete(fullyRead.Count, manifestSkipped + entries.Count(e => !e.Directory) - fullyRead.Count);
+                    }
+                }
+                hostStopped.Set(); _ = Task.Run(CloseReaders);
+            }
+        }
     }
-    public void Cancel() { lock (gate) inOperation = false; if (!cancellation.IsCancellationRequested) cancellation.Cancel(); operation?.Cancel(); active.TryRemove(id, out _); hostStopped.Set(); }
+    public void Cancel()
+    {
+        NativeTrace.Write("Cancel enter");
+        if (!cancellation.IsCancellationRequested) cancellation.Cancel(); operation?.Cancel();
+        lock (gate) if (!inOperation) { active.TryRemove(id, out _); hostStopped.Set(); }
+        NativeTrace.Write("Cancel exit");
+    }
     private void CloseReaders()
     {
+        NativeTrace.Write("CloseReaders enter");
         if (Interlocked.Exchange(ref readersClosed, 1) != 0) return;
         ShellFileStream[] open; Task<RemoteExportSource>? source;
         lock (gate) { open = streams.ToArray(); streams.Clear(); source = reader; }
-        if (source is not null) { try { source.GetAwaiter().GetResult().Dispose(); } catch { } }
+        if (source is not null) { try { NativeTrace.Write("Source dispose start"); source.GetAwaiter().GetResult().Dispose(); NativeTrace.Write("Source dispose done"); } catch { } }
+        NativeTrace.Write("Streams close start");
         foreach (var stream in open) stream.Close();
+        NativeTrace.Write("Streams close done");
         cancellation.Dispose();
+        NativeTrace.Write("CloseReaders exit");
     }
 
     public void GetData(ref FORMATETC format, out STGMEDIUM medium)
@@ -200,6 +263,7 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
                 medium = new STGMEDIUM { tymed = TYMED.TYMED_ISTREAM, unionmember = Marshal.GetComInterfaceForObject(stream, typeof(INativeStream)), pUnkForRelease = null };
             }
         }
+        catch (COMException e) when (e.HResult is unchecked((int)0x8000000A) or ShellInterop.IndexError or ShellInterop.FormatError or ShellInterop.MediumError) { throw; }
         catch (Exception e) { Failed(e); throw; }
     }
     public static byte[] DescriptorBytes(IReadOnlyList<VirtualEntry> entries)
@@ -208,6 +272,7 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
         for (var i = 0; i < entries.Count; i++)
         {
             var entry = entries[i]; var offset = 4 + i * 592;
+            if (!entry.Directory && entry.Length < 0) throw new IOException("Нельзя передать отрицательный или неизвестный размер файла в Windows Shell.");
             var hasTime = entry.Remote is not null && entry.Remote.LastWriteTimeUtc.Year >= 1601;
             var flags = 0x80004004u | (entry.Directory ? 0u : 0x40u) | (hasTime ? 0x20u : 0u);
             BitConverter.GetBytes(flags).CopyTo(result, offset);
@@ -253,16 +318,17 @@ public sealed class ShellVirtualDataObject : System.Runtime.InteropServices.ComT
     public int InOperation(out bool value) { lock (gate) value = inOperation; return 0; }
     public int EndOperation(int result, IntPtr reserved, uint effects)
     {
+        NativeTrace.Write("EndOperation enter " + result.ToString("X"));
         lock (gate) { ended = true; inOperation = false; }
-        if (result == ShellInterop.Abort) Cancel();
+        if (result == ShellInterop.Abort) { if (!faulted) Cancel(); }
         else if (result < 0) Failed(new COMException("Windows Explorer прервал получение файлов.", result));
         else if (!cancellation.IsCancellationRequested)
         {
             var entries = manifest?.IsCompletedSuccessfully == true ? manifest.Result : [];
             int complete; lock (gate) complete = fullyRead.Count;
-            operation?.Complete(complete, entries.Count(e => !e.Directory) - complete);
+            operation?.Complete(complete, manifestSkipped + entries.Count(e => !e.Directory) - complete);
         }
-        _ = Task.Run(CloseReaders); active.TryRemove(id, out _); hostStopped.Set(); return 0;
+        _ = Task.Run(CloseReaders); active.TryRemove(id, out _); hostStopped.Set(); NativeTrace.Write("EndOperation exit"); return 0;
     }
     public CustomQueryInterfaceResult GetInterface(ref Guid iid, out IntPtr ppv)
     {

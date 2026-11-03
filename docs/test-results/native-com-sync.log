@@ -1,0 +1,21 @@
+PASS independent host fingerprint
+PASS fixture uploaded via real SFTP
+PASS creating native drag data does not start download or queue job
+PASS remote source never advertises nonexistent CF_HDROP paths
+PASS FILEDESCRIPTOR high/low preserves >4 GiB lengths
+PASS native descriptor group has entries
+DESCRIPTOR_COUNT 5
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS synchronous native consumer copied all streams without async capability or EndOperation
+PASS Shell async extraction registered in common transfer queue
+PASS native EndOperation completes actual common queue job
+PASS empty directory preserved by FILEDESCRIPTORW
+PASS out-of-process native IStream bytes match SHA256
+PASS common queue reports real transferred bytes
+PASS native GetData and actual network Read ran in MTA, outside UI STA
+NATIVE_THREADS GetData=17/MTA Read=17/MTA; no UI entered
+PASS native COM probe; live Explorer mouse/OLE acceptance remains separate

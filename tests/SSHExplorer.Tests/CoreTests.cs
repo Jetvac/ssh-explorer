@@ -174,6 +174,30 @@ internal static class CoreTests
             TestSuite.True(!two.Lifetime.IsCancellationRequested);
             await two.DisposeAsync();
         });
+        foreach (var fail in new[] { true, false })
+        {
+            await t.Run(fail ? "failed native export unlinks source lifetime and is collectible" : "cancelled native export unlinks source lifetime and is collectible", async () =>
+            {
+                var store = NewStore();
+                await using var source = new ServerSession(new ServerProfile { Name = "isolated lifetime", Host = "unused.invalid", Username = "unused" }, store);
+                var reference = await TransientExternalOperation(source, fail);
+                for (var attempt = 0; attempt < 12 && reference.IsAlive; attempt++)
+                { await Task.Delay(25); GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); }
+                TestSuite.True(!source.Lifetime.IsCancellationRequested, "Test source must remain alive while its finished export is collected");
+                TestSuite.True(!reference.IsAlive, "A terminal export was retained by its still-open source session");
+            });
+        }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static async Task<WeakReference> TransientExternalOperation(ServerSession source, bool fail)
+    {
+        TransferQueue? queue = new(); ExternalTransferOperation? operation = queue.BeginExternalDownload(source, ["/isolated-test-file"]);
+        TransferJob? job = operation.Job;
+        if (fail) operation.Fail(new IOException("isolated expected export failure")); else operation.Cancel();
+        await queue.WaitAsync(job);
+        TestSuite.Equal(fail ? TransferState.Failed : TransferState.Cancelled, job.State);
+        var reference = new WeakReference(operation); operation = null; job = null; queue = null; return reference;
     }
 
     private static AppStore NewStore()

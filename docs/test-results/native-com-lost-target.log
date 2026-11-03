@@ -1,0 +1,10 @@
+PASS independent host fingerprint
+PASS fixture uploaded via real SFTP
+PASS creating native drag data does not start download or queue job
+PASS remote source never advertises nonexistent CF_HDROP paths
+PASS FILEDESCRIPTOR high/low preserves >4 GiB lengths
+PASS target dies during a real indexed IStream transfer after StartOperation
+PASS source close cancels extraction after target crash without EndOperation
+PASS lost target drains active registry and MTA host within bounded cancellation grace
+LOST_TARGET drain=2032ms active=0 hosts=0
+PASS cleanup connection independently verifies host key

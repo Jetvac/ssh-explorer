@@ -1,0 +1,9 @@
+PASS negative/unknown size is rejected before unsigned FILEDESCRIPTOR conversion
+PASS native QI negotiates IDataObjectAsyncCapability
+PASS native descriptor group has entries
+DESCRIPTOR_COUNT 1
+PASS descriptor target contained in dedicated directory
+PASS native out-of-process IDataObject -> FILEDESCRIPTORW -> indexed IStream -> EndOperation
+PASS ABI-only native EndOperation completes zero-byte job
+PASS ABI-only native stream produced zero-byte test file
+PASS isolated ABI-only probe: synthetic zero-byte file, no SSH or live Explorer claimed

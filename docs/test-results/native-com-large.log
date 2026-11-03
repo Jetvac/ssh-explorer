@@ -1,0 +1,47 @@
+PASS independent host fingerprint
+PASS fixture uploaded via real SFTP
+PASS isolated fixture creates sparse large source with existing truncate
+PASS creating native drag data does not start download or queue job
+PASS remote source never advertises nonexistent CF_HDROP paths
+PASS FILEDESCRIPTOR high/low preserves >4 GiB lengths
+NATIVE_PROGRESS 125018271/2149580979 bytes, 12,0 MiB/s, producerRSS 62 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 253639920/2149580979 bytes, 12,1 MiB/s, producerRSS 62 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 381213201/2149580979 bytes, 12,1 MiB/s, producerRSS 62 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 506362131/2149580979 bytes, 12,1 MiB/s, producerRSS 62 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 631969722/2149580979 bytes, 12,0 MiB/s, producerRSS 62 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 759084342/2149580979 bytes, 12,1 MiB/s, producerRSS 62 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 886985238/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 1015344795/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 1141542093/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 1269967173/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 33 MiB
+NATIVE_PROGRESS 1399833759/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 35 MiB
+NATIVE_PROGRESS 1528783023/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 35 MiB
+NATIVE_PROGRESS 1656159735/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 35 MiB
+NATIVE_PROGRESS 1786091844/2149580979 bytes, 12,1 MiB/s, producerRSS 63 MiB, consumerRSS 35 MiB
+NATIVE_PROGRESS 1916941275/2149580979 bytes, 12,2 MiB/s, producerRSS 63 MiB, consumerRSS 35 MiB
+NATIVE_PROGRESS 2046938907/2149580979 bytes, 12,2 MiB/s, producerRSS 63 MiB, consumerRSS 35 MiB
+PASS native QI negotiates IDataObjectAsyncCapability
+PASS native descriptor group has entries
+DESCRIPTOR_COUNT 7
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS native out-of-process IDataObject -> FILEDESCRIPTORW -> indexed IStream -> EndOperation
+PASS native Shell extraction registered in common transfer queue
+PASS native EndOperation completes actual common queue job
+PASS empty directory preserved by FILEDESCRIPTORW
+PASS out-of-process native IStream bytes match SHA256
+PASS common queue reports real transferred bytes
+PASS native GetData and actual network Read ran in MTA, outside UI STA
+NATIVE_THREADS GetData=18/MTA Read=18/MTA; no UI entered
+PASS native IStream target length matches real >2 GiB source
+REMOTE_SHA256 waiting 10s (existing server utility, PTY only for test)
+REMOTE_SHA256 waiting 20s (existing server utility, PTY only for test)
+REMOTE_SHA256 waiting 30s (existing server utility, PTY only for test)
+PASS real native IStream >2 GiB source and target SHA256 match
+NATIVE_LARGE bytes=2148532224 sourceSHA256=F9C8466CDAC8F598A9DBBE999B62B47C2745C7B7368CD6BFCEE1B636368A9071 targetSHA256=F9C8466CDAC8F598A9DBBE999B62B47C2745C7B7368CD6BFCEE1B636368A9071 producerPeakObservedMiB=63 consumerPeakObservedMiB=35
+PASS native COM probe; live Explorer mouse/OLE acceptance remains separate

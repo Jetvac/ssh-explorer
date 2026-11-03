@@ -1,0 +1,17 @@
+PASS independent host fingerprint
+PASS fixture uploaded via real SFTP
+PASS creating native drag data does not start download or queue job
+PASS remote source never advertises nonexistent CF_HDROP paths
+PASS FILEDESCRIPTOR high/low preserves >4 GiB lengths
+PASS native cancellation occurs during actual nonempty IStream transfer
+PASS native QI negotiates IDataObjectAsyncCapability
+PASS native descriptor group has entries
+DESCRIPTOR_COUNT 5
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS descriptor target contained in dedicated directory
+PASS source-session close cancels native extraction queue job
+PASS native target observes cancellation instead of false success
+PASS cancelled native export has no active common-queue work
+PASS native source-close probe; bytes=196569, real Explorer gesture remains separate
+PASS cleanup connection independently verifies host key

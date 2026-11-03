@@ -46,23 +46,29 @@ public sealed class ShellFileStream : INativeStream, INativeSequentialStream
         {
             lock (gate)
             {
+                NativeTrace.Write("Read enter pos=" + position + " count=" + count);
                 if (closed) return ShellInterop.Abort;
                 if (count == 0) return 0;
-                if (position >= entry.Length) { owner.BytesRead(index, position, 0, entry.Length); return 1; }
-                stream ??= owner.OpenStream(entry); stream.Position = position;
+                if (position >= entry.Length)
+                {
+                    // Zero-byte source files still need identity/existence validation at actual extraction.
+                    if (entry.Length == 0 && stream is null) { stream = owner.OpenStream(entry); if (stream.Read(new byte[1], 0, 1) != 0) throw new IOException("Пустой источник изменился."); }
+                    owner.BytesRead(index, position, 0, entry.Length); return 1;
+                }
+                stream ??= owner.OpenStream(entry); NativeTrace.Write("Read stream ready"); stream.Position = position;
                 var bytes = new byte[Math.Min(128 * 1024u, count)]; uint total = 0;
                 while (total < count && position < entry.Length)
                 {
                     var amount = (int)Math.Min(bytes.Length, Math.Min((long)(count - total), entry.Length - position));
-                    var got = stream.Read(bytes, 0, amount); if (got == 0) throw new IOException("Источник неожиданно закончился.");
+                    NativeTrace.Write("Read source before"); var got = stream.Read(bytes, 0, amount); NativeTrace.Write("Read source after " + got); if (got == 0) throw new IOException("Источник неожиданно закончился.");
                     Marshal.Copy(bytes, 0, new IntPtr(checked(buffer.ToInt64() + total)), got);
-                    position += got; total += (uint)got; owner.BytesRead(index, position, got, entry.Length);
+                    position += got; total += (uint)got; NativeTrace.Write("Read progress before"); owner.BytesRead(index, position, got, entry.Length); NativeTrace.Write("Read progress after");
                     if (read != IntPtr.Zero) Marshal.WriteInt32(read, unchecked((int)total));
                 }
                 return total == count ? 0 : 1;
             }
         }
-        catch (Exception error) { owner.Failed(error); return error is OperationCanceledException ? ShellInterop.Abort : ShellInterop.ReadFault; }
+        catch (Exception error) { NativeTrace.Write("IStream.Read catch " + error.GetType().Name); owner.Failed(error); NativeTrace.Write("IStream.Read returning failure"); return error is OperationCanceledException ? ShellInterop.Abort : ShellInterop.ReadFault; }
     }
     public int Write(IntPtr buffer, uint count, IntPtr written) => unchecked((int)0x80030005);
     public int Seek(long move, uint origin, IntPtr result)
