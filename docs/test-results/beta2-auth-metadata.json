@@ -1,0 +1,23 @@
+{
+  "utc": "2026-11-03T13:11:42.6777023Z",
+  "baseCommit": "eda137a734e8fc259eb97fca300b2072d11232a8",
+  "workingTree": "dirty; component evidence only",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "sdk": "10.0.403",
+  "runtime": "10.0.14",
+  "sshNet": "2026.0.0",
+  "componentAssertions": 13,
+  "scriptedNetworkAssertions": 26,
+  "verifiedAlpineAssertions": 5,
+  "fullRegressionAssertions": 54,
+  "applicationWindowLaunch": "NOT RUN; prohibited on host",
+  "sha256": {
+    "src/SSHExplorer.Core/ServerSession.cs": "6fe366f14d6dcf4e147c2340bd332ef63237984b7c32df9e9f6468e11a4cfcf5",
+    "src/SSHExplorer.Core/Models.cs": "142b7a783bda0e29c1692f528c437b4382e472e96c0b2b39aa3eff17cbb22196",
+    "src/SSHExplorer.Core/SessionAuthentication.cs": "f0d0002dbba4f7fae899932e5527512ba37ca0b4a175124dd1b75483188fbd13",
+    "src/SSHExplorer.Core/ConnectionDiagnostics.cs": "5cebf267e2d8be619b4999f7c67c37a7a30024f33339f8a37d1be04bc424ea32",
+    "scripts/testing/auth_fixture.py": "d224e4a1b9a67b721aa6fd68e6787320ad03a712be9734e62570b7fb7541629b",
+    ".tools/auth-v02/SSHExplorer.Core.dll": "4ff1d4c636672c05700a94635f9b69c292ebd47f0ebfab046e0345acbbd3ba97",
+    ".tools/auth-v02/SSHExplorer.Core.Smoke.dll": "d70c29dc2273fc1662479418793c0b7500370ed041e6724c77caecf91c5fa05b"
+  }
+}

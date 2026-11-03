@@ -45,7 +45,7 @@ public sealed class AppStore
     /// A new secret is staged under an immutable random reference; settings.json is the
     /// commit point. Until it succeeds neither Profiles nor the old secret reference changes.
     /// </summary>
-    public async Task<ProfileCommitResult> SaveProfileAsync(ServerProfile profile,string? secret,CancellationToken ct=default)
+    public async Task<ProfileCommitResult> SaveProfileAsync(ServerProfile profile,string? secret,CancellationToken ct=default,bool deferSecretUntilAuthentication=false)
     {
         profile.Validate();
         if(profile.TimeoutSeconds is <3 or >120)throw new ArgumentException("Таймаут подключения должен быть от 3 до 120 секунд.");
@@ -62,7 +62,7 @@ public sealed class AppStore
             {
                 if(secret is null)
                 {
-                    if(!File.Exists(oldSecretPath))throw new InvalidOperationException("Введите секрет перед включением его сохранения.");
+                    if(!File.Exists(oldSecretPath)&&!deferSecretUntilAuthentication)throw new InvalidOperationException("Введите секрет перед включением его сохранения.");
                 }
                 else
                 {
@@ -109,6 +109,7 @@ public sealed class AppStore
                 await stream.FlushAsync(ct).ConfigureAwait(false);
                 stream.Flush(true);
             }
+            ct.ThrowIfCancellationRequested();
             if (File.Exists(path)) File.Replace(temporary, path, path + ".bak", true);
             else File.Move(temporary, path);
         }
@@ -130,6 +131,34 @@ public sealed class AppStore
         try{await AtomicWriteAsync(SecretPath(profileId),encrypted,ct).ConfigureAwait(false);}
         finally{_saveGate.Release();}
     }
+    /// <summary>Commits credentials only after a successful attempt and only to its unchanged, opted-in profile.</summary>
+    public async Task<bool> SaveAuthenticatedSecretAsync(ServerProfile authenticatedProfile,string secret,CancellationToken ct=default)
+    {
+        await _saveGate.WaitAsync(ct).ConfigureAwait(false);
+        string? staged=null;bool committed=false;
+        try
+        {
+            var current=Profiles.FirstOrDefault(p=>p.Id==authenticatedProfile.Id);
+            if(current is null||!current.SaveSecret||!SameAuthenticationTarget(current,authenticatedProfile))return false;
+            string oldPath=SecretPath(current.Id);Guid reference=Guid.NewGuid();staged=SecretFilePath(reference);
+            await AtomicWriteAsync(staged,ProtectSecret(current.Id,secret),ct).ConfigureAwait(false);
+            var references=new Dictionary<Guid,Guid>(_secretReferences){[current.Id]=reference};
+            await WriteSettingsAsync(Profiles,references,ct).ConfigureAwait(false);
+            _secretReferences=references;committed=true;LastProfileCleanupWarning=null;
+            try{if(File.Exists(oldPath))File.Delete(oldPath);if(File.Exists(oldPath+".bak"))File.Delete(oldPath+".bak");}
+            catch(Exception ex)when(ex is IOException or UnauthorizedAccessException)
+            {LastProfileCleanupWarning="Новый секрет сохранён, но не удалось удалить прежнюю защищённую копию. Новые подключения её не используют.";}
+            return true;
+        }
+        finally
+        {
+            if(!committed&&staged is not null&&File.Exists(staged))try{File.Delete(staged);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException){}
+            _saveGate.Release();
+        }
+    }
+    private static bool SameAuthenticationTarget(ServerProfile a,ServerProfile b)=>
+        HostTrustStore.NormalizeHost(a.Host)==HostTrustStore.NormalizeHost(b.Host)&&a.Port==b.Port&&a.Username==b.Username&&a.Authentication==b.Authentication&&
+        (a.Authentication!=AuthenticationKind.PrivateKey||string.Equals(a.PrivateKeyPath,b.PrivateKeyPath,StringComparison.OrdinalIgnoreCase));
     public async Task<string?> ReadSecretAsync(Guid profileId, CancellationToken ct = default)
     {
         await _saveGate.WaitAsync(ct).ConfigureAwait(false);

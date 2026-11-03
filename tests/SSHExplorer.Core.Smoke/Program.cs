@@ -1,6 +1,9 @@
 using System.Text.Json;
 using SSHExplorer.Core;
 
+if(args.Length==1&&args[0]=="--auth-unit"){await AuthenticationScenarios.RunUnitAsync();return;}
+if(args.Length==2&&args[0]=="--auth-scripted"){await AuthenticationNetworkScenarios.RunScriptedAsync(args[1]);return;}
+if(args.Length==2&&args[0]=="--auth-linux"){await AuthenticationNetworkScenarios.RunLinuxAsync(args[1]);return;}
 if(args.Length==2&&args[1]=="--connections-only"){await ConnectionScenarios.RunAsync(args[0]);return;}
 if(args.Length==2&&args[1]=="--failures-only"){await TransferFailureScenarios.RunAsync(args[0]);return;}
 if(args.Length!=1)throw new ArgumentException("Usage: SSHExplorer.Core.Smoke <isolated-fixture.json> [--connections-only|--failures-only]");

@@ -25,6 +25,7 @@ public sealed class ServerProfile
         if (Host.Any(char.IsWhiteSpace) || Host.IndexOfAny(['/', '\\', '\0']) >= 0)
             throw new ArgumentException("Адрес должен быть DNS-именем, IPv4 или IPv6 без схемы и пути.");
         if (Port is < 1 or > 65535) throw new ArgumentException("Порт должен быть от 1 до 65535.");
+        if (TimeoutSeconds is < 3 or > 120) throw new ArgumentException("Время ожидания должно быть от 3 до 120 секунд.");
         if (Authentication == AuthenticationKind.PrivateKey && !File.Exists(PrivateKeyPath))
             throw new FileNotFoundException("Приватный ключ не найден.", PrivateKeyPath);
     }
@@ -54,7 +55,11 @@ public sealed class AppSettings
     public List<ColumnSetting> Columns { get; set; } = [];
 }
 public sealed record InteractivePrompt(string Instruction, string Prompt, bool Echo);
-public sealed record SessionCredentials(string Secret, Func<InteractivePrompt, Task<string?>>? Prompt = null);
+public sealed record SessionCredentials(string Secret, Func<InteractivePrompt, Task<string?>>? Prompt = null,
+    Func<InteractivePrompt, CancellationToken, Task<string?>>? CancellablePrompt = null)
+{
+    public override string ToString() => "SessionCredentials { Secret = [redacted] }";
+}
 public enum TrustDecision { Reject, Session, Permanent }
 public sealed record HostKeyPrompt(string Host, int Port, string Algorithm, string Fingerprint, string? PreviousFingerprint, bool Changed);
 public enum SessionState { Connecting, AwaitingTrust, Connected, Disconnected, Closing, Closed }

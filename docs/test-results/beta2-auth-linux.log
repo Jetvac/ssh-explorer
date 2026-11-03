@@ -1,0 +1,6 @@
+PASS verified fresh Alpine password login exec probe and SFTP connection succeed
+PASS real initial folder listing succeeds after separate SFTP stage
+PASS real Alpine independent PTY and export transports preserve main exec and state
+PASS real Alpine encrypted Ed25519 passphrase authenticates independent exec and SFTP
+PASS encrypted Ed25519 authentication also supports separate PTY and native export transports
+5 verified Alpine auth checks passed (headless component/network)
