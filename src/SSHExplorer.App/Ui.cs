@@ -17,6 +17,12 @@ public static class Ui
     public static readonly DependencyProperty IsCurrentFolderProperty = DependencyProperty.RegisterAttached("IsCurrentFolder", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(false));
     public static void SetIsCurrentFolder(DependencyObject target, bool value) => target.SetValue(IsCurrentFolderProperty, value);
     public static bool GetIsCurrentFolder(DependencyObject target) => (bool)target.GetValue(IsCurrentFolderProperty);
+    public static readonly DependencyProperty IsFileSectionActiveProperty = DependencyProperty.RegisterAttached("IsFileSectionActive", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.Inherits));
+    public static void SetIsFileSectionActive(DependencyObject target, bool value) => target.SetValue(IsFileSectionActiveProperty, value);
+    public static bool GetIsFileSectionActive(DependencyObject target) => (bool)target.GetValue(IsFileSectionActiveProperty);
+    public static readonly DependencyProperty IsNavigationActiveProperty = DependencyProperty.RegisterAttached("IsNavigationActive", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(false));
+    public static void SetIsNavigationActive(DependencyObject target, bool value) => target.SetValue(IsNavigationActiveProperty, value);
+    public static bool GetIsNavigationActive(DependencyObject target) => (bool)target.GetValue(IsNavigationActiveProperty);
     public static readonly DependencyProperty TreeDepthProperty = DependencyProperty.RegisterAttached("TreeDepth", typeof(int), typeof(Ui), new FrameworkPropertyMetadata(0));
     public static void SetTreeDepth(DependencyObject target, int value) => target.SetValue(TreeDepthProperty, value);
     public static int GetTreeDepth(DependencyObject target) => (int)target.GetValue(TreeDepthProperty);
@@ -125,6 +131,8 @@ public static class Ui
         if (size == 18) block.SetResourceReference(TextBlock.FontSizeProperty, "IconSize"); return block;
     }
     public static StackPanel Row(params UIElement[] items) { var p = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var x in items) p.Children.Add(x); return p; }
+    public static WrapPanel Actions(params UIElement[] items) { var p = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; foreach (var item in items) p.Children.Add(item); return p; }
+    public static TextBlock DialogHeading(string text) { var heading = Text(text, 18, true); heading.SetResourceReference(FrameworkElement.StyleProperty, "DialogTitleStyle"); return heading; }
     public static MenuItem Menu(string text, Action action, string shortcut = "", string? glyph = null) { var m = new MenuItem { Header = text, InputGestureText = shortcut }; if (glyph is not null) m.Icon = Icon(glyph, 16, false); m.Click += (_, _) => action(); return m; }
     public static MenuItem AsyncMenu(string text, Func<Task> action, string shortcut = "", string? glyph = null) => Menu(text, async () => await Guard(action), shortcut, glyph);
     public static Border Line() { var b = new Border { Width = 1, Height = 26, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 5, 9, 5) }; b.SetResourceReference(Border.BackgroundProperty, "Edge"); return b; }
@@ -140,6 +148,7 @@ public static class Ui
     public static string? Prompt(string title, string label, string value = "")
     {
         var w = new Window { Title = title, Width = 500, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current.MainWindow };
+        w.SetResourceReference(FrameworkElement.StyleProperty, "DialogWindowStyle");
         var p = new StackPanel { Margin = new Thickness(22) }; p.Children.Add(Text(label));
         var t = new TextBox { Text = value, Margin = new Thickness(0, 12, 0, 16) }; p.Children.Add(t);
         var ok = Button("Готово", () => w.DialogResult = true); ok.IsDefault = true;
@@ -198,6 +207,7 @@ public static class Theme
         if (SystemParameters.HighContrast)
         {
             r["Paper"] = SystemColors.WindowBrush; r["Surface"] = SystemColors.ControlBrush; r["NavigationSurface"] = SystemColors.WindowBrush; r["CaptionSurface"] = SystemColors.ControlBrush; r["Ink"] = SystemColors.WindowTextBrush; r["SelectedInk"] = SystemColors.HighlightTextBrush; r["AccentInk"] = SystemColors.HighlightTextBrush; r["Muted"] = SystemColors.GrayTextBrush; r["Edge"] = SystemColors.WindowTextBrush; r["Hover"] = SystemColors.ControlBrush; r["Pressed"] = SystemColors.HighlightBrush; r["Selected"] = SystemColors.HighlightBrush; r["SelectedInactive"] = SystemColors.ControlBrush; r["Accent"] = SystemColors.HighlightBrush; r["DropTarget"] = SystemColors.HighlightBrush; r["DisabledInk"] = SystemColors.GrayTextBrush;
+            r["NavigationSelected"] = SystemColors.HighlightBrush; r["NavigationSelectedInk"] = SystemColors.HighlightTextBrush; r["ValidationInk"] = SystemColors.WindowTextBrush;
             r["AccentHover"] = SystemColors.HighlightBrush; r["AccentPressed"] = SystemColors.HighlightBrush;
             r["FocusStroke"] = SystemColors.WindowTextBrush; r["SelectedFocusStroke"] = SystemColors.HighlightTextBrush; r["PrimaryFocusStroke"] = SystemColors.HighlightTextBrush;
             Changed?.Invoke();
@@ -206,6 +216,7 @@ public static class Theme
         Brush B(string s) => (Brush)new BrushConverter().ConvertFromString(s)!;
         r["Paper"] = B(dark ? "#202020" : "#FFFFFF"); r["Surface"] = B(dark ? "#292929" : "#F3F3F3");
         r["NavigationSurface"] = B(dark ? "#252525" : "#FAFAFA"); r["CaptionSurface"] = B(dark ? "#242424" : "#E9ECEC");
+        r["NavigationSelected"] = B(dark ? "#353535" : "#EAEAEA"); r["NavigationSelectedInk"] = B(dark ? "#F4F4F4" : "#1A1A1A"); r["ValidationInk"] = B(dark ? "#FFB4AB" : "#B42318");
         r["Ink"] = B(dark ? "#F4F4F4" : "#1A1A1A"); r["Muted"] = B(dark ? "#B7B7B7" : "#626262");
         r["SelectedInk"] = r["Ink"];
         r["Edge"] = B(dark ? "#414141" : "#E4E4E4"); r["Hover"] = B(dark ? "#343434" : "#EFEFEF"); r["Pressed"] = B(dark ? "#3C3C3C" : "#E3E3E3"); r["SelectedInactive"] = B(dark ? "#353B40" : "#E8EBEF"); r["DisabledInk"] = B(dark ? "#777777" : "#A1A1A1");

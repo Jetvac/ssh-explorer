@@ -22,10 +22,10 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
 {
     readonly ServerSession session; readonly MainWindow main;
     readonly DockPanel root = new(); readonly DataGrid table = new(); readonly ListBox tiles = new() { SelectionMode = SelectionMode.Extended };
-    readonly ContentControl content = new(); readonly TextBox address = new(); readonly StackPanel breadcrumbs = new() { Orientation = Orientation.Horizontal };
+    readonly ContentControl content = new() { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch }; readonly TextBox address = new(); readonly StackPanel breadcrumbs = new() { Orientation = Orientation.Horizontal };
     readonly TextBox search = new() { MinWidth = 180, ToolTip = "Поиск по имени в текущей папке" }; readonly TextBlock status = Ui.Text(""), message = Ui.Text("");
-    readonly TreeView tree = new() { MinHeight = 100 }; readonly StackPanel navigation = new();
-    readonly StackPanel pins = new(); readonly Border preview = new() { Width = 280, Padding = new Thickness(16), BorderThickness = new Thickness(1, 0, 0, 0) };
+    readonly TreeView tree = new() { MinHeight = 0 }; readonly Grid navigation = new();
+    readonly List<TreeViewItem> pins = []; readonly Border preview = new() { Width = 280, Padding = new Thickness(16), BorderThickness = new Thickness(1, 0, 0, 0) };
     readonly FileBrowserViewModel viewModel = new();
     FrameworkElement addressBar = null!, commandBar = null!, statusBar = null!;
     CancellationTokenSource navigationCts = new(); CancellationTokenSource previewCts = new(); readonly CancellationTokenSource lifetime = new();
@@ -66,10 +66,13 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     void BuildNavigation()
     {
         navigation.DataContext = viewModel;
+        navigation.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); navigation.RowDefinitions.Add(new RowDefinition());
         var home = Ui.AsyncCommandButton(Ui.HomeGlyph, "Домашняя папка", () => NavigateAsync("~")); home.SetResourceReference(StyleProperty, "NavigationButtonStyle"); navigation.Children.Add(home);
         var homeMenu = new ContextMenu(); homeMenu.Items.Add(Ui.AsyncMenu("Открыть", () => NavigateAsync("~"), glyph: Ui.HomeGlyph)); homeMenu.Items.Add(Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, "~"), glyph: Ui.NewTabGlyph)); homeMenu.Items.Add(Ui.Menu("Копировать путь", () => Clipboard.SetText(session.Files.HomeDirectory), glyph: Ui.CopyGlyph)); Ui.AttachContextMenu(home, homeMenu);
-        navigation.Children.Add(pins); RefreshPins(); navigation.Children.Add(tree);
+        Grid.SetRow(tree, 1); navigation.Children.Add(tree);
+        ScrollViewer.SetVerticalScrollBarVisibility(tree, ScrollBarVisibility.Auto); ScrollViewer.SetHorizontalScrollBarVisibility(tree, ScrollBarVisibility.Disabled);
         var rootNode = Node("Корень /", "/"); rootNode.ToolTip = "Корень файловой системы, доступный этой учётной записи (с учётом SFTP chroot)"; tree.Items.Add(rootNode);
+        RefreshPins();
         tree.SelectedItemChanged += async (_, e) => { if (!syncingTree && e.NewValue is TreeViewItem { Tag: string path } && path != CurrentPath) await Ui.Guard(() => NavigateAsync(path)); };
     }
     TreeViewItem Node(string name, string path)
@@ -99,10 +102,14 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     void RefreshPins()
     {
-        pins.Children.Clear(); foreach (var path in session.Profile.Bookmarks)
+        foreach (var pin in pins) tree.Items.Remove(pin); pins.Clear(); foreach (var path in session.Profile.Bookmarks)
         {
-            var b = Ui.AsyncCommandButton("\uE718", PosixPath.Name(path) is { Length: > 0 } n ? n : path, () => NavigateAsync(path)); b.SetResourceReference(StyleProperty, "NavigationButtonStyle"); b.ToolTip = path;
-            var menu = new ContextMenu(); menu.Items.Add(Ui.AsyncMenu("Открепить", () => TogglePin(path), glyph: Ui.PinGlyph)); Ui.AttachContextMenu(b, menu); pins.Children.Add(b);
+            var label = Ui.Text(PosixPath.Name(path) is { Length: > 0 } n ? n : path); label.TextTrimming = TextTrimming.CharacterEllipsis;
+            var pin = new TreeViewItem { Header = Ui.Row(Ui.Icon(Ui.PinGlyph, 16), label), Tag = path, ToolTip = "Закреплённая папка: " + path, AllowDrop = true };
+            Ui.SetIsCurrentFolder(pin, path == CurrentPath);
+            pin.DragOver += (_, e) => DropOver(e, path, pin); pin.DragLeave += (_, _) => ClearDropTarget();
+            pin.Drop += async (_, e) => { e.Handled = true; var effect = CanDropTo(e.Data, path, e.KeyStates); e.Effects = effect; ClearDropTarget(); if (effect != DragDropEffects.None) await Ui.Guard(() => DropData(e.Data, path, e.KeyStates)); };
+            var menu = new ContextMenu(); menu.Items.Add(Ui.AsyncMenu("Открыть", () => NavigateAsync(path), glyph: Ui.FolderGlyph)); menu.Items.Add(Ui.AsyncMenu("Открепить", () => TogglePin(path), glyph: Ui.PinGlyph)); Ui.AttachContextMenu(pin, menu); tree.Items.Insert(pins.Count, pin); pins.Add(pin);
         }
     }
     async Task TogglePin(string path) { if (!session.Profile.Bookmarks.Remove(path)) session.Profile.Bookmarks.Add(path); await App.Store.SaveAsync(); RefreshPins(); }
@@ -133,12 +140,13 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         var download = Ui.AsyncIconButton(Ui.DownloadGlyph, Download, "Скачать выделенные объекты"); download.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.HasSelection))); commands.Children.Add(download);
         commands.Children.Add(Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu)); commands.Children.Add(Ui.FlyoutButton(Ui.ViewGlyph, "Просмотреть", BuildViewMenu));
         var more = Ui.FlyoutButton(Ui.MoreGlyph, "", () => BuildContextMenu(Selected().Count > 0), "Дополнительные действия"); commands.Children.Add(more);
-        var border = new Border { Child = commands, DataContext = viewModel, BorderThickness = new Thickness(0, 0, 0, 1) }; border.SetResourceReference(Border.BorderBrushProperty, "Edge"); commandBar = border;
+        var border = new Border { Child = commands, DataContext = viewModel }; border.SetResourceReference(StyleProperty, "CommandBarStyle"); commandBar = border;
         var bottom = new Grid { DataContext = viewModel, Margin = new Thickness(14, 5, 14, 5), Height = 20 }; bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); bottom.ColumnDefinitions.Add(new ColumnDefinition()); status.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); bottom.Children.Add(status); statusBar = bottom;
         message.Margin = new Thickness(16, 0, 0, 0); message.TextWrapping = TextWrapping.NoWrap; message.TextTrimming = TextTrimming.CharacterEllipsis; message.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); message.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); message.SetBinding(ToolTipProperty, new Binding(nameof(FileBrowserViewModel.Message))); Grid.SetColumn(message, 1); bottom.Children.Add(message);
     }
     void BuildTable()
     {
+        table.SetResourceReference(StyleProperty, "FileTableStyle");
         table.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(FileBrowserViewModel.VisibleEntries)));
         var template = new DataTemplate(); var row = new FrameworkElementFactory(typeof(DockPanel)); row.SetValue(DockPanel.LastChildFillProperty, true); var icon = new FrameworkElementFactory(typeof(Image)); icon.SetBinding(Image.SourceProperty, new Binding(nameof(FileItemViewModel.FileIcon))); icon.SetValue(Image.WidthProperty, 20d); icon.SetValue(Image.HeightProperty, 20d); icon.SetValue(MarginProperty, new Thickness(0, 0, 8, 0)); icon.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetValue(DockPanel.DockProperty, Dock.Left); row.AppendChild(icon); var name = new FrameworkElementFactory(typeof(TextBlock)); name.SetBinding(TextBlock.TextProperty, new Binding("DisplayName")); name.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); name.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); row.AppendChild(name); template.VisualTree = row;
         table.Columns.Add(new DataGridTemplateColumn { Header = "Имя", CellTemplate = template, Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 220, SortMemberPath = "Name" });
@@ -235,14 +243,14 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     public Task RefreshAsync()
     {
         imageCache.Clear(); cacheBytes = 0;
-        void Invalidate(ItemsControl parent) { foreach (var n in parent.Items.OfType<TreeViewItem>()) { if ((n.Tag as string) == CurrentPath) { n.Items.Clear(); n.Items.Add(new TreeViewItem { Header = "Загрузка…", IsEnabled = false }); if (n.IsExpanded) _ = LoadNode(n); return; } Invalidate(n); } } Invalidate(tree);
+        void Invalidate(ItemsControl parent) { foreach (var n in parent.Items.OfType<TreeViewItem>()) { if (pins.Contains(n)) continue; if ((n.Tag as string) == CurrentPath) { n.Items.Clear(); n.Items.Add(new TreeViewItem { Header = "Загрузка…", IsEnabled = false }); if (n.IsExpanded) _ = LoadNode(n); return; } Invalidate(n); } } Invalidate(tree);
         return CurrentPath.Length > 0 ? Navigate(CurrentPath, false) : Task.CompletedTask;
     }
     async Task SyncTree(string path, long version)
     {
         try
         {
-            var node = tree.Items.OfType<TreeViewItem>().FirstOrDefault(); if (node is null) return; var full = "";
+            var node = tree.Items.OfType<TreeViewItem>().FirstOrDefault(n => n.Tag is string root && root == "/" && !pins.Contains(n)); if (node is null) return; var full = "";
             foreach (var part in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
             {
                 await LoadNode(node); if (version != generation || disposed) return; node.IsExpanded = true; full += "/" + part; var next = node.Items.OfType<TreeViewItem>().FirstOrDefault(x => (x.Tag as string) == full); if (next is null) return; node = next;
@@ -432,7 +440,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     async Task Properties()
     {
         var entry = Selected().FirstOrDefault()?.Entry; if (entry is null) return; entry = await session.Files.StatAsync(entry.FullPath, lifetime.Token);
-        var w = new Window { Title = "Свойства: " + entry.Name, Width = 580, SizeToContent = SizeToContent.Height, MaxHeight = 820, Owner = main, WindowStartupLocation = WindowStartupLocation.CenterOwner }; var panel = new StackPanel { Margin = new Thickness(24) };
+        var w = new Window { Title = "Свойства: " + entry.Name, Width = 580, SizeToContent = SizeToContent.Height, MaxHeight = 820, Owner = main, WindowStartupLocation = WindowStartupLocation.CenterOwner }; w.SetResourceReference(StyleProperty, "DialogWindowStyle"); var panel = new StackPanel { Margin = new Thickness(24) };
         var text = Ui.Text($"{entry.Name}\n\nПуть: {entry.FullPath}\nТип: {entry.TypeName}\nРазмер: {entry.SizeText}\nИзменён (местное время): {TimeText(entry.LastWriteTimeUtc)}\nДоступ (местное время): {TimeText(entry.LastAccessTimeUtc)}\nUID: {IdText(entry.UserId)}   GID: {IdText(entry.GroupId)}" + (entry.IsSymbolicLink ? "\nЦель ссылки: " + (entry.LinkTarget ?? "Недоступно") : "")); text.TextWrapping = TextWrapping.Wrap; panel.Children.Add(text);
         var modeText = new TextBox { Text = entry.PermissionsText, Margin = new Thickness(0, 14, 0, 6), ToolTip = "POSIX-права в восьмеричной записи, например 0755" }; panel.Children.Add(Ui.Text("Права (восьмеричные)")); panel.Children.Add(modeText);
         var rwx = new UniformGrid { Columns = 3 }; var boxes = new List<CheckBox>(); foreach (var label in new[] { "Владелец: чтение", "Запись", "Выполнение", "Группа: чтение", "Запись", "Выполнение", "Остальные: чтение", "Запись", "Выполнение" }) { var b = new CheckBox { Content = label }; boxes.Add(b); rwx.Children.Add(b); } panel.Children.Add(rwx);

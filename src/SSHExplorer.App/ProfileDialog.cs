@@ -29,25 +29,26 @@ public sealed class ProfileDialog:Window,ICancellableModal
     {
         _allowConnect=allowConnect;
         _model=new(persistence,old);DataContext=_model;
+        SetResourceReference(StyleProperty,"DialogWindowStyle");
         Title=old is null?"Добавить сервер":"Изменить сервер";Width=540;MinWidth=430;
         MaxHeight=Math.Max(320,SystemParameters.WorkArea.Height-48);SizeToContent=SizeToContent.Height;
         ResizeMode=ResizeMode.CanResize;ShowInTaskbar=false;WindowStartupLocation=WindowStartupLocation.CenterScreen;
         if(owner is not null&&(owner.IsLoaded||new System.Windows.Interop.WindowInteropHelper(owner).Handle!=IntPtr.Zero)){Owner=owner;WindowStartupLocation=WindowStartupLocation.CenterOwner;}
-        var root=new DockPanel();root.SetResourceReference(Panel.BackgroundProperty,"Surface");
-        var footer=new StackPanel{Margin=new(24,14,24,18)};DockPanel.SetDock(footer,Dock.Bottom);
+        var root=new DockPanel();root.SetResourceReference(Panel.BackgroundProperty,"Paper");
+        var footer=new StackPanel();var footerSurface=new Border{Child=footer};footerSurface.SetResourceReference(StyleProperty,"DialogFooterStyle");DockPanel.SetDock(footerSurface,Dock.Bottom);
         var status=Ui.Text("",12);status.TextWrapping=TextWrapping.Wrap;status.Margin=new(0,0,0,10);status.SetBinding(TextBlock.TextProperty,new Binding(nameof(_model.Status)));footer.Children.Add(status);
         _save=Ui.Button("Сохранить",()=>{});_save.IsDefault=!allowConnect;_save.MinWidth=104;_save.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));_save.Click+=SaveClicked;
         var cancel=Ui.Button("Отмена",()=>DialogResult=false);cancel.IsCancel=true;cancel.MinWidth=100;cancel.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));
-        var buttons=Ui.Row(cancel,_save);
+        var buttons=new WrapPanel();buttons.Children.Add(cancel);buttons.Children.Add(_save);
         if(allowConnect)
         {
             var connect=Ui.Button("Сохранить и подключиться",()=>{});connect.IsDefault=true;connect.MinWidth=198;connect.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));connect.Click+=ConnectClicked;
             if(TryFindResource("PrimaryButtonStyle")is Style primary)connect.Style=primary;buttons.Children.Add(connect);
         }
         else if(TryFindResource("PrimaryButtonStyle")is Style primary)_save.Style=primary;
-        buttons.HorizontalAlignment=HorizontalAlignment.Right;footer.Children.Add(buttons);root.Children.Add(footer);
+        buttons.HorizontalAlignment=HorizontalAlignment.Right;footer.Children.Add(buttons);root.Children.Add(footerSurface);
         var panel=new StackPanel{Margin=new(24,18,24,0)};panel.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));
-        panel.Children.Add(Ui.Text(old is null?"Новый сервер":"Параметры сервера",20,true));
+        var title=Ui.Text(old is null?"Новый сервер":"Параметры сервера",18,true);title.SetResourceReference(StyleProperty,"DialogTitleStyle");panel.Children.Add(title);
         panel.Children.Add(Field("Название",nameof(_model.ProfileName),nameof(_model.NameError)));
         var endpoint=new Grid();endpoint.ColumnDefinitions.Add(new());endpoint.ColumnDefinitions.Add(new(){Width=new GridLength(110)});
         var host=Field("Адрес сервера",nameof(_model.Host),nameof(_model.HostError));host.Margin=new(0,0,12,0);endpoint.Children.Add(host);
@@ -91,8 +92,8 @@ public sealed class ProfileDialog:Window,ICancellableModal
     }
     TextBlock Error(string property)
     {
-        var text=Ui.Text("",12);text.TextWrapping=TextWrapping.Wrap;text.Margin=new(0,4,0,0);text.SetBinding(TextBlock.TextProperty,new Binding(property));text.SetResourceReference(TextBlock.ForegroundProperty,"Ink");
-        var style=new Style(typeof(TextBlock));var empty=new DataTrigger{Binding=new Binding(property),Value=""};empty.Setters.Add(new Setter(VisibilityProperty,Visibility.Collapsed));style.Triggers.Add(empty);text.Style=style;return text;
+        var text=Ui.Text("",12);text.SetBinding(TextBlock.TextProperty,new Binding(property));
+        var style=new Style(typeof(TextBlock),(Style)FindResource("ValidationMessageStyle"));var empty=new DataTrigger{Binding=new Binding(property),Value=""};empty.Setters.Add(new Setter(VisibilityProperty,Visibility.Collapsed));style.Triggers.Add(empty);text.Style=style;return text;
     }
     async void SaveClicked(object sender,RoutedEventArgs args)
         =>await SubmitAsync(false);

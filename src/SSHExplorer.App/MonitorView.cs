@@ -1,93 +1,260 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
+using SSHExplorer.App.ViewModels;
 using SSHExplorer.Core;
 using SSHExplorer.Monitoring;
-using SSHExplorer.App.ViewModels;
 
 namespace SSHExplorer.App;
 
+public enum MonitorPage { Processes, Performance }
+
 public sealed class MonitorView : UserControl, IDisposable
 {
-    readonly ServerSession session; readonly LinuxMonitor monitor;
-    readonly DataGrid processes = new(); readonly TextBox search = new() { Width = 300, ToolTip = "Поиск по имени процесса, PID или пользователю" };
-    readonly TextBlock freshness = Ui.Text("Ещё нет замера"), summary = Ui.Text(""), limits = Ui.Text("");
-    readonly TextBlock cpu = Ui.Text("Недоступно", 22, true), memory = Ui.Text("Недоступно", 22, true), systemInfo = Ui.Text("");
-    readonly DataGrid networks = new(), disks = new(), storage = new();
-    readonly MetricGraph cpuGraph = new() { Height = 130 }, memoryGraph = new() { Height = 130 };
-    readonly CancellationTokenSource lifetime = new(); readonly System.Windows.Threading.DispatcherTimer timer = new();
-    readonly MonitorViewModel viewModel = new();
-    bool applyingProcesses, disposed;
-    bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
-    bool busy { get => viewModel.IsBusy; set => viewModel.IsBusy = value; }
-    public MonitorView(ServerSession session)
+    public static readonly DependencyProperty PaletteRevisionProperty = DependencyProperty.Register(nameof(PaletteRevision), typeof(int), typeof(MonitorView), new PropertyMetadata(0));
+    public int PaletteRevision { get => (int)GetValue(PaletteRevisionProperty); private set => SetValue(PaletteRevisionProperty, value); }
+    readonly ServerSession? session;
+    readonly LinuxMonitor? monitor;
+    readonly MonitorViewModel viewModel;
+    readonly CancellationTokenSource lifetime;
+    readonly DispatcherTimer timer = new();
+    readonly Grid header = new(), pages = new();
+    readonly TextBlock title = Ui.Text("Процессы", 18, true), status = Ui.Text("", 12), empty = Ui.Text("");
+    readonly TextBox search = new() { MinWidth = 150, ToolTip = "Имя, пользователь или PID" };
+    readonly Grid searchHost = new();
+    readonly DataGrid processes = new(), networks = new(), disks = new(), storage = new();
+    readonly ScrollViewer performance = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
+    readonly UniformGrid resources = new() { Columns = 2 };
+    readonly MetricGraph cpuGraph = new() { Height = 160, Metric = GraphMetric.Cpu }, memoryGraph = new() { Height = 160, Metric = GraphMetric.Memory };
+    readonly Button terminate, overflow;
+    readonly Dictionary<string, DataGridColumn> columns = [];
+    readonly HashSet<string> userColumns = [], userOverrides = [];
+    readonly HashSet<Window> ownedWindows = [];
+    bool applyingSelection, disposed, active, pausedByUser, compactCommands, searchSecondRow;
+    long pollEpoch, pageEpoch;
+    double processOffset, performanceOffset;
+    MonitorPage page;
+    public MonitorPage Page => page;
+    internal DataGrid ProcessTable => processes;
+    internal Grid Header => header;
+    internal MonitorViewModel Model => viewModel;
+
+    public MonitorView(ServerSession session) : this(new MonitorViewModel(), session) { }
+    // CI rendering uses the same composition with public data, no SSH or normal settings.
+    internal MonitorView(MonitorViewModel model) : this(model, null) { }
+    MonitorView(MonitorViewModel model, ServerSession? owner)
     {
-        this.session = session; monitor = new LinuxMonitor(async (command, ct) => { var r = await session.ExecuteAsync(command, ct); return new ExecResult(r.Output, r.Error, r.ExitStatus); });
-        DataContext = viewModel;
-        freshness.SetBinding(TextBlock.TextProperty, new Binding(nameof(MonitorViewModel.Freshness)));
-        summary.SetBinding(TextBlock.TextProperty, new Binding(nameof(MonitorViewModel.Summary)));
-        cpu.SetBinding(TextBlock.TextProperty, new Binding(nameof(MonitorViewModel.CpuText)));
-        memory.SetBinding(TextBlock.TextProperty, new Binding(nameof(MonitorViewModel.MemoryText)));
-        systemInfo.SetBinding(TextBlock.TextProperty, new Binding(nameof(MonitorViewModel.SystemInfo)));
-        limits.SetBinding(TextBlock.TextProperty, new Binding(nameof(MonitorViewModel.Limitations)));
-        networks.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MonitorViewModel.Networks)));
-        disks.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MonitorViewModel.Disks)));
-        storage.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MonitorViewModel.Storage)));
-        cpuGraph.SetBinding(MetricGraph.ValuesProperty, new Binding(nameof(MonitorViewModel.CpuHistory)));
-        memoryGraph.SetBinding(MetricGraph.ValuesProperty, new Binding(nameof(MonitorViewModel.MemoryHistory)));
-        processes.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MonitorViewModel.Processes)));
+        session = owner; viewModel = model; DataContext = model;
+        lifetime = owner is null ? new CancellationTokenSource() : CancellationTokenSource.CreateLinkedTokenSource(owner.Lifetime);
+        if (owner is not null) monitor = new LinuxMonitor(async (command, ct) => { var result = await owner.ExecuteAsync(command, ct); return new ExecResult(result.Output, result.Error, result.ExitStatus); });
+        SetResourceReference(BackgroundProperty, "Paper");
+        terminate = Ui.AsyncCommandButton(Ui.CloseGlyph, "Завершить задачу", () => Signal(15), "Завершить выбранный процесс (SIGTERM)");
+        terminate.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected)));
+        terminate.SetBinding(ToolTipProperty, new Binding(nameof(MonitorViewModel.SignalDisabledReason))); terminate.SetBinding(AutomationProperties.HelpTextProperty, new Binding(nameof(MonitorViewModel.SignalDisabledReason))); ToolTipService.SetShowOnDisabled(terminate, true);
+        if (owner is null) { terminate.IsEnabled = false; terminate.ToolTip = "Представление данных без SSH-сессии"; }
+        overflow = Ui.FlyoutButton(Ui.MoreGlyph, "", BuildOverflow, "Дополнительные действия");
+        BuildHeader();
+        BuildProcessTable();
+        BuildPerformance();
+        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var commandBar = new Border { Child = header }; commandBar.SetResourceReference(StyleProperty, "CommandBarStyle"); root.Children.Add(commandBar);
+        var processSurface = new Grid(); processSurface.Children.Add(processes); empty.HorizontalAlignment = HorizontalAlignment.Center; empty.VerticalAlignment = VerticalAlignment.Center; empty.Margin = new Thickness(24); empty.TextWrapping = TextWrapping.Wrap; empty.IsHitTestVisible = false; empty.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); processSurface.Children.Add(empty);
+        pages.Children.Add(processSurface); pages.Children.Add(performance); Grid.SetRow(pages, 1); root.Children.Add(pages);
+        var footer = new Grid(); footer.ColumnDefinitions.Add(new ColumnDefinition()); footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        status.SetBinding(TextBlock.TextProperty, new Binding(nameof(MonitorViewModel.StatusText))); status.SetBinding(ToolTipProperty, new Binding(nameof(MonitorViewModel.StatusDetails))); status.TextTrimming = TextTrimming.CharacterEllipsis; status.Margin = new Thickness(4, 0, 12, 0); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite); footer.Children.Add(status);
+        var details = Ui.CommandButton(Ui.PropertiesGlyph, "Сведения", ShowDataDetails, "Сведения о данных, ограничениях и последней ошибке"); details.Height = double.NaN; details.MinHeight = 24; details.Padding = new Thickness(8, 2, 8, 2); details.Margin = new Thickness(0); Grid.SetColumn(details, 1); footer.Children.Add(details);
+        var statusBar = new Border { Child = footer }; statusBar.SetResourceReference(StyleProperty, "StatusBarStyle"); Grid.SetRow(statusBar, 2); root.Children.Add(statusBar);
+        Content = root;
+        viewModel.PropertyChanged += ModelChanged; viewModel.ProcessesUpdated += ApplyProcesses; viewModel.Processes.CollectionChanged += ProcessesChanged;
+        Theme.Changed += PaletteChanged;
+        timer.Tick += async (_, _) => await Poll();
+        SizeChanged += (_, _) => UpdateResponsive();
+        PreviewKeyDown += OnKey;
+        ApplyPage(); ApplyProcesses(); UpdateEmpty(); UpdateResponsive();
+    }
+
+    void BuildHeader()
+    {
+        header.Margin = new Thickness(16, 8, 16, 8);
+        header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        title.SetResourceReference(StyleProperty, "MonitorPageTitleStyle"); title.Margin = new Thickness(4, 0, 20, 0); header.Children.Add(title);
+        searchHost.Margin = new Thickness(0, 0, 12, 0); search.Padding = new Thickness(32, 6, 10, 6); search.VerticalAlignment = VerticalAlignment.Center;
         search.SetBinding(TextBox.TextProperty, new Binding(nameof(MonitorViewModel.SearchQuery)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
-        viewModel.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MonitorViewModel.SelectedIdentity)) ApplyProcesses(); };
-        viewModel.ProcessesUpdated += ApplyProcesses;
-        processes.SelectionChanged += (_, _) => { if (!applyingProcesses) viewModel.SelectedIdentity = (processes.SelectedItem as ProcessItemViewModel)?.Metric.Identity; };
-        var root = new DockPanel(); root.SetResourceReference(Panel.BackgroundProperty, "Paper");
-        var header = new DockPanel { Margin = new Thickness(20, 10, 16, 10) }; var terminate = Ui.AsyncCommandButton(Ui.CloseGlyph, "Завершить задачу", () => Signal(15), "Завершить выбранный процесс (SIGTERM)"); terminate.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected)));
-        var more = Ui.FlyoutButton(Ui.MoreGlyph, "", () => { var menu = new ContextMenu { DataContext = viewModel }; var kill = Ui.AsyncMenu("Принудительно завершить (SIGKILL)…", () => Signal(9), glyph: Ui.CloseGlyph); kill.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected))); menu.Items.Add(kill); menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Открыть htop / top в терминале", OpenTop, glyph: Ui.TerminalGlyph)); return menu; }, "Дополнительные действия"); var buttons = Ui.Row(terminate, more); DockPanel.SetDock(buttons, Dock.Right); header.Children.Add(buttons); header.Children.Add(Ui.Text("Диспетчер задач", 18, true)); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        var footer = new StackPanel { Margin = new Thickness(18, 7, 18, 10) }; freshness.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); freshness.FontSize = 12; footer.Children.Add(freshness); var scale = Ui.Text(SystemMetric.CpuScale + ". Сеть измеряется по интерфейсам, не по процессам.", 12); scale.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); scale.TextWrapping = TextWrapping.Wrap; footer.Children.Add(scale); limits.TextWrapping = TextWrapping.Wrap; limits.FontSize = 12; footer.Children.Add(limits); DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
-        var tabs = new TabControl(); var processTab = new TabItem { Header = "Процессы" }; var performance = new TabItem { Header = "Производительность" }; tabs.Items.Add(processTab); tabs.Items.Add(performance); root.Children.Add(tabs);
-        var processRoot = new DockPanel(); var searchBar = new DockPanel { Margin = new Thickness(16, 8, 16, 8) }; var searchHost = new Grid { MinWidth = 180, MaxWidth = 440, Width = 350 }; search.Width = double.NaN; search.MinWidth = 0; search.Padding = new Thickness(32, 6, 10, 6); searchHost.Children.Add(search); var searchIcon = Ui.Icon(Ui.SearchGlyph, 14, false); searchIcon.IsHitTestVisible = false; searchIcon.HorizontalAlignment = HorizontalAlignment.Left; searchIcon.Margin = new Thickness(10, 0, 0, 0); searchIcon.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(searchIcon); var hint = Ui.Text("Имя, пользователь или PID", 13); hint.IsHitTestVisible = false; hint.Margin = new Thickness(32, 0, 10, 0); hint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(hint); search.TextChanged += (_, _) => hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; DockPanel.SetDock(searchHost, Dock.Right); searchBar.Children.Add(searchHost); summary.FontSize = 12; summary.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchBar.Children.Add(summary); DockPanel.SetDock(searchBar, Dock.Top); processRoot.Children.Add(searchBar); SizeChanged += (_, _) => searchHost.Width = Math.Clamp(ActualWidth * .42, 180, 440);
-        MainWindow.AddColumn(processes, "Имя", "Name", 240); processes.Columns[0].Width = new DataGridLength(1, DataGridLengthUnitType.Star); processes.Columns[0].MinWidth = 180; MainWindow.AddColumn(processes, "PID", "Pid", 72); MainWindow.AddColumn(processes, "Пользователь", "User", 110); MainWindow.AddColumn(processes, "Состояние", "State", 112);
-        processes.ColumnHeaderHeight = 60; AddMetricColumn("ЦП", "Cpu", "CpuText", 96, nameof(MonitorViewModel.CpuHeader)); AddMetricColumn("Память", "MemoryFraction", "MemoryText", 128, nameof(MonitorViewModel.MemoryHeader)); MainWindow.AddColumn(processes, "Чтение, Б/с", "ReadText", 130); MainWindow.AddColumn(processes, "Запись, Б/с", "WriteText", 130);
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Завершить процесс (SIGTERM)…", () => Signal(15), glyph: Ui.CloseGlyph), Ui.AsyncMenu("Принудительно завершить (SIGKILL)…", () => Signal(9), glyph: Ui.CloseGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected))); menu.Items.Add(item); } menu.Items.Add(Ui.Menu("Показать командную строку", ShowCommand, glyph: Ui.TerminalGlyph)); Ui.AttachContextMenu(processes, menu); processRoot.Children.Add(processes); processTab.Content = processRoot;
-        var perf = new StackPanel { Margin = new Thickness(20, 16, 20, 16) }; perf.Children.Add(Ui.Text("Видимое пространство имён Linux (хост или контейнер)", 14, true));
-        var graphGrid = new Grid { Margin = new Thickness(0, 16, 0, 16) }; graphGrid.ColumnDefinitions.Add(new ColumnDefinition()); graphGrid.ColumnDefinitions.Add(new ColumnDefinition());
-        var cpuPanel = new StackPanel { Margin = new Thickness(0, 0, 12, 0) }; cpuPanel.Children.Add(Ui.Text("ЦП")); cpuPanel.Children.Add(cpu); cpuPanel.Children.Add(cpuGraph); graphGrid.Children.Add(cpuPanel);
-        var memPanel = new StackPanel { Margin = new Thickness(12, 0, 0, 0) }; memPanel.Children.Add(Ui.Text("Память")); memPanel.Children.Add(memory); memPanel.Children.Add(memoryGraph); Grid.SetColumn(memPanel, 1); graphGrid.Children.Add(memPanel); perf.Children.Add(graphGrid);
-        systemInfo.TextWrapping = TextWrapping.Wrap; systemInfo.Margin = new Thickness(0, 0, 0, 16); perf.Children.Add(systemInfo);
-        MainWindow.AddColumn(networks, "Интерфейс", "Name", 160); MainWindow.AddColumn(networks, "Получение", "Receive", 190); MainWindow.AddColumn(networks, "Отправка", "Send", 190); networks.Height = 150; perf.Children.Add(Ui.Text("Сеть", 17, true)); perf.Children.Add(networks);
-        MainWindow.AddColumn(disks, "Устройство", "Name", 160); MainWindow.AddColumn(disks, "Чтение", "Read", 190); MainWindow.AddColumn(disks, "Запись", "Write", 190); disks.Height = 150; perf.Children.Add(Ui.Text("Дисковый ввод-вывод", 17, true)); perf.Children.Add(disks);
-        MainWindow.AddColumn(storage, "Файловая система", "FileSystem", 200); MainWindow.AddColumn(storage, "Точка монтирования", "MountPoint", 200); MainWindow.AddColumn(storage, "Всего", "Total", 140); MainWindow.AddColumn(storage, "Доступно", "Available", 140); storage.Height = 150; perf.Children.Add(Ui.Text("Место на дисках", 17, true)); perf.Children.Add(storage);
-        performance.Content = new ScrollViewer { Content = perf, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; Content = root;
-        timer.Interval = TimeSpan.FromSeconds(App.Store.Settings.PollIntervalSeconds); timer.Tick += async (_, _) => await Poll();
+        AutomationProperties.SetName(search, "Поиск процессов по имени, пользователю или PID");
+        searchHost.Children.Add(search); var icon = Ui.Icon(Ui.SearchGlyph, 14, false); icon.HorizontalAlignment = HorizontalAlignment.Left; icon.IsHitTestVisible = false; icon.Margin = new Thickness(10, 0, 0, 0); icon.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(icon);
+        var hint = Ui.Text("Имя, пользователь или PID"); hint.Margin = new Thickness(32, 0, 10, 0); hint.IsHitTestVisible = false; hint.TextTrimming = TextTrimming.CharacterEllipsis; hint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(hint);
+        search.TextChanged += (_, _) => hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        Grid.SetColumn(searchHost, 1); header.Children.Add(searchHost);
+        var actions = Ui.Row(terminate, overflow); Grid.SetColumn(actions, 2); header.Children.Add(actions);
     }
-    void AddMetricColumn(string title, string metric, string text, double width, string aggregateBinding)
+
+    void BuildProcessTable()
     {
-        var header = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, DataContext = viewModel }; var total = Ui.Text("", 20); total.HorizontalAlignment = HorizontalAlignment.Right; total.SetBinding(TextBlock.TextProperty, new Binding(aggregateBinding)); header.Children.Add(total); var caption = Ui.Text(title, 12); caption.HorizontalAlignment = HorizontalAlignment.Right; caption.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); header.Children.Add(caption);
-        var border = new FrameworkElementFactory(typeof(Border)); border.SetBinding(Border.BackgroundProperty, new Binding(metric) { Converter = new HeatConverter() }); border.SetValue(Border.PaddingProperty, new Thickness(10, 5, 10, 5)); var label = new FrameworkElementFactory(typeof(TextBlock)); label.SetBinding(TextBlock.TextProperty, new Binding(text)); label.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right); border.AppendChild(label); processes.Columns.Add(new DataGridTemplateColumn { Header = header, CellTemplate = new DataTemplate { VisualTree = border }, SortMemberPath = metric, Width = width, HeaderStyle = new Style(typeof(DataGridColumnHeader), (Style)FindResource(typeof(DataGridColumnHeader))) { Setters = { new Setter(HorizontalContentAlignmentProperty, HorizontalAlignment.Right) } } });
+        processes.SetResourceReference(StyleProperty, "ProcessTableStyle"); processes.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MonitorViewModel.Processes))); processes.SelectionMode = DataGridSelectionMode.Single;
+        var nameRow = new FrameworkElementFactory(typeof(DockPanel)); nameRow.SetValue(DockPanel.LastChildFillProperty, true);
+        var icon = new FrameworkElementFactory(typeof(ProcessIcon)); icon.SetValue(MarginProperty, new Thickness(0, 0, 8, 0)); icon.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetValue(DockPanel.DockProperty, Dock.Left); nameRow.AppendChild(icon);
+        var label = new FrameworkElementFactory(typeof(TextBlock)); label.SetBinding(TextBlock.TextProperty, new Binding(nameof(ProcessItemViewModel.Name))); label.SetBinding(ToolTipProperty, new Binding(nameof(ProcessItemViewModel.Name))); label.SetBinding(AutomationProperties.NameProperty, new Binding(nameof(ProcessItemViewModel.Name))); label.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); label.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); nameRow.AppendChild(label);
+        AddColumn("Name", new DataGridTemplateColumn { Header = "Имя", CellTemplate = new DataTemplate { VisualTree = nameRow }, SortMemberPath = nameof(ProcessItemViewModel.Name), MinWidth = 180, Width = new DataGridLength(1, DataGridLengthUnitType.Star) }, true);
+        AddTextColumn("Pid", "PID", nameof(ProcessItemViewModel.Pid), 78, true);
+        AddTextColumn("User", "Пользователь", nameof(ProcessItemViewModel.User), 120, false);
+        AddTextColumn("State", "Состояние", nameof(ProcessItemViewModel.State), 120, true);
+        AddMetricColumn("Cpu", "ЦП", nameof(ProcessItemViewModel.Cpu), nameof(ProcessItemViewModel.CpuText), nameof(ProcessItemViewModel.CpuReason), 96, nameof(MonitorViewModel.CpuHeader), nameof(MonitorViewModel.CpuReason));
+        AddMetricColumn("Memory", "Память", nameof(ProcessItemViewModel.MemoryFraction), nameof(ProcessItemViewModel.MemoryText), nameof(ProcessItemViewModel.MemoryReason), 126, nameof(MonitorViewModel.MemoryHeader), nameof(MonitorViewModel.MemoryReason));
+        columns["Memory"].SortMemberPath = nameof(ProcessItemViewModel.MemoryBytes);
+        AddTextColumn("Read", "Чтение", nameof(ProcessItemViewModel.ReadText), 118, false, nameof(ProcessItemViewModel.ReadBytesPerSecond), nameof(ProcessItemViewModel.ReadReason));
+        AddTextColumn("Write", "Запись", nameof(ProcessItemViewModel.WriteText), 118, false, nameof(ProcessItemViewModel.WriteBytesPerSecond), nameof(ProcessItemViewModel.WriteReason));
+        processes.SelectionChanged += (_, _) => { if (!applyingSelection) viewModel.SelectedIdentity = (processes.SelectedItem as ProcessItemViewModel)?.Metric.Identity; };
+        Ui.AttachContextMenu(processes, BuildProcessMenu);
     }
-    public void SetActive(bool value)
+
+    void AddColumn(string key, DataGridColumn column, bool visible)
     {
-        active = value; if (value && !disposed) { timer.Interval = TimeSpan.FromSeconds(Math.Clamp(App.Store.Settings.PollIntervalSeconds, 1, 60)); timer.Start(); _ = Poll(); } else timer.Stop();
+        column.HeaderStyle = (Style)FindResource("ProcessColumnHeaderStyle"); columns[key] = column; processes.Columns.Add(column); if (visible) userColumns.Add(key); column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+    void AddTextColumn(string key, string caption, string text, double width, bool visible, string? numericSort = null, string? reason = null)
+    {
+        var column = new DataGridTextColumn { Header = caption, Width = width, MinWidth = 56, SortMemberPath = numericSort ?? text, Binding = new Binding(text) };
+        var style = new Style(typeof(TextBlock)); style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center)); style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+        if (key is "Pid" or "Read" or "Write") style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        if (reason is not null) { style.Setters.Add(new Setter(ToolTipProperty, new Binding(reason))); style.Setters.Add(new Setter(AutomationProperties.HelpTextProperty, new Binding(reason))); }
+        column.ElementStyle = style; AddColumn(key, column, visible);
+    }
+    void AddMetricColumn(string key, string caption, string metric, string text, string reason, double width, string aggregate, string aggregateReason)
+    {
+        var heading = new StackPanel { DataContext = viewModel, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var total = Ui.Text("", 20); total.TextAlignment = TextAlignment.Right; total.SetBinding(TextBlock.TextProperty, new Binding(aggregate)); total.SetBinding(ToolTipProperty, new Binding(aggregateReason)); total.SetBinding(AutomationProperties.HelpTextProperty, new Binding(aggregateReason)); heading.Children.Add(total);
+        var name = Ui.Text(caption, 12); name.TextAlignment = TextAlignment.Right; name.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); heading.Children.Add(name);
+        var cell = new Style(typeof(DataGridCell), (Style)FindResource("ProcessMetricCellStyle")); cell.Setters.Add(new Setter(AutomationProperties.HelpTextProperty, new Binding(reason)));
+        var border = new FrameworkElementFactory(typeof(Border), "MetricSurface"); border.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Stretch); border.SetValue(VerticalAlignmentProperty, VerticalAlignment.Stretch); border.SetValue(Border.PaddingProperty, new Thickness(10, 4, 10, 4));
+        var heat = new MultiBinding { Converter = new MetricHeatConverter() }; heat.Bindings.Add(new Binding(metric)); heat.Bindings.Add(new Binding(nameof(DataGridRow.IsSelected)) { RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridRow), 1) }); heat.Bindings.Add(new Binding(nameof(DataGridRow.IsMouseOver)) { RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridRow), 1) }); heat.Bindings.Add(new Binding(nameof(PaletteRevision)) { RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(MonitorView), 1) }); heat.Bindings.Add(new Binding(nameof(ProcessItemViewModel.IsStale))); border.SetBinding(Border.BackgroundProperty, heat); border.SetBinding(ToolTipProperty, new Binding(reason));
+        var value = new FrameworkElementFactory(typeof(TextBlock), "MetricValue"); value.SetResourceReference(StyleProperty, "ProcessValueStyle"); value.SetBinding(TextBlock.TextProperty, new Binding(text)); value.SetBinding(AutomationProperties.HelpTextProperty, new Binding(reason)); value.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right); value.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); border.AppendChild(value);
+        AddColumn(key, new DataGridTemplateColumn { Header = heading, CellTemplate = new DataTemplate { VisualTree = border }, CellStyle = cell, SortMemberPath = metric, Width = width, MinWidth = 76 }, true);
+    }
+
+    void BuildPerformance()
+    {
+        cpuGraph.SetBinding(MetricGraph.HistoryProperty, new Binding(nameof(MonitorViewModel.History))); memoryGraph.SetBinding(MetricGraph.HistoryProperty, new Binding(nameof(MonitorViewModel.History)));
+        resources.Children.Add(ResourcePanel("ЦП", nameof(MonitorViewModel.CpuText), nameof(MonitorViewModel.CpuReason), cpuGraph));
+        resources.Children.Add(ResourcePanel("Память", nameof(MonitorViewModel.MemoryText), nameof(MonitorViewModel.MemoryReason), memoryGraph));
+        var body = new StackPanel { Margin = new Thickness(20, 16, 20, 16) }; body.Children.Add(resources);
+        AddPerformanceTable(body, "Сеть", networks, nameof(MonitorViewModel.Networks), [("Интерфейс", "Name", 150), ("Получение", "Receive", 170), ("Отправка", "Send", 170)]);
+        AddPerformanceTable(body, "Дисковый ввод-вывод", disks, nameof(MonitorViewModel.Disks), [("Устройство", "Name", 150), ("Чтение", "Read", 170), ("Запись", "Write", 170)]);
+        AddPerformanceTable(body, "Хранилища", storage, nameof(MonitorViewModel.Storage), [("Файловая система", "FileSystem", 170), ("Точка монтирования", "MountPoint", 180), ("Всего", "Total", 130), ("Доступно", "Available", 130)]);
+        performance.Content = body;
+    }
+    FrameworkElement ResourcePanel(string caption, string valueProperty, string reasonProperty, MetricGraph graph)
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 0, 16, 16) };
+        var row = new DockPanel(); var value = Ui.Text("", 24, true); value.HorizontalAlignment = HorizontalAlignment.Right; value.SetBinding(TextBlock.TextProperty, new Binding(valueProperty)); value.SetBinding(ToolTipProperty, new Binding(reasonProperty)); value.SetBinding(AutomationProperties.HelpTextProperty, new Binding(reasonProperty)); DockPanel.SetDock(value, Dock.Right); row.Children.Add(value); row.Children.Add(Ui.Text(caption, 18, true)); panel.Children.Add(row);
+        var scale = Ui.Text("100%", 12); scale.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); scale.Margin = new Thickness(0, 10, 0, 4); panel.Children.Add(scale); panel.Children.Add(graph);
+        var axis = new DockPanel { Margin = new Thickness(0, 4, 0, 0) }; var zero = Ui.Text("0%", 12); zero.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); axis.Children.Add(zero); var interval = Ui.Text(graph.IntervalLabel, 12); interval.TextAlignment = TextAlignment.Right; interval.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); axis.Children.Add(interval); graph.IntervalChanged += () => interval.Text = graph.IntervalLabel; panel.Children.Add(axis);
+        return panel;
+    }
+    void AddPerformanceTable(Panel parent, string caption, DataGrid table, string source, (string Caption, string Property, double Width)[] fields)
+    {
+        var name = Ui.Text(caption, 18, true); name.Margin = new Thickness(0, 12, 0, 6); parent.Children.Add(name);
+        table.SetResourceReference(StyleProperty, "ProcessTableStyle"); table.ColumnHeaderHeight = 36; table.MaxHeight = 180; table.MinHeight = 76;
+        table.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(source));
+        foreach (var field in fields) MainWindow.AddColumn(table, field.Caption, field.Property, field.Width);
+        parent.Children.Add(table);
+    }
+
+    public void SetPage(MonitorPage value)
+    {
+        if (disposed || page == value) return;
+        if (page == MonitorPage.Processes) processOffset = FindScroll(processes)?.VerticalOffset ?? processOffset; else performanceOffset = performance.VerticalOffset;
+        page = value; ApplyPage();
+        var version = ++pageEpoch;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (disposed || version != pageEpoch) return; if (page == MonitorPage.Processes) FindScroll(processes)?.ScrollToVerticalOffset(processOffset); else performance.ScrollToVerticalOffset(performanceOffset); });
+    }
+    void ApplyPage()
+    {
+        pages.Children[0].Visibility = page == MonitorPage.Processes ? Visibility.Visible : Visibility.Collapsed;
+        performance.Visibility = page == MonitorPage.Performance ? Visibility.Visible : Visibility.Collapsed;
+        title.Text = page == MonitorPage.Processes ? "Процессы" : "Производительность"; searchHost.Visibility = page == MonitorPage.Processes ? Visibility.Visible : Visibility.Collapsed;
+        UpdateResponsive(); UpdateGraphTime();
+    }
+    void UpdateResponsive()
+    {
+        var width = ActualWidth > 0 ? ActualWidth : 1000;
+        compactCommands = width < 780;
+        terminate.Visibility = page == MonitorPage.Processes && !compactCommands ? Visibility.Visible : Visibility.Collapsed;
+        var second = width < 500 && page == MonitorPage.Processes;
+        if (second != searchSecondRow)
+        {
+            searchSecondRow = second; Grid.SetRow(searchHost, second ? 1 : 0); Grid.SetColumn(searchHost, second ? 0 : 1); Grid.SetColumnSpan(searchHost, second ? 3 : 1); searchHost.Margin = second ? new Thickness(4, 8, 4, 0) : new Thickness(0, 0, 12, 0);
+        }
+        resources.Columns = width < 680 ? 1 : 2;
+        foreach (var key in new[] { "Pid", "User", "State", "Read", "Write" })
+            columns[key].Visibility = userColumns.Contains(key) && (userOverrides.Contains(key) || width >= (key is "Pid" or "State" ? 650 : 900)) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    ContextMenu BuildOverflow()
+    {
+        var menu = new ContextMenu { DataContext = viewModel };
+        if (page == MonitorPage.Processes)
+        {
+            if (compactCommands) menu.Items.Add(SignalItem("Завершить задачу (SIGTERM)…", 15));
+            menu.Items.Add(SignalItem("Принудительно завершить (SIGKILL)…", 9)); menu.Items.Add(new Separator());
+            var choose = new MenuItem { Header = "Выбрать столбцы", Icon = Ui.Icon(Ui.ViewGlyph, 16, false) };
+            foreach (var (key, column) in columns)
+            {
+                var item = new MenuItem { Header = key switch { "Cpu" => "ЦП", "Memory" => "Память", _ => column.Header }, IsCheckable = true, IsChecked = column.Visibility == Visibility.Visible, IsEnabled = key is not "Name" and not "Cpu" and not "Memory" };
+                item.Click += (_, _) => { userOverrides.Add(key); if (item.IsChecked) userColumns.Add(key); else userColumns.Remove(key); UpdateResponsive(); }; choose.Items.Add(item);
+            }
+            menu.Items.Add(choose); var details = Ui.Menu("Сведения о выбранном процессе", ShowProcessDetails, "Alt+Enter", Ui.PropertiesGlyph); details.IsEnabled = viewModel.SelectedIdentity is not null; menu.Items.Add(details); menu.Items.Add(new Separator());
+        }
+        var refresh = Ui.AsyncMenu("Обновить сейчас", Poll, "F5", Ui.RefreshGlyph); refresh.IsEnabled = monitor is not null && viewModel.IsActive && !viewModel.IsBusy; menu.Items.Add(refresh);
+        var pause = Ui.Menu(pausedByUser ? "Продолжить обновление" : "Приостановить обновление", () => { pausedByUser = !pausedByUser; ApplyPolling(); }, glyph: pausedByUser ? "\uE768" : "\uE769"); pause.IsEnabled = monitor is not null; menu.Items.Add(pause);
+        var top = Ui.AsyncMenu("Открыть htop / top в терминале", OpenTop, glyph: Ui.TerminalGlyph); top.IsEnabled = session?.ShellAvailable == true; menu.Items.Add(top);
+        menu.Items.Add(Ui.Menu("Сведения о данных", ShowDataDetails, "F1", Ui.PropertiesGlyph)); return menu;
+    }
+    ContextMenu BuildProcessMenu()
+    {
+        var menu = new ContextMenu { DataContext = viewModel }; menu.Items.Add(SignalItem("Завершить процесс (SIGTERM)…", 15)); menu.Items.Add(SignalItem("Принудительно завершить (SIGKILL)…", 9)); menu.Items.Add(new Separator());
+        var info = Ui.Menu("Сведения о процессе", ShowProcessDetails, "Alt+Enter", Ui.PropertiesGlyph); info.IsEnabled = viewModel.SelectedIdentity is not null; menu.Items.Add(info); return menu;
+    }
+    MenuItem SignalItem(string caption, int signal)
+    {
+        var item = Ui.AsyncMenu(caption, () => Signal(signal), glyph: Ui.CloseGlyph); item.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected))); item.SetBinding(ToolTipProperty, new Binding(nameof(MonitorViewModel.SignalDisabledReason))); item.SetBinding(AutomationProperties.HelpTextProperty, new Binding(nameof(MonitorViewModel.SignalDisabledReason))); ToolTipService.SetShowOnDisabled(item, true); if (session is null) item.IsEnabled = false; return item;
+    }
+
+    public void SetActive(bool value) { if (disposed) return; active = value; ApplyPolling(); }
+    void ApplyPolling()
+    {
+        var effective = active && !pausedByUser;
+        if (viewModel.IsActive == effective && (timer.IsEnabled || !effective || monitor is null)) return;
+        ++pollEpoch; viewModel.IsActive = effective; timer.Stop(); UpdateGraphTime();
+        if (!effective) { monitor?.MarkGap(DateTimeOffset.UtcNow, pausedByUser ? "Обновление приостановлено пользователем" : "Раздел мониторинга скрыт"); return; }
+        if (monitor is null) return;
+        var interval = TimeSpan.FromSeconds(Math.Clamp(App.Store.Settings.PollIntervalSeconds, 1, 60)); monitor.ExpectedInterval = interval; timer.Interval = interval; cpuGraph.GapThreshold = memoryGraph.GapThreshold = TimeSpan.FromSeconds(Math.Max(3, interval.TotalSeconds * 2.5)); timer.Start(); _ = Poll();
     }
     async Task Poll()
     {
-        if (disposed || !active || busy) return; busy = true;
+        if (disposed || monitor is null || !viewModel.IsActive || viewModel.IsBusy) return;
+        var epoch = pollEpoch; viewModel.IsBusy = true;
         try
         {
-            var sample = await monitor.SampleAsync(lifetime.Token); if (disposed) return;
-            viewModel.ApplySnapshot(sample, monitor.History);
+            var sample = await monitor.SampleAsync(lifetime.Token);
+            if (disposed || epoch != pollEpoch || !viewModel.IsActive) return;
+            viewModel.ApplySnapshot(sample, monitor.History); UpdateGraphTime();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (Exception ex) { viewModel.ReportFailure(ErrorMessages.Describe(ex)); }
-        finally { busy = false; }
+        catch (Exception ex) { if (!disposed && epoch == pollEpoch && viewModel.IsActive) { viewModel.ReportFailure(ErrorMessages.Describe(ex), monitor.History); UpdateGraphTime(); } }
+        finally { if (!disposed) viewModel.IsBusy = false; }
     }
     void ApplyProcesses()
     {
-        if (applyingProcesses) return; applyingProcesses = true;
+        if (disposed || applyingSelection) return; applyingSelection = true;
         try
         {
             var view = CollectionViewSource.GetDefaultView(processes.ItemsSource);
@@ -95,43 +262,77 @@ public sealed class MonitorView : UserControl, IDisposable
             var selected = viewModel.Processes.FirstOrDefault(x => x.Metric.Identity == viewModel.SelectedIdentity);
             if (!ReferenceEquals(processes.SelectedItem, selected)) processes.SelectedItem = selected;
         }
-        finally { applyingProcesses = false; }
+        finally { applyingSelection = false; }
+        UpdateEmpty();
     }
+    void ModelChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(MonitorViewModel.SelectedIdentity)) ApplyProcesses();
+        if (args.PropertyName is nameof(MonitorViewModel.Snapshot) or nameof(MonitorViewModel.HasError) or nameof(MonitorViewModel.SearchQuery) or nameof(MonitorViewModel.IsActive)) UpdateEmpty();
+    }
+    void ProcessesChanged(object? sender, NotifyCollectionChangedEventArgs args) => UpdateEmpty();
+    void UpdateEmpty()
+    {
+        empty.Visibility = viewModel.Processes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        empty.Text = viewModel.Snapshot is null ? viewModel.HasError ? "Не удалось получить процессы" : !viewModel.IsActive ? "Обновление приостановлено" : "Собираем данные…" : search.Text.Length > 0 ? "Нет совпадений" : "Нет доступных процессов";
+    }
+    void UpdateGraphTime() { cpuGraph.Now = memoryGraph.Now = DateTimeOffset.UtcNow; }
+
     async Task Signal(int signal)
     {
-        if (processes.SelectedItem is not ProcessItemViewModel row) return;
-        if (!Ui.Confirm($"{(signal == 9 ? "ПРИНУДИТЕЛЬНО завершить (SIGKILL)" : "Завершить (SIGTERM)")} процесс «{row.Name}», PID {row.Pid}, пользователь {row.User}?\n\nСервер: {session.Profile.Name}\nПеред сигналом повторно проверяются start time и UID. Между проверкой и сигналом остаётся небольшая гонка PID. Автоматического sudo нет.")) return;
+        if (monitor is null || !viewModel.CanSignalSelected || processes.SelectedItem is not ProcessItemViewModel row) return;
+        if (!Ui.Confirm($"{(signal == 9 ? "Принудительно завершить (SIGKILL)" : "Завершить (SIGTERM)")} процесс «{row.Name}», PID {row.Pid}, пользователь {row.User}?\n\nСервер: {session!.Profile.Name}\nИдентичность и права будут повторно проверены сервером. Автоматического sudo нет.")) return;
         await monitor.SignalAsync(row.Metric.Identity, signal, lifetime.Token); await Poll();
     }
-    void ShowCommand()
+    void ShowDataDetails() => ShowReadOnly("Сведения о данных", viewModel.StatusDetails + "\n\n" + viewModel.DataDetails + "\n\nИстория: " + cpuGraph.IntervalLabel + ". Пустые интервалы обозначают отсутствие измерений.");
+    void ShowProcessDetails()
     {
-        if (processes.SelectedItem is not ProcessItemViewModel row) return; var w = new Window { Title = $"PID {row.Pid}: командная строка", Width = 760, Height = 300, Owner = Window.GetWindow(this), WindowStartupLocation = WindowStartupLocation.CenterOwner }; w.Content = new TextBox { IsReadOnly = true, Text = row.Metric.CommandLine ?? "Недоступно: нет прав или процесс завершился.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(18), VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; w.Show();
+        if (processes.SelectedItem is not ProcessItemViewModel row) return;
+        ShowReadOnly($"PID {row.Pid} — сведения", $"{row.Name}\nПользователь: {row.User}\nСостояние: {row.State}\n\nЦП: {row.CpuText}\n{row.CpuReason}\n\nПамять: {row.MemoryText}\n{row.MemoryReason}\n\nЧтение: {row.ReadText}\n{row.ReadReason}\n\nЗапись: {row.WriteText}\n{row.WriteReason}\n\nКомандная строка:\n{row.Metric.CommandLine ?? "Нет доступа или процесс завершился"}");
+    }
+    void ShowReadOnly(string caption, string text)
+    {
+        var window = new Window { Title = caption, Width = 730, Height = 500, Owner = Window.GetWindow(this), WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        window.Content = new TextBox { Text = text, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(20), VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Track(window); window.Show();
     }
     async Task OpenTop()
     {
+        if (monitor is null || session?.ShellAvailable != true) return;
         var caps = await monitor.GetCapabilitiesAsync(lifetime.Token); var command = caps.HasHtop ? "htop" : caps.HasTop ? "top" : null;
-        if (command is null) { Ui.Error("На сервере нет доступных htop и top. Графический монитор продолжает работать без них."); return; }
+        if (command is null) { Ui.Error("На сервере нет доступных htop и top."); return; }
         if (!caps.HasHtop && !Ui.Confirm("htop отсутствует. Открыть установленный top в отдельном терминале?")) return;
-        var w = new Window { Title = session.Profile.Name + " — " + command, Width = 1050, Height = 650, Owner = Window.GetWindow(this), WindowStartupLocation = WindowStartupLocation.CenterOwner }; var terminal = new TerminalView(session); w.Content = terminal; var registration = session.Lifetime.Register(() => Dispatcher.BeginInvoke(() => { if (w.IsLoaded) w.Close(); })); w.Closed += (_, _) => { registration.Dispose(); terminal.Dispose(); }; w.Show(); await terminal.StartAsync(); await terminal.SendTextAsync(command + "\r");
+        var window = new Window { Title = session.Profile.Name + " — " + command, Width = 1050, Height = 650, Owner = Window.GetWindow(this), WindowStartupLocation = WindowStartupLocation.CenterOwner }; var terminal = new TerminalView(session); window.Content = terminal; window.Closed += (_, _) => terminal.Dispose(); Track(window); window.Show(); await terminal.StartAsync(); await terminal.SendTextAsync(command + "\r");
     }
-    public void Dispose() { disposed = true; timer.Stop(); lifetime.Cancel(); lifetime.Dispose(); }
-    sealed class HeatConverter : IValueConverter
+    void Track(Window window) { ownedWindows.Add(window); window.Closed += (_, _) => ownedWindows.Remove(window); }
+    void OnKey(object sender, KeyEventArgs args)
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => !SystemParameters.HighContrast && value is double n && Application.Current.TryFindResource("Accent") is SolidColorBrush accent ? new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(12 + n * 1.8, 12, 150), accent.Color.R, accent.Color.G, accent.Color.B)) : Brushes.Transparent;
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+        if (Keyboard.Modifiers == ModifierKeys.Control && args.Key == Key.F && page == MonitorPage.Processes) { args.Handled = true; search.Focus(); search.SelectAll(); }
+        else if (args.Key == Key.F1) { args.Handled = true; ShowDataDetails(); }
+        else if (args.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Alt) { args.Handled = true; ShowProcessDetails(); }
+        else if (args.Key == Key.F5 && monitor is not null) { args.Handled = true; _ = Ui.Guard(Poll); }
+    }
+    void PaletteChanged() { PaletteRevision = unchecked(PaletteRevision + 1); cpuGraph.InvalidateVisual(); memoryGraph.InvalidateVisual(); processes.InvalidateVisual(); }
+    static ScrollViewer? FindScroll(DependencyObject parent)
+    {
+        if (parent is ScrollViewer viewer) return viewer;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++) if (FindScroll(VisualTreeHelper.GetChild(parent, i)) is { } found) return found;
+        return null;
+    }
+    public void Dispose()
+    {
+        if (disposed) return; disposed = true; ++pollEpoch; ++pageEpoch; timer.Stop(); lifetime.Cancel();
+        viewModel.PropertyChanged -= ModelChanged; viewModel.ProcessesUpdated -= ApplyProcesses; viewModel.Processes.CollectionChanged -= ProcessesChanged; Theme.Changed -= PaletteChanged;
+        foreach (var window in ownedWindows.ToArray()) if (window.IsLoaded) window.Close(); ownedWindows.Clear(); lifetime.Dispose();
+    }
+
+    sealed class MetricHeatConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (SystemParameters.HighContrast || values[0] is not double number || !double.IsFinite(number) || values[1] is true || values[2] is true || values[4] is true || Application.Current.TryFindResource("Accent") is not SolidColorBrush accent) return Brushes.Transparent;
+            var brush = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(12 + Math.Clamp(number, 0, 100) * 1.5, 12, 162), accent.Color.R, accent.Color.G, accent.Color.B)); brush.Freeze(); return brush;
+        }
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
     }
 }
-
-public sealed class MetricGraph : FrameworkElement
-{
-    public static readonly DependencyProperty ValuesProperty = DependencyProperty.Register(nameof(Values), typeof(double?[]), typeof(MetricGraph), new FrameworkPropertyMetadata(Array.Empty<double?>(), FrameworkPropertyMetadataOptions.AffectsRender));
-    public double?[] Values { get => (double?[])GetValue(ValuesProperty); set => SetValue(ValuesProperty, value); }
-    protected override void OnRender(DrawingContext dc)
-    {
-        base.OnRender(dc); var w = ActualWidth; var h = ActualHeight; var edge = (Brush)FindResource("Edge"); var accent = (Brush)FindResource("Accent"); dc.DrawRectangle((Brush)FindResource("Paper"), new Pen(edge, 1), new Rect(0, 0, w, h));
-        for (var i = 1; i < 5; i++) dc.DrawLine(new Pen(edge, .5), new Point(0, h * i / 5), new Point(w, h * i / 5));
-        for (var i = 1; i < 6; i++) dc.DrawLine(new Pen(edge, .5), new Point(w * i / 6, 0), new Point(w * i / 6, h));
-        var values = Values; Point? previous = null; for (var i = 0; i < values.Length; i++) { if (values[i] is not { } value) { previous = null; continue; } var point = new Point(w * (1 - (values.Length - 1 - i) / (double)Math.Max(119, values.Length - 1)), h * (1 - Math.Clamp(value, 0, 100) / 100)); if (previous is { } p) dc.DrawLine(new Pen(accent, 1.8), p, point); previous = point; }
-    }
-}
-

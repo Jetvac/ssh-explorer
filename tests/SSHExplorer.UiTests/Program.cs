@@ -11,8 +11,16 @@ internal static class Program
         if (args.Length == 1 && args[0] == "--resources-only") return ThemeResourceTests.Run();
         if (args.Length == 1 && args[0] == "--motion-only") return MotionTests.Run();
         if (args.Length == 1 && args[0] == "--connection-only") return ConnectionTests.Run();
+        if (args.Length == 1 && args[0] == "--monitor-graph-only") return MonitorUiTests.GraphOnly();
+        if (args.Length == 1 && args[0] == "--drag-payload-only") return DragPayloadTests.Run();
+        if (args.Length == 1 && args[0] == "--monitor-state-only")
+        {
+            try { int count=MonitorStateTests.Run(Assert);Console.WriteLine($"RESULT: {count} monitor state/history assertions passed; no Application, Window or SSH created");return 0; }
+            catch(Exception ex){Console.WriteLine(ex);return 1;}
+        }
+        if (args.Length > 0 && args[0] == "--monitor-ui-only") return MonitorUiTests.Run(args.Skip(1).ToArray());
         if (!string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase))
-        { Console.Error.WriteLine("Window checks require CI; use --resources-only, --motion-only or --connection-only for headless checks."); return 2; }
+        { Console.Error.WriteLine("Window checks require CI; use --resources-only, --motion-only, --connection-only, --monitor-graph-only or --monitor-state-only for headless checks."); return 2; }
         try
         {
             var app = TestApplication.Create(); Theme.Apply("Light");

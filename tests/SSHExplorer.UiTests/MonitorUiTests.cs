@@ -1,0 +1,157 @@
+using System.ComponentModel;
+using System.IO;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
+using SSHExplorer.App;
+using SSHExplorer.App.ViewModels;
+using SSHExplorer.Core;
+using SSHExplorer.Monitoring;
+
+internal static class MonitorUiTests
+{
+    static readonly DateTimeOffset Now=new(2026,11,3,12,0,0,TimeSpan.Zero);
+    public static int GraphOnly()
+    {
+        try{int count=GraphChecks(Check);Console.WriteLine($"RESULT: {count} timestamp/gap geometry checks passed; no Application, Window, HWND or SSH created");return 0;}
+        catch(Exception ex){Console.WriteLine(ex);return 1;}
+    }
+    public static int Run(string[] args)
+    {
+        CiVisualEvidence.RequireCi();
+        try
+        {
+            var app=TestApplication.Create();Theme.Apply("Light");int checks=0;
+            void Assert(bool value,string text){Check(value,text);checks++;}
+            var evidence=new CiVisualEvidence(Value(args,"--render-dir")??"artifacts/ui-beta3-after");
+            checks+=GraphChecks(Check);
+            var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","monitor-ui-store",Guid.NewGuid().ToString("N")));
+            typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);
+            var profile=new ServerProfile{Name="Linux · UI fixture",Host="127.0.0.1",Username="fixture"};
+            store.Profiles.Add(profile);var session=new ServerSession(profile,store);var main=new MainWindow{Width=1320,Height=850,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-10000,Top=-10000};
+            using var files=new FileBrowserView(session,main);var fileModel=(FileBrowserViewModel)files.DataContext;
+            var entries=Enumerable.Range(0,180).Select(i=>new RemoteEntry{Name=$"document-{i:000}.txt",FullPath=$"/srv/fixture/document-{i:000}.txt",IsRegularFile=true,Length=4096+i}).ToArray();
+            fileModel.CommitNavigation(fileModel.BeginNavigation(),"/srv/fixture",entries,true,[],0);fileModel.ApplyFilter(true,true);Invoke(files,"ApplyItems");
+            var tree=(TreeView)Field(files,"tree");tree.Items.Clear();var root=Node(files,"Корень /","/");var folder=Node(files,"fixture","/srv/fixture");root.Items.Clear();folder.Items.Clear();Ui.SetIsCurrentFolder(folder,true);root.Items.Add(folder);tree.Items.Add(root);root.IsExpanded=folder.IsExpanded=true;
+            var model=new MonitorViewModel(()=>Now);using var accentProbe=new AccentProbe();using var monitor=new MonitorView(model);model.ApplySnapshot(Sample(),History());
+            var view=new SessionView(session,main,files,monitor);view.SetActive(false);
+            typeof(MainWindow).GetMethod("AddSessionTab",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(main,[profile,session,view]);
+            main.Show();view.SetActive(false);view.ShowSection("processes");Layout(main);SetGraphTime(monitor);
+            Assert(!Descendants<TabControl>(monitor).Any(),"process/performance pages do not introduce a second server-style TabControl");
+            Assert(!Ui.GetIsFileSectionActive(files.Navigation)&&Ui.GetIsCurrentFolder(folder),"monitor navigation keeps the remembered folder while marking file section inactive");
+            var navigation=(Dictionary<string,Button>)Field(view,"navigationButtons");
+            Assert(Ui.GetIsNavigationActive(navigation["processes"])&&!Ui.GetIsNavigationActive(navigation["files"]),"exact process subpage is active while files remain inactive");
+            Assert(navigation.Values.All(button=>!Ancestors<ScrollViewer>(button).Any()),"long tree scrolling cannot carry fixed section navigation out of view");
+            Assert(Descendants<ScrollViewer>(tree).Count()==1,"folder tree has one native scrolling region without an outer competing ScrollViewer");
+            CheckHeader(monitor,Assert);
+            var table=monitor.ProcessTable;Layout(main);
+            var warmup=Sample() with{System=Sample().System with{CpuPercent=null},Processes=Sample().Processes.Select(p=>p with{CpuPercent=null,ReadBytesPerSecond=null,WriteBytesPerSecond=null}).ToArray()};
+            model.IsActive=true;model.IsBusy=true;model.ApplySnapshot(warmup,[]);Layout(main);
+            var firstRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromIndex(0)!;var unknownCpu=Descendants<DataGridCell>(firstRow).Single(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.Cpu));
+            var unknownSurface=Descendants<Border>(unknownCpu).Single(b=>b.Name=="MetricSurface");var unknownValue=Descendants<TextBlock>(unknownSurface).Single(t=>t.Name=="MetricValue");
+            Assert(unknownValue.Text=="—"&&AutomationProperties.GetHelpText(unknownValue).Length>0&&unknownSurface.Background is SolidColorBrush{Color.A:0},"first-sample unknown CPU has an uncolored dash and an accessible concrete reason");
+            evidence.Capture((FrameworkElement)main.Content,"processes-initial",new{theme="Light",fixtureOnly=true,phase="initial delta baseline, independently available memory"});
+            model.ApplySnapshot(Sample(),History());model.IsBusy=false;Layout(main);
+            var selected=model.Processes[3];table.SelectedItem=selected;table.ScrollIntoView(selected);Layout(main);
+            Assert(model.SelectedIdentity==selected.Metric.Identity,"actual process table selection updates the exact process identity");
+            var row=(DataGridRow)table.ItemContainerGenerator.ContainerFromItem(selected)!;
+            var cell=Descendants<DataGridCell>(row).First(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.MemoryBytes));
+            var surface=Descendants<Border>(cell).Single(b=>b.Name=="MetricSurface");var label=Descendants<TextBlock>(surface).Single(t=>t.Name=="MetricValue");
+            Assert(surface.ActualWidth>40&&cell.ActualWidth-surface.ActualWidth<=2,"metric background occupies the measured full cell rather than only its text width");
+            Assert(label.TextAlignment==TextAlignment.Right&&surface.Padding.Left==surface.Padding.Right&&surface.Padding.Right>0,"metric value is right aligned inside fixed symmetric cell padding");
+            Assert(surface.Background is SolidColorBrush {Color.A:0},"selected process heat surface yields to the whole-row selection cue");
+            table.SelectedItem=null;Layout(main);accentProbe.Enabled=true;Theme.Apply("Dark");Layout(main);
+            Assert(surface.Background is SolidColorBrush palette&&palette.Color.R==AccentProbe.ProbeColor.R&&palette.Color.G==AccentProbe.ProbeColor.G&&palette.Color.B==AccentProbe.ProbeColor.B,"theme event repaints the existing metric surface with a changed resource palette without a new sample");
+            accentProbe.Enabled=false;Theme.Apply("Light");table.SelectedItem=selected;Layout(main);
+            var nameCell=Descendants<DataGridCell>(row).First(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.Name));
+            Assert(Descendants<TextBlock>(nameCell).Any(t=>t.TextTrimming==TextTrimming.CharacterEllipsis&&Equals(t.ToolTip,selected.Name)&&AutomationProperties.GetName(t)==selected.Name),"long process name is ellipsized with full tooltip and automation name");
+            var cellsBefore=table.ItemsSource;var scroll=Descendants<ScrollViewer>(table).First();scroll.ScrollToVerticalOffset(18);Layout(main);double offset=scroll.VerticalOffset;
+            var next=Sample() with{Timestamp=Now.AddSeconds(1),Processes=Sample().Processes.Select(p=>p with{CpuPercent=p.CpuPercent+1}).ToArray()};
+            model.ApplySnapshot(next,History());Layout(main);
+            Assert(ReferenceEquals(cellsBefore,table.ItemsSource)&&ReferenceEquals(selected,table.SelectedItem)&&Math.Abs(scroll.VerticalOffset-offset)<.1,"actual refresh preserves collection, selected row and process viewport offset");
+            var collection=CollectionViewSource.GetDefaultView(table.ItemsSource);collection.SortDescriptions.Clear();collection.SortDescriptions.Add(new SortDescription(nameof(ProcessItemViewModel.Cpu),ListSortDirection.Descending));Layout(main);
+            var values=collection.Cast<ProcessItemViewModel>().Select(p=>p.Cpu).Where(v=>v.HasValue).Select(v=>v!.Value).ToArray();
+            Assert(values.Zip(values.Skip(1),(a,b)=>a>=b).All(x=>x),"process CPU ordering is numeric in the actual collection view");
+            // Restore the exact published-baseline fixture before comparable renders:
+            // original timestamp/values, original ordering, top viewport, long-name row selected.
+            collection.SortDescriptions.Clear();model.ApplySnapshot(Sample(),History());model.IsBusy=false;
+            table.SelectedItem=model.Processes[3];scroll.ScrollToVerticalOffset(0);Layout(main);SetGraphTime(monitor);
+            var captureRow=(DataGridRow)table.ItemContainerGenerator.ContainerFromItem(model.Processes[3])!;
+            var captureCell=Descendants<DataGridCell>(captureRow).Single(c=>c.Column.SortMemberPath==nameof(ProcessItemViewModel.MemoryBytes));
+            var captureSurface=Descendants<Border>(captureCell).Single(b=>b.Name=="MetricSurface");
+            evidence.Capture((FrameworkElement)main.Content,"processes-wide",new{theme="Light",fixtureOnly=true,processCount=160,sampleTimestamp=Now,selectedPid=103,verticalOffset=scroll.VerticalOffset,sort="fixture order",metricCellDip=captureCell.ActualWidth,metricSurfaceDip=captureSurface.ActualWidth,metricPadding=captureSurface.Padding.Right});
+            main.Width=760;Layout(main);CheckHeader(monitor,Assert);
+            Assert(table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Name))&&table.Columns.Where(c=>c.Visibility==Visibility.Visible).Any(c=>c.SortMemberPath==nameof(ProcessItemViewModel.Cpu)),"narrow viewport retains process name and CPU instead of only secondary columns");
+            evidence.Capture((FrameworkElement)main.Content,"processes-narrow",new{theme="Light",fixtureOnly=true});
+            main.Width=1320;Layout(main);double fileOffset=0;var fileTable=(DataGrid)Field(files,"table");
+            view.ShowSection("files");Layout(main);fileTable.SelectedItem=fileModel.Entries[5];var fileScroll=Descendants<ScrollViewer>(fileTable).First();fileScroll.ScrollToVerticalOffset(20);Layout(main);fileOffset=fileScroll.VerticalOffset;var fileSelection=fileModel.SelectedPaths.ToArray();int historyCount=fileModel.History.Count;
+            view.ShowSection("processes");view.ShowSection("performance");Layout(main);SetGraphTime(monitor);
+            Assert(monitor.Page==MonitorPage.Performance&&Ui.GetIsNavigationActive(navigation["performance"]),"performance subpage belongs to the common sidebar and uses the same monitor instance");
+            evidence.Capture((FrameworkElement)main.Content,"performance-gap",new{theme="Light",fixtureOnly=true,actualHistoryGapsSeconds=new[]{1,59,1,59}});
+            view.ShowSection("files");Layout(main);
+            Assert(fileModel.CurrentPath=="/srv/fixture"&&fileModel.History.Count==historyCount&&fileModel.SelectedPaths.SequenceEqual(fileSelection)&&Math.Abs(fileScroll.VerticalOffset-fileOffset)<.1&&folder.IsExpanded,"files-processes-performance-files preserves path, history, selection, scroll and expanded tree");
+            Assert(Ui.GetIsFileSectionActive(files.Navigation)&&Ui.GetIsCurrentFolder(folder)&&Ui.GetIsNavigationActive(navigation["files"]),"returning to files restores active section without discarding current folder marker");
+            evidence.Capture((FrameworkElement)main.Content,"files-tree",new{theme="Light",fixtureOnly=true});
+            view.ShowSection("processes");model.ReportFailure("Fixture: SSH sample timed out");Layout(main);
+            Assert(model.IsStale&&model.Processes.Count>0&&model.StatusDetails.Contains("Fixture",StringComparison.Ordinal),"failed sample keeps actual table rows with an explicit stale reason");
+            evidence.Capture((FrameworkElement)main.Content,"processes-stale",new{theme="Light",fixtureOnly=true});
+            Theme.Apply("Dark");Layout(main);evidence.Capture((FrameworkElement)main.Content,"processes-dark",new{theme="Dark",fixtureOnly=true});Theme.Apply("Light");
+            view.ShowSection("files");Layout(main);evidence.CaptureRelatedScenes(main,files,store,Assert);
+            Close(main,app);app.Shutdown();Console.WriteLine($"RESULT: {checks} monitor/shell actual WPF UI and graph checks passed; CI-only HWNDs, offline fixture, no SSH or process signals");return 0;
+        }
+        catch(Exception ex){Console.WriteLine(ex);return 1;}
+    }
+    static int GraphChecks(Action<bool,string> assert)
+    {
+        int count=0;void CheckGraph(bool ok,string label){assert(ok,label);count++;}
+        var points=new[]{new HistoryPoint(Now.AddSeconds(-9),10,30,0,0),new HistoryPoint(Now.AddSeconds(-8),20,30,0,0),new HistoryPoint(Now.AddSeconds(-2),40,30,0,0),new HistoryPoint(Now.AddSeconds(-1),50,30,0,0)};
+        var segments=MetricGraph.BuildSegments(points,GraphMetric.Cpu,Now,TimeSpan.FromSeconds(10),TimeSpan.FromSeconds(3),new Size(1000,100));
+        CheckGraph(segments.Count==2&&segments.All(s=>s.Length==2),"actual graph geometry separates a long sampling pause into two segments");
+        CheckGraph(Math.Abs(segments[0][0].X-100)<.001&&Math.Abs(segments[1][0].X-800)<.001,"actual graph horizontal positions use elapsed timestamps instead of sample index");
+        var gap=points.ToArray();gap[1]=gap[1] with{IsGap=true,Reason="pause"};
+        var split=MetricGraph.BuildSegments(gap,GraphMetric.Cpu,Now,TimeSpan.FromSeconds(10),TimeSpan.FromSeconds(20),new Size(1000,100));
+        CheckGraph(split.Count==2&&split[0].Length==1&&split[1].Length==2,"explicit history gap never receives a connecting line");
+        var missing=points.ToArray();missing[1]=missing[1] with{CpuPercent=null};
+        CheckGraph(MetricGraph.BuildSegments(missing,GraphMetric.Cpu,Now,TimeSpan.FromSeconds(10),TimeSpan.FromSeconds(20),new Size(1000,100)).Count==2,"missing CPU does not interpolate across unknown data");
+        CheckGraph(MetricGraph.BuildSegments(missing,GraphMetric.Memory,Now,TimeSpan.FromSeconds(10),TimeSpan.FromSeconds(20),new Size(1000,100)).Count==1,"independent available memory history is preserved when CPU is missing");
+        CheckGraph(MetricGraph.BuildSegments([new(Now.AddSeconds(-11),10,10,0,0),new(Now.AddSeconds(1),10,10,0,0)],GraphMetric.Cpu,Now,TimeSpan.FromSeconds(10),TimeSpan.FromSeconds(3),new Size(1000,100)).Count==0,"graph excludes past-window and future measurements rather than fabricating edge samples");
+        return count;
+    }
+    static void CheckHeader(MonitorView monitor,Action<bool,string> assert)
+    {
+        var header=monitor.Header;var children=header.Children.OfType<FrameworkElement>().Where(x=>x.IsVisible&&x.ActualWidth>0&&x.ActualHeight>0).ToArray();
+        var bounds=children.Select(x=>x.TransformToAncestor(header).TransformBounds(new Rect(x.RenderSize))).ToArray();
+        bool overlap=false;for(int i=0;i<bounds.Length;i++)for(int j=i+1;j<bounds.Length;j++){var cross=Rect.Intersect(bounds[i],bounds[j]);if(!cross.IsEmpty&&cross.Width>.5&&cross.Height>.5)overlap=true;}
+        assert(!overlap&&bounds.All(b=>b.Left>=-.5&&b.Right<=header.ActualWidth+.5),"measured monitor header title, search and commands stay inside the viewport without overlap");
+    }
+    static MonitorSnapshot Sample()
+    {
+        var rows=Enumerable.Range(0,160).Select(i=>new ProcessMetric(new ProcessIdentity(100+i,(ulong)(8000+i),1000),i==3?"long-service-name-with-readable-context-and-worker-arguments":"service-"+i,"fixture","S",i%23,32L*1024*1024+i*1048576,i%4==0?null:2048+i*512,i%5==0?null:1024,"/usr/bin/service --fixture")).ToArray();
+        return new(Now,new(46,4,8L<<30,5L<<30,3L<<30,0,0,TimeSpan.FromDays(3),.7,.9,1.1,100,false),rows,[new("eth0",4096,8192,2048,1024)],[new("vda",4096,8192,1024,2048)],[new("ext4","/",16L<<30,4L<<30,12L<<30)],["Детерминированный UI fixture; I/O недоступен для части процессов."]);
+    }
+    static IReadOnlyList<HistoryPoint> History()=>[new(Now.AddSeconds(-120),10,35,0,0),new(Now.AddSeconds(-119),30,36,0,0),new(Now.AddSeconds(-60),20,37,0,0),new(Now.AddSeconds(-59),50,38,0,0),new(Now,46,37.5,0,0)];
+    static void SetGraphTime(MonitorView monitor){foreach(var graph in Descendants<MetricGraph>(monitor))graph.Now=Now;}
+    static string? Value(string[] args,string name){int i=Array.IndexOf(args,name);return i<0?null:i+1<args.Length?args[i+1]:throw new ArgumentException(name+" needs a value");}
+    static void Check(bool condition,string name){if(!condition)throw new Exception("FAIL "+name);Console.WriteLine("PASS "+name);}
+    static object Field(object target,string name)=>target.GetType().GetField(name,BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(target)!;
+    static TreeViewItem Node(FileBrowserView browser,string name,string path)=>(TreeViewItem)typeof(FileBrowserView).GetMethod("Node",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(browser,[name,path])!;
+    static void Invoke(object target,string name)=>target.GetType().GetMethod(name,BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(target,null);
+    static void Pump(){var frame=new DispatcherFrame();Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,()=>frame.Continue=false);Dispatcher.PushFrame(frame);}
+    static void Layout(Window window){var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(110)};var frame=new DispatcherFrame();timer.Tick+=(_,_)=>{timer.Stop();frame.Continue=false;};window.UpdateLayout();timer.Start();Dispatcher.PushFrame(frame);window.UpdateLayout();}
+    static void Close(Window window,Application app){bool closed=false;window.Closed+=(_,_)=>closed=true;window.Close();var watch=System.Diagnostics.Stopwatch.StartNew();while(!closed||app.Windows.Cast<Window>().Contains(window)){if(watch.Elapsed>TimeSpan.FromSeconds(15))throw new TimeoutException("CI fixture did not close");Pump();}}
+    static IEnumerable<T> Descendants<T>(DependencyObject root)where T:DependencyObject{for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T item)yield return item;foreach(var nested in Descendants<T>(child))yield return nested;}}
+    static IEnumerable<T> Ancestors<T>(DependencyObject child)where T:DependencyObject{for(DependencyObject? parent=VisualTreeHelper.GetParent(child);parent is not null;parent=VisualTreeHelper.GetParent(parent))if(parent is T item)yield return item;}
+    sealed class AccentProbe:IDisposable
+    {
+        public static readonly Color ProbeColor=Color.FromRgb(145,57,193);public bool Enabled{get;set;}
+        public AccentProbe()=>Theme.Changed+=Apply;
+        void Apply(){if(Enabled)Application.Current.Resources["Accent"]=new SolidColorBrush(ProbeColor);}
+        public void Dispose()=>Theme.Changed-=Apply;
+    }
+}

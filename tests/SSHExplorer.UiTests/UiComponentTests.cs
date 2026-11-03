@@ -19,7 +19,7 @@ internal static class UiComponentTests
         void Check(bool value, string name) { assert(value, name); checks++; }
         var directory = Path.Combine(Path.GetTempPath(), "sshexplorer-ui-components-" + Guid.NewGuid().ToString("N"));
         var store = new AppStore(directory); typeof(App).GetProperty(nameof(App.Store))!.SetValue(null, store);
-        var profile = new ServerProfile { Name = "UI component fixture", Host = "127.0.0.1", Username = "fixture" };
+        var profile = new ServerProfile { Name = "UI component fixture", Host = "127.0.0.1", Username = "fixture", Bookmarks=["/bookmarked-fixture"] };
         var session = new ServerSession(profile, store);
         // No command is invoked; the component's MainWindow owner is irrelevant
         // to this render-only test. No connection, authentication or shell is opened.
@@ -50,7 +50,7 @@ internal static class UiComponentTests
             model.Message = "Загрузка и ошибка остаются в status без изменения положения заголовков"; Layout(host); var during = table.TransformToAncestor(composition).Transform(new Point(0, 0)).Y;
             model.Message = ""; Layout(host); var message = (TextBlock)Field(browser, "message");
             Check(before == during && message.Visibility == Visibility.Collapsed, "nonempty and empty operation messages do not shift table headers");
-            var tree = (TreeView)Field(browser, "tree"); var root = (TreeViewItem)tree.Items[0]; root.Items.Clear();
+            var tree = (TreeView)Field(browser, "tree"); var root = tree.Items.OfType<TreeViewItem>().Single(node=>node.Tag is string path&&path=="/"); root.Items.Clear();
             var child = (TreeViewItem)typeof(FileBrowserView).GetMethod("Node", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(browser, ["Child", "/Child"])!;
             root.Items.Add(child); root.IsExpanded = true; typeof(FileBrowserView).GetMethod("UpdateCurrentTree", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(browser, null); Layout(host);
             var rootHeader = (Border)root.Template.FindName("HeaderChrome", root); var childHeader = (Border)child.Template.FindName("HeaderChrome", child);

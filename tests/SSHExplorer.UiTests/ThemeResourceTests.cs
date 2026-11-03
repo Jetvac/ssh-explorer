@@ -18,10 +18,18 @@ internal static class ThemeResourceTests
             foreach (var mode in new[] { "Light", "Dark", "System" })
             {
                 Theme.Apply(mode);
+                var templates=new HashSet<FrameworkTemplate>();
                 foreach (var type in new[] { typeof(Button), typeof(TextBox), typeof(PasswordBox), typeof(ComboBox), typeof(CheckBox), typeof(DataGrid), typeof(DataGridColumnHeader), typeof(DataGridRow), typeof(DataGridCell), typeof(ListBox), typeof(ListBoxItem), typeof(TreeView), typeof(TreeViewItem), typeof(ContextMenu), typeof(MenuItem), typeof(ToolTip) })
                 {
                     if (app.FindResource(type) is not Style style) throw new Exception("Style missing: " + type.Name);
-                    style.Seal();
+                    style.Seal();MaterializeTemplates(style,templates);
+                }
+                foreach(var key in new[]{"CommandButtonStyle","PrimaryButtonStyle","NavigationButtonStyle","SubNavigationButtonStyle","TabCloseButtonStyle","SessionTabControlStyle","SessionTabItemStyle","FileTableStyle","HomeTableStyle","TransferTableStyle","ProcessCellStyle","ProcessMetricCellStyle","ProcessColumnHeaderStyle","ProcessTableStyle","ProcessValueStyle","MonitorPageTitleStyle","CommandBarStyle","StatusBarStyle","DialogWindowStyle","DialogTitleStyle","DialogFooterStyle","ValidationMessageStyle"})
+                {
+                    if(app.FindResource(key)is not Style role)throw new Exception("Role style missing: "+key);
+                    // FindResource forces deferred BAML setter conversion; Seal and
+                    // LoadContent exercise templates without creating a Window.
+                    role.Seal();MaterializeTemplates(role,templates);
                 }
                 foreach (var key in new[] { "Paper", "Surface", "NavigationSurface", "CaptionSurface", "Accent", "DropTarget", "Hover", "Selected", "DisabledInk", "FocusStroke", "SelectedFocusStroke", "PrimaryFocusStroke" })
                     if (app.FindResource(key) is not Brush) throw new Exception("Theme brush missing: " + key);
@@ -29,7 +37,7 @@ internal static class ThemeResourceTests
                     if (app.FindResource(key) is not double) throw new Exception("Metric token missing: " + key);
                 foreach (var key in new[] { "ControlRadius", "FlyoutRadius" }) if (app.FindResource(key) is not CornerRadius) throw new Exception("Radius token missing: " + key);
                 foreach (var key in new[] { "MotionFast", "MotionSurface", "MotionSlow" }) if (app.FindResource(key) is not TimeSpan) throw new Exception("Motion token missing: " + key);
-                Console.WriteLine("PASS actual application Fluent styles and parity tokens: " + mode);
+                Console.WriteLine("PASS actual application Fluent styles, 22 explicit role styles and materialized templates: " + mode);
             }
             var contrast = new ResourceDictionary { Source = new Uri("/PresentationFramework.Fluent;component/Themes/Fluent.HC.xaml", UriKind.Relative) };
             if (contrast[typeof(ComboBox)] is not Style contrastStyle) throw new Exception("Native High Contrast style missing."); contrastStyle.Seal();
@@ -58,5 +66,18 @@ internal static class ThemeResourceTests
             app.Shutdown(); Console.WriteLine($"RESULT: 8 resource/contract + {stateChecks} MVVM checks passed; no Windows were created; layout, focus and live UI are separate"); return 0;
         }
         catch (Exception ex) { Console.WriteLine(ex); return 1; }
+    }
+    static void MaterializeTemplates(Style style,HashSet<FrameworkTemplate> visited)
+    {
+        if(style.BasedOn is not null)MaterializeTemplates(style.BasedOn,visited);
+        foreach(var setter in style.Setters.OfType<Setter>())Load(setter.Value);
+        foreach(var trigger in style.Triggers)
+        {
+            if(trigger is Trigger normal)foreach(var setter in normal.Setters.OfType<Setter>())Load(setter.Value);
+            else if(trigger is MultiTrigger multi)foreach(var setter in multi.Setters.OfType<Setter>())Load(setter.Value);
+            else if(trigger is DataTrigger data)foreach(var setter in data.Setters.OfType<Setter>())Load(setter.Value);
+            else if(trigger is MultiDataTrigger multiData)foreach(var setter in multiData.Setters.OfType<Setter>())Load(setter.Value);
+        }
+        void Load(object value){if(value is FrameworkTemplate template&&visited.Add(template))_ = template.LoadContent();}
     }
 }

@@ -40,6 +40,8 @@ public sealed partial class MainWindow : Window
         // hides the real caption buttons even when native hit testing is enabled.
         Background = Brushes.Transparent;
         DataContext = viewModel;
+        tabs.SetResourceReference(StyleProperty, "SessionTabControlStyle");
+        home.SetResourceReference(StyleProperty, "SessionTabItemStyle");
         Title = "SSH Explorer " + BuildInfo.DisplayVersion; Width = 1320; Height = 850; MinWidth = 720; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 44, GlassFrameThickness = new Thickness(0, 44, 0, 0), ResizeBorderThickness = SystemParameters.WindowResizeBorderThickness, CornerRadius = new CornerRadius(8), UseAeroCaptionButtons = true });
         var root = new Grid();
@@ -61,10 +63,11 @@ public sealed partial class MainWindow : Window
         var location = new Border { CornerRadius = new CornerRadius(5), Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(0, 0, 12, 0), Child = Ui.Row(Ui.Icon(Ui.HomeGlyph, 17), Ui.Text("Главная")) }; location.SetResourceReference(Border.BackgroundProperty, "Surface"); navigation.Children.Add(location);
         search.MinWidth = 0; search.SetBinding(TextBox.TextProperty, new Binding(nameof(HomeViewModel.SearchQuery)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
         var searchHost = new Grid(); searchHost.Children.Add(search); var searchHint = Ui.Text("Поиск серверов", 14); searchHint.Margin = new Thickness(10, 0, 6, 0); searchHint.IsHitTestVisible = false; searchHint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(searchHint); search.TextChanged += (_, _) => searchHint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; Grid.SetColumn(searchHost, 1); navigation.Children.Add(searchHost); DockPanel.SetDock(navigation, Dock.Top); p.Children.Add(navigation);
-        var commands = Ui.Row(Ui.AsyncCommandButton(Ui.AddGlyph, "Добавить сервер", AddProfile), Ui.Line());
+        var commands = new WrapPanel(); commands.Children.Add(Ui.AsyncCommandButton(Ui.AddGlyph, "Добавить сервер", AddProfile)); commands.Children.Add(Ui.Line());
         foreach (var button in new[] { Ui.AsyncCommandButton("\uE768", "Подключиться", ConnectSelected), Ui.AsyncCommandButton(Ui.RenameGlyph, "Изменить", EditSelected), Ui.AsyncCommandButton(Ui.DeleteGlyph, "Удалить профиль", RemoveSelected) }) { button.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); commands.Children.Add(button); }
-        commands.Margin = new Thickness(10, 4, 10, 5); var commandBorder = new Border { Child = commands, BorderThickness = new Thickness(0, 0, 0, 1) }; commandBorder.SetResourceReference(Border.BorderBrushProperty, "Edge"); DockPanel.SetDock(commandBorder, Dock.Top); p.Children.Add(commandBorder);
-        homeStatus.Margin = new Thickness(16, 6, 16, 6); homeStatus.FontSize = 12; homeStatus.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); homeStatus.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.StatusText))); DockPanel.SetDock(homeStatus, Dock.Bottom); p.Children.Add(homeStatus);
+        commands.Margin = new Thickness(10, 4, 10, 5); var commandBorder = new Border { Child = commands, BorderThickness = new Thickness(0, 0, 0, 1) }; commandBorder.SetResourceReference(StyleProperty, "CommandBarStyle"); DockPanel.SetDock(commandBorder, Dock.Top); p.Children.Add(commandBorder);
+        homeStatus.Margin = new Thickness(16, 6, 16, 6); homeStatus.FontSize = 12; homeStatus.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); homeStatus.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.StatusText))); var homeFooter = new Border { Child = homeStatus }; homeFooter.SetResourceReference(StyleProperty, "StatusBarStyle"); homeStatus.Margin = new Thickness(0); DockPanel.SetDock(homeFooter, Dock.Bottom); p.Children.Add(homeFooter);
+        servers.SetResourceReference(StyleProperty, "HomeTableStyle");
         servers.Margin = new Thickness(12, 4, 12, 0); servers.SelectionMode = DataGridSelectionMode.Single;
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
@@ -76,7 +79,11 @@ public sealed partial class MainWindow : Window
     }
     public static void AddColumn(DataGrid grid, string title, string binding, double width, string? format = null)
     {
-        grid.Columns.Add(new DataGridTextColumn { Header = title, Binding = new Binding(binding) { StringFormat = format, TargetNullValue = "Недоступно" }, Width = width, SortMemberPath = binding });
+        var textStyle = new Style(typeof(TextBlock));
+        textStyle.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+        textStyle.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
+        textStyle.Setters.Add(new Setter(ToolTipProperty, new Binding(binding) { StringFormat = format }));
+        grid.Columns.Add(new DataGridTextColumn { Header = title, Binding = new Binding(binding) { StringFormat = format, TargetNullValue = "—" }, Width = width, SortMemberPath = binding, ElementStyle = textStyle });
     }
     void RefreshHome()
     {
@@ -212,6 +219,7 @@ public sealed partial class MainWindow : Window
     void AddSessionTab(ServerProfile profile, ServerSession session, SessionView view)
     {
         var tab = new TabItem { Content = view, ToolTip = profile.Username + "@" + profile.Endpoint };
+        tab.SetResourceReference(StyleProperty, "SessionTabItemStyle");
         var number = sessionNumbers.GetValueOrDefault(profile.Id) + 1; sessionNumbers[profile.Id] = number; var title = profile.Name + (number > 1 ? $" ({number})" : "");
         var close = Ui.Button("", async () => await CloseTab(tab), "Закрыть сессию"); close.Content = Ui.Icon(Ui.CloseGlyph, 11, false); close.SetResourceReference(StyleProperty, "TabCloseButtonStyle"); WindowChrome.SetIsHitTestVisibleInChrome(close, true);
         var label = Ui.Text(title); label.TextTrimming = TextTrimming.CharacterEllipsis; label.MaxWidth = 155; var header = Ui.Row(Ui.Icon("\uE968", 16), label, close); header.ToolTip = tab.ToolTip; tab.ClearValue(ToolTipProperty); tab.Header = header; WindowChrome.SetIsHitTestVisibleInChrome(header, true);
@@ -292,14 +300,19 @@ public sealed class SessionView : UserControl, IAsyncDisposable
 {
     public ServerSession Session { get; }
     readonly MainWindow main; readonly Grid host = new(); readonly TextBlock state = Ui.Text("Подключение…");
-    readonly StackPanel side = new(); readonly ContentControl screen = new() { Focusable = false, IsTabStop = false };
-    readonly ContentControl addressHost = new() { Focusable = false, IsTabStop = false }, commandHost = new() { Focusable = false, IsTabStop = false }, fileStatusHost = new() { Focusable = false, IsTabStop = false };
+    readonly StackPanel side = new(), monitorNavigation = new();
+    readonly ContentControl fileNavigationHost = new() { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
+    MonitorPage monitorPage = MonitorPage.Processes;
+    readonly ContentControl screen = new() { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
+    readonly ContentControl addressHost = new() { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch }, commandHost = new() { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch }, fileStatusHost = new() { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
+    readonly Border connectionStatus = new();
+    readonly bool presentationOnly;
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
     FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
-    bool disposed, failed, initialFolderFailed;
+    bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
     string section { get => viewModel.CurrentSection; set => viewModel.CurrentSection = value; }
     public SessionView(ServerSession session, MainWindow main, string? startPath)
@@ -309,15 +322,20 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         host.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); host.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); host.RowDefinitions.Add(new RowDefinition()); host.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         host.Children.Add(addressHost); Grid.SetRow(commandHost, 1); host.Children.Add(commandHost);
         state.Margin = new Thickness(12, 5, 16, 5); state.FontSize = 12; state.MaxWidth = 430; state.TextTrimming = TextTrimming.CharacterEllipsis; state.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); state.SetBinding(TextBlock.TextProperty, new Binding(nameof(SessionViewModel.StatusText))); state.SetBinding(ToolTipProperty, new Binding(nameof(SessionViewModel.StatusText)));
-        var statusRow = new DockPanel { LastChildFill = true, MinHeight = 30 }; DockPanel.SetDock(state, Dock.Right); statusRow.Children.Add(state); statusRow.Children.Add(fileStatusHost); var statusBorder = new Border { Child = statusRow, BorderThickness = new Thickness(0, 1, 0, 0) }; statusBorder.SetResourceReference(Border.BorderBrushProperty, "Edge"); Grid.SetRow(statusBorder, 3); host.Children.Add(statusBorder);
+        var statusRow = new DockPanel { LastChildFill = true, MinHeight = 30 }; DockPanel.SetDock(state, Dock.Right); statusRow.Children.Add(state); statusRow.Children.Add(fileStatusHost); connectionStatus.Child = statusRow; connectionStatus.Padding = new Thickness(0); connectionStatus.SetResourceReference(StyleProperty, "StatusBarStyle"); Grid.SetRow(connectionStatus, 3); host.Children.Add(connectionStatus);
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Clamp(App.Store.Settings.TreeWidth, 190, 420)), MinWidth = 190, MaxWidth = 420 }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 340 });
         side.Margin = new Thickness(5, 8, 5, 8); side.SetResourceReference(Panel.BackgroundProperty, "NavigationSurface");
-        side.Children.Add(Nav("\uE756", "Терминал", "terminal")); side.Children.Add(Nav("\uE9D9", "Диспетчер задач", "monitor"));
+        side.Children.Add(Nav(Ui.TerminalGlyph, "Терминал", "terminal")); side.Children.Add(Nav("\uE9D9", "Диспетчер задач", "monitor"));
+        monitorNavigation.Children.Add(Nav("\uE9D9", "Процессы", "processes"));
+        monitorNavigation.Children.Add(Nav("\uE9D2", "Производительность", "performance"));
+        monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
         var line = new Border { Height = 1, Margin = new Thickness(8, 10, 8, 10) }; line.SetResourceReference(Border.BackgroundProperty, "Edge"); side.Children.Add(line);
         side.Children.Add(Nav("\uE8B7", "Файлы", "files"));
         reconnect = Ui.AsyncButton("Переподключиться", () => main.Reconnect(this, files?.CurrentPath)); reconnect.Visibility = Visibility.Collapsed; reconnect.Margin = new Thickness(7, 8, 7, 4); side.Children.Add(reconnect);
         reconnect.SetBinding(VisibilityProperty, new Binding(nameof(SessionViewModel.CanReconnect)) { Converter = new BooleanToVisibilityConverter() });
-        var sidebar = new Border { Child = new ScrollViewer { Content = side, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } }; sidebar.SetResourceReference(Border.BackgroundProperty, "NavigationSurface"); body.Children.Add(sidebar);
+        var sidebarLayout = new Grid(); sidebarLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); sidebarLayout.RowDefinitions.Add(new RowDefinition());
+        sidebarLayout.Children.Add(side); Grid.SetRow(fileNavigationHost, 1); fileNavigationHost.Margin = new Thickness(5, 0, 5, 8); sidebarLayout.Children.Add(fileNavigationHost);
+        var sidebar = new Border { Child = sidebarLayout, BorderThickness = new Thickness(0, 0, 1, 0) }; sidebar.SetResourceReference(Border.BackgroundProperty, "NavigationSurface"); sidebar.SetResourceReference(Border.BorderBrushProperty, "Edge"); body.Children.Add(sidebar);
         var preferredTreeWidth = App.Store.Settings.TreeWidth;
         var splitter = new GridSplitter { Width = 4, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch }; splitter.SetResourceReference(BackgroundProperty, "NavigationSurface"); Grid.SetColumn(splitter, 1); body.Children.Add(splitter); splitter.DragCompleted += (_, _) => { preferredTreeWidth = App.Store.Settings.TreeWidth = body.ColumnDefinitions[0].ActualWidth; _ = App.Store.SaveAsync(); };
         body.SizeChanged += (_, _) => { var width = Math.Clamp(preferredTreeWidth, 190, Math.Max(190, Math.Min(420, body.ActualWidth - 344))); if (Math.Abs(body.ColumnDefinitions[0].ActualWidth - width) > 1) body.ColumnDefinitions[0].Width = new GridLength(width); };
@@ -326,7 +344,26 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     }
     Button Nav(string glyph, string text, string key)
     {
-        var b = Ui.Button("", () => Show(key), text); b.Content = Ui.Row(Ui.Icon(glyph), Ui.Text(text)); b.SetResourceReference(StyleProperty, "NavigationButtonStyle"); navigationButtons[key] = b; return b;
+        var b = Ui.Button("", () => ShowSection(key), text); var label = Ui.Text(text); label.ClearValue(TextBlock.FontWeightProperty); label.TextTrimming = TextTrimming.CharacterEllipsis;
+        var content = new DockPanel { LastChildFill = true }; var icon = Ui.Icon(glyph); DockPanel.SetDock(icon, Dock.Left); content.Children.Add(icon); content.Children.Add(label); b.Content = content;
+        b.SetResourceReference(StyleProperty, key is "processes" or "performance" ? "SubNavigationButtonStyle" : "NavigationButtonStyle"); navigationButtons[key] = b; return b;
+    }
+    // Presentation-only fixture: it uses the production layout without opening SSH or polling.
+    internal SessionView(ServerSession session, MainWindow main, FileBrowserView fileView, MonitorView monitorView) : this(session, main, null)
+    {
+        presentationOnly = true; files = fileView; monitor = monitorView; AttachFilePresentation(); Show("files");
+    }
+    void AttachFilePresentation()
+    {
+        if (files is null) return;
+        files.FileNavigationRequested += () => Show("files");
+        files.NavigationCommitted += () => { if (initialFolderFailed && !disposed) { initialFolderFailed = false; hasNotice = false; viewModel.Update(Session); UpdateConnectionStatusVisibility(); } };
+        addressHost.Content = files.AddressBar; commandHost.Content = files.CommandBar; fileStatusHost.Content = files.StatusBar; fileNavigationHost.Content = files.Navigation;
+    }
+    internal void ShowSection(string key)
+    {
+        if (key is "processes" or "performance") { monitorPage = key == "processes" ? MonitorPage.Processes : MonitorPage.Performance; key = "monitor"; }
+        Show(key);
     }
     internal void AttachConnection(ConnectionInteraction value, EventHandler<ConnectionStageEvent> handler, ConnectionAttempt attempt) { interaction = value; diagnostics = handler; connecting = attempt; }
     void StateChanged(object? sender, EventArgs e)
@@ -335,7 +372,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         Dispatcher.BeginInvoke(() =>
         {
             if (disposed || failed) return;
-            viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected);
+            viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected); UpdateConnectionStatusVisibility();
         });
     }
     internal async Task<bool> ConnectAsync(SessionCredentials credentials, ConnectionInteraction prompts, ConnectionAttempt attempt, Func<HostKeyPrompt, Task<TrustDecision>>? trustOverride = null)
@@ -346,15 +383,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             await Session.ConnectAsync(credentials, (key, ct) => trustOverride is null ? prompts.TrustAsync(key, ct) : trustOverride(key).WaitAsync(ct), attempt.Token, attempt.Id);
             attempt.Token.ThrowIfCancellationRequested();
             navigationButtons["terminal"].IsEnabled = Session.ShellAvailable;
-            navigationButtons["monitor"].IsEnabled = Session.ShellAvailable;
+            navigationButtons["monitor"].IsEnabled = navigationButtons["processes"].IsEnabled = navigationButtons["performance"].IsEnabled = Session.ShellAvailable;
             navigationButtons["files"].IsEnabled = Session.SftpAvailable;
             if (Session.SftpAvailable)
             {
                 stage = "view.files"; await attempt.RecordAsync(stage, "started");
                 attempt.Token.ThrowIfCancellationRequested();
-                files = new FileBrowserView(Session, main); files.FileNavigationRequested += () => Show("files");
-                files.NavigationCommitted += () => { if (initialFolderFailed && !disposed) { initialFolderFailed = false; viewModel.Update(Session); } };
-                addressHost.Content = files.AddressBar; commandHost.Content = files.CommandBar; fileStatusHost.Content = files.StatusBar; side.Children.Add(files.Navigation);
+                files = new FileBrowserView(Session, main); AttachFilePresentation();
                 await attempt.RecordAsync(stage, "succeeded"); Show("files");
                 stage = "navigation.initial"; await attempt.RecordAsync(stage, "started");
                 await files.InitializeAsync(startPath ?? Session.Profile.InitialPath, attempt.Token);
@@ -386,11 +421,11 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             return false;
         }
     }
-    internal void SetNotice(string text) { if (!disposed) viewModel.StatusText = text; }
+    internal void SetNotice(string text) { if (!disposed) { hasNotice = !string.IsNullOrWhiteSpace(text); viewModel.StatusText = text; UpdateConnectionStatusVisibility(); } }
     internal void SetConnectionFailure(Exception error, bool timeout)
     {
         if (disposed) return;
-        failed = true; viewModel.Update(Session);
+        failed = true; hasNotice = true; connectionStatus.Visibility = Visibility.Visible; viewModel.Update(Session);
         viewModel.StatusText = timeout ? "Время подключения истекло. Повторите попытку." : error is OperationCanceledException ? "Подключение отменено. Можно повторить попытку." : ErrorMessages.Describe(error);
         addressHost.Content = commandHost.Content = fileStatusHost.Content = null;
         screen.Content = new TextBlock { Text = viewModel.StatusText, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(24), MaxWidth = 720, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
@@ -398,21 +433,31 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     void Show(string key)
     {
         if (disposed) return;
-        if (section == key && screen.Content is not null &&
+        if (section == key && key != "monitor" && screen.Content is not null &&
             (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal))) return;
-        section = key; monitor?.SetActive(false);
+        var previousContent = screen.Content; var previousPage = monitor?.Page;
+        section = key;
+        UpdateConnectionStatusVisibility();
+        if (key != "monitor") monitor?.SetActive(false);
+        monitorNavigation.Visibility = key == "monitor" ? Visibility.Visible : Visibility.Collapsed;
+        if (files is not null) Ui.SetIsFileSectionActive(files.Navigation, key == "files");
         addressHost.Visibility = commandHost.Visibility = fileStatusHost.Visibility = key == "files" ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var (name, button) in navigationButtons) { button.SetResourceReference(BackgroundProperty, name == key ? "Selected" : "NavigationSurface"); button.SetResourceReference(BorderBrushProperty, "Accent"); button.BorderThickness = name == key ? new Thickness(2, 0, 0, 0) : new Thickness(0); }
+        foreach (var (name, button) in navigationButtons)
+        {
+            Ui.SetIsNavigationActive(button, key == "monitor" ? name == (monitorPage == MonitorPage.Processes ? "processes" : "performance") : name == key);
+            button.FontWeight = name == "monitor" && key == "monitor" ? FontWeights.SemiBold : FontWeights.Normal;
+        }
         if (key == "terminal") { _ = OpenTerminalAsync(); return; }
         if (key == "monitor")
         {
-            if (!Session.ShellAvailable) return;
-            try { monitor ??= new MonitorView(Session); screen.Content = monitor; monitor.SetActive(active); }
+            if (monitor is null && !Session.ShellAvailable) return;
+            try { monitor ??= new MonitorView(Session); monitor.SetPage(monitorPage); screen.Content = monitor; monitor.SetActive(active); }
             catch (Exception ex) { _ = LocalDiagnostics.RecordAsync("monitor.construct.failed", ex); SetNotice(ErrorMessages.Describe(ex)); screen.Content = new TextBlock { Text = "Диспетчер задач не удалось открыть. Нажмите раздел для повторной попытки.", Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap }; }
         }
         else screen.Content = files;
-        UiMotion.SurfaceChanged(screen);
+        if (!ReferenceEquals(previousContent, screen.Content) || key == "monitor" && previousPage != monitorPage) UiMotion.SurfaceChanged(screen);
     }
+    void UpdateConnectionStatusVisibility() => connectionStatus.Visibility = hasNotice || section != "monitor" || !presentationOnly && Session.State != SessionState.Connected ? Visibility.Visible : Visibility.Collapsed;
     async Task OpenTerminalAsync()
     {
         if (!Session.ShellAvailable || disposed) return;
@@ -465,9 +510,15 @@ public sealed class TransfersWindow : Window
     {
         Style = (Style)FindResource(typeof(Window));
         Title = "Передачи — SSH Explorer"; Width = 1050; Height = 440; MinWidth = 700; MinHeight = 300; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var p = new DockPanel { Margin = new Thickness(18) }; var buttons = Ui.Row(Ui.Button("Отменить", () => (grid.SelectedItem as TransferRow)?.Job.Cancel()), Ui.AsyncButton("Повторить", async () => { if (grid.SelectedItem is TransferRow row) await row.Job.RetryAsync(); })); DockPanel.SetDock(buttons, Dock.Bottom); p.Children.Add(buttons);
+        var p = new DockPanel(); p.SetResourceReference(Panel.BackgroundProperty, "Paper");
+        grid.SetResourceReference(StyleProperty, "TransferTableStyle");
+        var header = new Border { Child = Ui.Row(Ui.Text("Передачи", 18, true), Ui.Line(), Ui.CommandButton(Ui.CloseGlyph, "Отменить", () => (grid.SelectedItem as TransferRow)?.Job.Cancel()), Ui.AsyncCommandButton(Ui.RefreshGlyph, "Повторить", async () => { if (grid.SelectedItem is TransferRow row) await row.Job.RetryAsync(); })), Padding = new Thickness(12, 6, 12, 6) };
+        header.SetResourceReference(StyleProperty, "CommandBarStyle"); DockPanel.SetDock(header, Dock.Top); p.Children.Add(header);
+        var status = Ui.Text("", 12); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        var footer = new Border { Child = status }; footer.SetResourceReference(StyleProperty, "StatusBarStyle"); DockPanel.SetDock(footer, Dock.Bottom); p.Children.Add(footer);
         MainWindow.AddColumn(grid, "Название", "Name", 220); MainWindow.AddColumn(grid, "Состояние", "State", 150); MainWindow.AddColumn(grid, "Передано", "Transferred", 120); MainWindow.AddColumn(grid, "Всего", "Total", 120); MainWindow.AddColumn(grid, "Прогресс", "Progress", 100); MainWindow.AddColumn(grid, "Скорость", "Speed", 120); MainWindow.AddColumn(grid, "Осталось", "Remaining", 120); MainWindow.AddColumn(grid, "Источник", "Source", 280); MainWindow.AddColumn(grid, "Назначение", "Destination", 280); MainWindow.AddColumn(grid, "Результат / ошибка", "Result", 380); p.Children.Add(grid); Content = p;
         grid.ItemsSource = transfers.Rows;
-        timer.Tick += (_, _) => transfers.Refresh(App.Transfers.Jobs); transfers.Refresh(App.Transfers.Jobs); timer.Start(); Closed += (_, _) => timer.Stop();
+        void RefreshRows() { transfers.Refresh(App.Transfers.Jobs); status.Text = $"Передач: {transfers.Rows.Count} · Прогресс и результат обновляются автоматически"; }
+        timer.Tick += (_, _) => RefreshRows(); RefreshRows(); timer.Start(); Closed += (_, _) => timer.Stop();
     }
 }
