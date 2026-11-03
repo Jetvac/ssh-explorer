@@ -45,6 +45,9 @@ public sealed class MonitorView : UserControl, IDisposable
     readonly HashSet<Window> ownedWindows = [];
     bool applyingSelection, applyingPreferences, preferencesChanged, disposed, active, pausedByUser, compactCommands, searchSecondRow, nameReflowQueued;
     double responsiveWidth = double.NaN;
+    ProcessSortComparer? processComparer;
+    string? appliedSortColumn, appliedSortCulture;
+    ListSortDirection appliedSortDirection;
     long pollEpoch, pageEpoch;
     double processOffset, performanceOffset;
     MonitorPage page;
@@ -386,21 +389,40 @@ public sealed class MonitorView : UserControl, IDisposable
             double offset=FindScroll(processes)?.VerticalOffset??processOffset;
             if(view is ListCollectionView sortable)
             {
-                sortable.IsLiveSorting=false;
-                if(preferences.SortColumn is { } key)sortable.CustomSort=new ProcessSortComparer(key,preferences.SortDirection);
-                else if(sortable.CustomSort is ProcessSortComparer)sortable.CustomSort=null;
-                else sortable.Refresh();
+                if(preferences.SortColumn is { } key)
+                {
+                    if(sortable.IsLiveSorting is true)sortable.IsLiveSorting=false;
+                    string culture=CultureInfo.CurrentCulture.Name;
+                    if(processComparer is null||appliedSortColumn!=key||appliedSortDirection!=preferences.SortDirection||appliedSortCulture!=culture||!ReferenceEquals(sortable.CustomSort,processComparer))
+                    {
+                        processComparer=new ProcessSortComparer(key,preferences.SortDirection);appliedSortColumn=key;appliedSortDirection=preferences.SortDirection;appliedSortCulture=culture;
+                        sortable.CustomSort=processComparer;
+                    }
+                    else sortable.Refresh(); // A completed snapshot may change numeric ordering.
+                }
+                else if(sortable.CustomSort is ProcessSortComparer){sortable.CustomSort=null;processComparer=null;}
             }
-            var selected = viewModel.Processes.FirstOrDefault(x => x.Metric.Identity == viewModel.SelectedIdentity);
-            if (!ReferenceEquals(processes.SelectedItem, selected)) processes.SelectedItem = selected;
+            SelectCurrentProcess();
             FindScroll(processes)?.ScrollToVerticalOffset(offset);
         }
         finally { applyingSelection = false; }
         UpdateEmpty();
     }
+    void SyncProcessSelection()
+    {
+        if(disposed||applyingSelection)return;
+        applyingSelection=true;
+        try { SelectCurrentProcess(); }
+        finally { applyingSelection=false; }
+    }
+    void SelectCurrentProcess()
+    {
+        var selected=viewModel.Processes.FirstOrDefault(x=>x.Metric.Identity==viewModel.SelectedIdentity);
+        if(!ReferenceEquals(processes.SelectedItem,selected))processes.SelectedItem=selected;
+    }
     void ModelChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(MonitorViewModel.SelectedIdentity)) ApplyProcesses();
+        if (args.PropertyName == nameof(MonitorViewModel.SelectedIdentity)) SyncProcessSelection();
         if (args.PropertyName is nameof(MonitorViewModel.Snapshot) or nameof(MonitorViewModel.HasError) or nameof(MonitorViewModel.SearchQuery) or nameof(MonitorViewModel.IsActive)) UpdateEmpty();
     }
     void ProcessesChanged(object? sender, NotifyCollectionChangedEventArgs args) => UpdateEmpty();

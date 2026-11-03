@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
@@ -91,6 +92,10 @@ internal static class MonitorRefinementTests
         Check(cpu.SortDirection==ListSortDirection.Ascending&&saved.SortColumn=="Cpu"&&saved.SortDirection==ListSortDirection.Ascending,"actual WPF column-header OnClick applies and persists ascending numeric sort with its indicator");
         typeof(DataGridColumnHeader).GetMethod("OnClick",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(header,null);Layout(host);
         Check(cpu.SortDirection==ListSortDirection.Descending&&saved.SortDirection==ListSortDirection.Descending,"actual WPF column-header second invocation toggles descending and the matching sort indicator");
+        var sortedView=(INotifyCollectionChanged)CollectionViewSource.GetDefaultView(table.ItemsSource);int resets=0;
+        NotifyCollectionChangedEventHandler countReset=(_,change)=>{if(change.Action==NotifyCollectionChangedAction.Reset)resets++;};sortedView.CollectionChanged+=countReset;
+        table.SelectedItem=model.Processes[0];Layout(host);table.SelectedItem=null;Layout(host);sortedView.CollectionChanged-=countReset;
+        Check(resets==0,"selecting and deselecting a process does not reset its sorted collection or replace the metric cell visuals");
         string beforeResize=System.Text.Json.JsonSerializer.Serialize(saved);host.Width=760;Layout(host);host.Width=1000;Layout(host);
         Check(System.Text.Json.JsonSerializer.Serialize(saved)==beforeResize&&saved.Columns.Single(c=>c.Key=="Name").WidthMode==MonitorColumnWidthMode.Star,"viewport resize and deferred star-name reflow cannot overwrite user visibility or persist measured pixels as width intent");
         var selected=model.Processes[0];model.SelectedIdentity=selected.Metric.Identity;var updated=model.Snapshot!;
