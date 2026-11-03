@@ -9,7 +9,14 @@ namespace SSHExplorer.App;
 public static class Dialogs
 {
     static readonly Dictionary<(Guid, int, bool, bool, string), ConflictDecision> conflictPolicies = [];
-    static Window Window(string title, double width = 560) => new() { Title = title, Width = width, SizeToContent = SizeToContent.Height, MaxHeight = 850, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current.MainWindow, ShowInTaskbar = false };
+    static Window? Owner(Window? owner)=>owner??Application.Current?.MainWindow;
+    static Window Window(string title, double width = 560,Window? owner=null)
+    {
+        var window=new Window { Title = title, Width = width, SizeToContent = SizeToContent.Height, MaxHeight = Math.Max(320,SystemParameters.WorkArea.Height-48), ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, ShowInTaskbar = false };
+        var parent=Owner(owner);
+        if(parent is not null&&(parent.IsLoaded||new System.Windows.Interop.WindowInteropHelper(parent).Handle!=IntPtr.Zero)){window.Owner=parent;window.WindowStartupLocation=WindowStartupLocation.CenterOwner;}
+        return window;
+    }
     static TextBox Field(Panel p, string label, string value)
     {
         var l = Ui.Text(label); l.Margin = new Thickness(0, 9, 0, 5); p.Children.Add(l);
@@ -18,39 +25,55 @@ public static class Dialogs
     public static ServerProfile? Profile(ServerProfile? old = null)
     {
         var dialog=new ProfileDialog(new ProfilePersistence(App.Store),old,Application.Current.MainWindow);
-        return dialog.ShowDialog()==true?dialog.SavedProfile:null;
+        return ModalRunner.Show(dialog,Owner(null))?dialog.SavedProfile:null;
     }
     public static Task<ServerProfile?> ProfileAsync(ServerProfile? old=null)=>Task.FromResult(Profile(old));
-    public static SessionCredentials? Credentials(ServerProfile profile, string? saved)
+    public static Task<ProfileSubmission?> ProfileSubmissionAsync(ServerProfile? old=null,Window? owner=null,CancellationToken ct=default)
     {
-        var w = Window("Вход — " + profile.Name, 480); var p = new StackPanel { Margin = new Thickness(24) };
+        if(ct.IsCancellationRequested)return Task.FromResult<ProfileSubmission?>(null);
+        var dialog=new ProfileDialog(new ProfilePersistence(App.Store),old,Owner(owner),allowConnect:true);
+        return Task.FromResult(ModalRunner.Show(dialog,Owner(owner),ct)?dialog.Submission:null);
+    }
+    public static SessionCredentials? Credentials(ServerProfile profile, string? saved,Window? owner=null,CancellationToken ct=default,string? notice=null)
+    {
+        if(ct.IsCancellationRequested)return null;
+        var w = Window("Вход — " + profile.Name, 480,owner); var p = new StackPanel { Margin = new Thickness(24) };
         p.Children.Add(Ui.Text(profile.Username + "@" + profile.Endpoint, 18, true));
+        if(notice is not null){var warning=Ui.Text(notice,12);warning.TextWrapping=TextWrapping.Wrap;warning.Margin=new Thickness(0,8,0,8);p.Children.Add(warning);}
         p.Children.Add(Ui.Text(profile.Authentication == AuthenticationKind.PrivateKey ? "Passphrase приватного ключа (может быть пустой)" : "Пароль", 14));
-        var password = new PasswordBox { Password = saved ?? "", Margin = new Thickness(0, 10, 0, 12) }; System.Windows.Automation.AutomationProperties.SetName(password,profile.Authentication==AuthenticationKind.PrivateKey?"Парольная фраза приватного ключа":"Пароль SSH"); p.Children.Add(password);
-        var info = Ui.Text("Секрет передаётся только после проверки ключа сервера.\n"+(profile.SaveSecret?"В профиле включено сохранение с защитой Windows.":"Секрет не сохраняется. Эту настройку можно изменить в профиле."), 12); info.TextWrapping = TextWrapping.Wrap; info.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(info);
+        var password = new SecretEntry(profile.Authentication==AuthenticationKind.PrivateKey?"Парольная фраза приватного ключа":"Пароль SSH") { Password = saved ?? "", Margin = new Thickness(0, 10, 0, 12) }; p.Children.Add(password);
+        var info = Ui.Text("Секрет передаётся только после проверки ключа сервера.\n"+(profile.SaveSecret?"Защищённая копия обновится только после успешного подключения.":"Секрет не сохраняется. Эту настройку можно изменить в профиле."), 12); info.TextWrapping = TextWrapping.Wrap; info.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(info);
         var ok = Ui.Button("Подключиться", () => w.DialogResult = true); ok.IsDefault = true;
         var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true;
-        var row = Ui.Row(ok, cancel); row.HorizontalAlignment = HorizontalAlignment.Right; row.Margin = new Thickness(0, 18, 0, 0); p.Children.Add(row); w.Content = p; w.Loaded += (_, _) => password.Focus();
-        return w.ShowDialog() == true ? new SessionCredentials(password.Password) : null;
+        var row = Ui.Row(ok, cancel); row.HorizontalAlignment = HorizontalAlignment.Right; row.Margin = new Thickness(0, 18, 0, 0); p.Children.Add(row); w.Content = p; w.Loaded += (_, _) => password.FocusInput();
+        try{return ModalRunner.Show(w,Owner(owner),ct)?new SessionCredentials(password.Password):null;}
+        finally{password.Clear();}
     }
-    public static TrustDecision Trust(HostKeyPrompt key)
+    public static TrustDecision Trust(HostKeyPrompt key,Window? owner=null,CancellationToken ct=default)
     {
-        if (key.Changed) { Ui.Error($"Ключ сервера {key.Host}:{key.Port} изменён. Подключение заблокировано.\n\nРанее: {key.PreviousFingerprint}\nСейчас: {key.Fingerprint}\n\nПроверьте ключ у администратора. Замена доступна отдельно в настройках доверенных ключей."); return TrustDecision.Reject; }
-        var w = Window("Проверка ключа сервера", 660); var p = new StackPanel { Margin = new Thickness(24) };
-        p.Children.Add(Ui.Text("Доверять этому серверу?", 22, true));
+        if(ct.IsCancellationRequested)return TrustDecision.Reject;
+        var w = Window("Проверка ключа сервера", 660,owner); var p = new StackPanel { Margin = new Thickness(24) };
+        p.Children.Add(Ui.Text(key.Changed?"Ключ сервера изменён — вход заблокирован":"Доверять этому серверу?", 22, true));
         var explanation = Ui.Text("Сравните отпечаток с данными администратора сервера до входа. Это ключ сервера, а не ваш приватный ключ."); explanation.TextWrapping = TextWrapping.Wrap; explanation.Margin = new Thickness(0, 12, 0, 18); p.Children.Add(explanation);
         p.Children.Add(Ui.Text($"Адрес: {key.Host}:{key.Port}\nАлгоритм: {key.Algorithm}"));
-        var fp = new TextBox { Text = key.Fingerprint, IsReadOnly = true, FontFamily = new FontFamily("Consolas"), Margin = new Thickness(0, 14, 0, 18) }; p.Children.Add(fp);
+        var fp = new TextBox { Text = key.Fingerprint, IsReadOnly = true, FontFamily = new FontFamily("Consolas"), Margin = new Thickness(0, 14, 0, 18) };System.Windows.Automation.AutomationProperties.SetName(fp,"SHA256-отпечаток ключа сервера");p.Children.Add(fp);
         var result = TrustDecision.Reject;
-        p.Children.Add(Ui.Row(Ui.Button("Доверить и сохранить", () => { result = TrustDecision.Permanent; w.DialogResult = true; }), Ui.Button("Только эта сессия", () => { result = TrustDecision.Session; w.DialogResult = true; }), Ui.Button("Отмена", () => w.DialogResult = false)));
-        w.Content = p; w.ShowDialog(); return result;
+        var cancel=Ui.Button("Отмена",()=>w.DialogResult=false);cancel.IsCancel=true;
+        if(key.Changed)
+        {
+            var old=Ui.Text("Ранее: "+key.PreviousFingerprint+"\nПроверьте новый ключ у администратора. Замена доверия доступна отдельным действием в настройках.");old.TextWrapping=TextWrapping.Wrap;p.Children.Add(old);p.Children.Add(cancel);
+        }
+        else p.Children.Add(Ui.Row(Ui.Button("Доверить и сохранить", () => { result = TrustDecision.Permanent; w.DialogResult = true; }), Ui.Button("Только эта сессия", () => { result = TrustDecision.Session; w.DialogResult = true; }), cancel));
+        w.Content = p;return ModalRunner.Show(w,Owner(owner),ct)?result:TrustDecision.Reject;
     }
-    public static string? Interactive(InteractivePrompt prompt)
+    public static string? Interactive(InteractivePrompt prompt,Window? owner=null,CancellationToken ct=default)
     {
-        var w = Window("Дополнительная проверка SSH", 520); var p = new StackPanel { Margin = new Thickness(24) }; var text = Ui.Text(prompt.Instruction + "\n" + prompt.Prompt); text.TextWrapping = TextWrapping.Wrap; p.Children.Add(text);
-        Control input = prompt.Echo ? new TextBox() : new PasswordBox(); input.Margin = new Thickness(0, 12, 0, 16); p.Children.Add(input);
-        var ok = Ui.Button("Продолжить", () => w.DialogResult = true); ok.IsDefault = true; var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true; p.Children.Add(Ui.Row(ok, cancel)); w.Content = p; w.Loaded += (_, _) => input.Focus();
-        return w.ShowDialog() == true ? input is PasswordBox password ? password.Password : ((TextBox)input).Text : null;
+        if(ct.IsCancellationRequested)return null;
+        var w = Window("Дополнительная проверка SSH", 520,owner); var p = new StackPanel { Margin = new Thickness(24) }; var text = Ui.Text(prompt.Instruction + "\n" + prompt.Prompt); text.TextWrapping = TextWrapping.Wrap; p.Children.Add(text);
+        Control input = prompt.Echo ? new TextBox() : new SecretEntry("Ответ на дополнительный запрос SSH"); input.Margin = new Thickness(0, 12, 0, 16); p.Children.Add(input);
+        var ok = Ui.Button("Продолжить", () => w.DialogResult = true); ok.IsDefault = true; var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true; p.Children.Add(Ui.Row(ok, cancel)); w.Content = p; w.Loaded += (_, _) =>{if(input is SecretEntry secret)secret.FocusInput();else input.Focus();};
+        try{return ModalRunner.Show(w,Owner(owner),ct)?input is SecretEntry secret?secret.Password:((TextBox)input).Text:null;}
+        finally{if(input is SecretEntry secret)secret.Clear();else ((TextBox)input).Clear();}
     }
     public static ConflictDecision Conflict(TransferConflict c)
     {
@@ -68,6 +91,8 @@ public static class Dialogs
     {
         var w = Window("Параметры SSH Explorer", 570); var p = new StackPanel { Margin = new Thickness(24) }; var s = App.Store.Settings;
         p.Children.Add(Ui.Text("Параметры", 24, true)); p.Children.Add(Ui.Text("Тема приложения"));
+        var version=Ui.Text($"SSH Explorer {BuildInfo.DisplayVersion}\nСборка: {BuildInfo.Commit}",12);version.TextWrapping=TextWrapping.Wrap;p.Children.Add(version);
+        p.Children.Add(Ui.AsyncButton("Скопировать путь к диагностике",()=>{Clipboard.SetText(System.IO.Path.Combine(App.Store.DirectoryPath,"Logs"));return Task.CompletedTask;}));
         var themes = new ComboBox { ItemsSource = new[] { "Как в Windows", "Светлая", "Тёмная" }, SelectedIndex = s.Theme == "Light" ? 1 : s.Theme == "Dark" ? 2 : 0, Margin = new Thickness(0, 10, 0, 10) }; p.Children.Add(themes);
         var poll = Field(p, "Обновление диспетчера задач, секунд (1–60)", s.PollIntervalSeconds.ToString());
         var font = Field(p, "Размер шрифта терминала (8–36)", s.TerminalFontSize.ToString());

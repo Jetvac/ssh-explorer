@@ -21,7 +21,7 @@ public sealed class MonitorView : UserControl, IDisposable
     readonly MetricGraph cpuGraph = new() { Height = 130 }, memoryGraph = new() { Height = 130 };
     readonly CancellationTokenSource lifetime = new(); readonly System.Windows.Threading.DispatcherTimer timer = new();
     readonly MonitorViewModel viewModel = new();
-    SortDescription[] processSorts = []; bool applyingProcesses, disposed;
+    bool applyingProcesses, disposed;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
     bool busy { get => viewModel.IsBusy; set => viewModel.IsBusy = value; }
     public MonitorView(ServerSession session)
@@ -41,18 +41,18 @@ public sealed class MonitorView : UserControl, IDisposable
         memoryGraph.SetBinding(MetricGraph.ValuesProperty, new Binding(nameof(MonitorViewModel.MemoryHistory)));
         processes.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(MonitorViewModel.Processes)));
         search.SetBinding(TextBox.TextProperty, new Binding(nameof(MonitorViewModel.SearchQuery)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
-        viewModel.PropertyChanged += (_, e) => { if (e.PropertyName is nameof(MonitorViewModel.Processes) or nameof(MonitorViewModel.SelectedIdentity)) ApplyProcesses(); };
+        viewModel.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MonitorViewModel.SelectedIdentity)) ApplyProcesses(); };
+        viewModel.ProcessesUpdated += ApplyProcesses;
         processes.SelectionChanged += (_, _) => { if (!applyingProcesses) viewModel.SelectedIdentity = (processes.SelectedItem as ProcessItemViewModel)?.Metric.Identity; };
-        processes.Sorting += (_, _) => Dispatcher.BeginInvoke(() => processSorts = CollectionViewSource.GetDefaultView(processes.ItemsSource)?.SortDescriptions.ToArray() ?? []);
         var root = new DockPanel(); root.SetResourceReference(Panel.BackgroundProperty, "Paper");
         var header = new DockPanel { Margin = new Thickness(20, 10, 16, 10) }; var terminate = Ui.AsyncCommandButton(Ui.CloseGlyph, "Завершить задачу", () => Signal(15), "Завершить выбранный процесс (SIGTERM)"); terminate.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected)));
-        var more = Ui.IconButton(Ui.MoreGlyph, () => { var menu = new ContextMenu { DataContext = viewModel }; var kill = Ui.AsyncMenu("Принудительно завершить (SIGKILL)…", () => Signal(9)); kill.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected))); menu.Items.Add(kill); menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Открыть htop / top в терминале", OpenTop)); menu.IsOpen = true; }, "Дополнительные действия"); var buttons = Ui.Row(terminate, more); DockPanel.SetDock(buttons, Dock.Right); header.Children.Add(buttons); header.Children.Add(Ui.Text("Диспетчер задач", 18, true)); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var more = Ui.FlyoutButton(Ui.MoreGlyph, "", () => { var menu = new ContextMenu { DataContext = viewModel }; var kill = Ui.AsyncMenu("Принудительно завершить (SIGKILL)…", () => Signal(9), glyph: Ui.CloseGlyph); kill.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected))); menu.Items.Add(kill); menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Открыть htop / top в терминале", OpenTop, glyph: Ui.TerminalGlyph)); return menu; }, "Дополнительные действия"); var buttons = Ui.Row(terminate, more); DockPanel.SetDock(buttons, Dock.Right); header.Children.Add(buttons); header.Children.Add(Ui.Text("Диспетчер задач", 18, true)); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         var footer = new StackPanel { Margin = new Thickness(18, 7, 18, 10) }; freshness.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); freshness.FontSize = 12; footer.Children.Add(freshness); var scale = Ui.Text(SystemMetric.CpuScale + ". Сеть измеряется по интерфейсам, не по процессам.", 12); scale.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); scale.TextWrapping = TextWrapping.Wrap; footer.Children.Add(scale); limits.TextWrapping = TextWrapping.Wrap; limits.FontSize = 12; footer.Children.Add(limits); DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         var tabs = new TabControl(); var processTab = new TabItem { Header = "Процессы" }; var performance = new TabItem { Header = "Производительность" }; tabs.Items.Add(processTab); tabs.Items.Add(performance); root.Children.Add(tabs);
         var processRoot = new DockPanel(); var searchBar = new DockPanel { Margin = new Thickness(16, 8, 16, 8) }; var searchHost = new Grid { MinWidth = 180, MaxWidth = 440, Width = 350 }; search.Width = double.NaN; search.MinWidth = 0; search.Padding = new Thickness(32, 6, 10, 6); searchHost.Children.Add(search); var searchIcon = Ui.Icon(Ui.SearchGlyph, 14, false); searchIcon.IsHitTestVisible = false; searchIcon.HorizontalAlignment = HorizontalAlignment.Left; searchIcon.Margin = new Thickness(10, 0, 0, 0); searchIcon.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(searchIcon); var hint = Ui.Text("Имя, пользователь или PID", 13); hint.IsHitTestVisible = false; hint.Margin = new Thickness(32, 0, 10, 0); hint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(hint); search.TextChanged += (_, _) => hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; DockPanel.SetDock(searchHost, Dock.Right); searchBar.Children.Add(searchHost); summary.FontSize = 12; summary.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchBar.Children.Add(summary); DockPanel.SetDock(searchBar, Dock.Top); processRoot.Children.Add(searchBar); SizeChanged += (_, _) => searchHost.Width = Math.Clamp(ActualWidth * .42, 180, 440);
         MainWindow.AddColumn(processes, "Имя", "Name", 240); processes.Columns[0].Width = new DataGridLength(1, DataGridLengthUnitType.Star); processes.Columns[0].MinWidth = 180; MainWindow.AddColumn(processes, "PID", "Pid", 72); MainWindow.AddColumn(processes, "Пользователь", "User", 110); MainWindow.AddColumn(processes, "Состояние", "State", 112);
         processes.ColumnHeaderHeight = 60; AddMetricColumn("ЦП", "Cpu", "CpuText", 96, nameof(MonitorViewModel.CpuHeader)); AddMetricColumn("Память", "MemoryFraction", "MemoryText", 128, nameof(MonitorViewModel.MemoryHeader)); MainWindow.AddColumn(processes, "Чтение, Б/с", "ReadText", 130); MainWindow.AddColumn(processes, "Запись, Б/с", "WriteText", 130);
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Завершить процесс (SIGTERM)…", () => Signal(15)), Ui.AsyncMenu("Принудительно завершить (SIGKILL)…", () => Signal(9)) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected))); menu.Items.Add(item); } menu.Items.Add(Ui.Menu("Показать командную строку", ShowCommand)); processes.ContextMenu = menu; processRoot.Children.Add(processes); processTab.Content = processRoot;
+        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Завершить процесс (SIGTERM)…", () => Signal(15), glyph: Ui.CloseGlyph), Ui.AsyncMenu("Принудительно завершить (SIGKILL)…", () => Signal(9), glyph: Ui.CloseGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected))); menu.Items.Add(item); } menu.Items.Add(Ui.Menu("Показать командную строку", ShowCommand, glyph: Ui.TerminalGlyph)); Ui.AttachContextMenu(processes, menu); processRoot.Children.Add(processes); processTab.Content = processRoot;
         var perf = new StackPanel { Margin = new Thickness(20, 16, 20, 16) }; perf.Children.Add(Ui.Text("Видимое пространство имён Linux (хост или контейнер)", 14, true));
         var graphGrid = new Grid { Margin = new Thickness(0, 16, 0, 16) }; graphGrid.ColumnDefinitions.Add(new ColumnDefinition()); graphGrid.ColumnDefinitions.Add(new ColumnDefinition());
         var cpuPanel = new StackPanel { Margin = new Thickness(0, 0, 12, 0) }; cpuPanel.Children.Add(Ui.Text("ЦП")); cpuPanel.Children.Add(cpu); cpuPanel.Children.Add(cpuGraph); graphGrid.Children.Add(cpuPanel);
@@ -88,7 +88,13 @@ public sealed class MonitorView : UserControl, IDisposable
     void ApplyProcesses()
     {
         if (applyingProcesses) return; applyingProcesses = true;
-        try { var view = CollectionViewSource.GetDefaultView(processes.ItemsSource); if (view is not null) { view.SortDescriptions.Clear(); foreach (var sort in processSorts) view.SortDescriptions.Add(sort); } processes.SelectedItem = viewModel.Processes.FirstOrDefault(x => x.Metric.Identity == viewModel.SelectedIdentity); }
+        try
+        {
+            var view = CollectionViewSource.GetDefaultView(processes.ItemsSource);
+            if (view is ICollectionViewLiveShaping { CanChangeLiveSorting: true } live) live.IsLiveSorting = true;
+            var selected = viewModel.Processes.FirstOrDefault(x => x.Metric.Identity == viewModel.SelectedIdentity);
+            if (!ReferenceEquals(processes.SelectedItem, selected)) processes.SelectedItem = selected;
+        }
         finally { applyingProcesses = false; }
     }
     async Task Signal(int signal)

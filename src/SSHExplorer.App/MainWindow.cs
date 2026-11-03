@@ -26,19 +26,25 @@ public sealed partial class MainWindow : Window
     readonly HomeViewModel viewModel = new();
     readonly Dictionary<string, WeakReference<TabItem>> tabDragTokens = [];
     readonly Dictionary<TabItem, DispatcherTimer> tabHoverTimers = [];
-    bool closing, refreshingHome;
+    bool closing, refreshingHome, profileEditorOpen;
+    readonly CancellationTokenSource windowLifetime = new();
+    readonly ConnectionAttemptRegistry connectionAttempts;
+    readonly HashSet<Guid> requireCredentials = [];
+    Button? openServerButton;
     TransfersWindow? transferWindow;
     public MainWindow()
     {
+        connectionAttempts = new(windowLifetime.Token);
         Style = (Style)FindResource(typeof(Window));
         // The glass strip belongs to DWM. An opaque WPF background over it
         // hides the real caption buttons even when native hit testing is enabled.
         Background = Brushes.Transparent;
         DataContext = viewModel;
-        Title = "SSH Explorer"; Width = 1320; Height = 850; MinWidth = 720; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        Title = "SSH Explorer " + BuildInfo.DisplayVersion; Width = 1320; Height = 850; MinWidth = 720; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 44, GlassFrameThickness = new Thickness(0, 44, 0, 0), ResizeBorderThickness = SystemParameters.WindowResizeBorderThickness, CornerRadius = new CornerRadius(8), UseAeroCaptionButtons = true });
         var root = new Grid();
-        var actions = Ui.Row(Ui.IconButton(Ui.AddGlyph, AddMenu, "Открыть сервер"), Ui.IconButton("\uE8AB", ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
+        openServerButton = Ui.IconButton(Ui.AddGlyph, AddMenu, "Открыть сервер");
+        var actions = Ui.Row(openServerButton, Ui.IconButton("\uE8AB", ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
         actions.VerticalAlignment = VerticalAlignment.Top; actions.HorizontalAlignment = HorizontalAlignment.Right; actions.Margin = new Thickness(0, 4, 146, 0); WindowChrome.SetIsHitTestVisibleInChrome(actions, true); root.Children.Add(tabs); root.Children.Add(actions); Content = root;
         home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
         tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); if (tabs.SelectedItem is TabItem item) (item.Header as FrameworkElement)?.BringIntoView(); RefreshHome(); };
@@ -63,8 +69,8 @@ public sealed partial class MainWindow : Window
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
         AddColumn(servers, "Название", "Name", 260); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240);
-        servers.MouseDoubleClick += async (_, _) => await Ui.Guard(ConnectSelected);
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter"), Ui.AsyncMenu("Изменить профиль", EditSelected), Ui.AsyncMenu("Удалить профиль", RemoveSelected) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile)); servers.ContextMenu = menu;
+        servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
+        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
         var body = new Grid(); body.Children.Add(servers); var empty = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 390, Margin = new Thickness(24) }; var emptyTitle = Ui.Text("", 18, true); emptyTitle.HorizontalAlignment = HorizontalAlignment.Center; emptyTitle.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateTitle))); empty.Children.Add(emptyTitle); var emptyText = Ui.Text(""); emptyText.TextWrapping = TextWrapping.Wrap; emptyText.TextAlignment = TextAlignment.Center; emptyText.Margin = new Thickness(0, 10, 0, 16); emptyText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); emptyText.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateMessage))); empty.Children.Add(emptyText); empty.SetBinding(VisibilityProperty, new Binding(nameof(HomeViewModel.ShowEmptyState)) { Converter = new BooleanToVisibilityConverter() }); body.Children.Add(empty); p.Children.Add(body); return p;
     }
@@ -81,11 +87,25 @@ public sealed partial class MainWindow : Window
     }
     async Task AddProfile()
     {
-        if (await Dialogs.ProfileAsync() is not { } saved) return; RefreshHome(); viewModel.SelectedProfile = viewModel.VisibleProfiles.FirstOrDefault(p => p.Profile.Id == saved.Id); if (viewModel.SelectedProfile is not null) servers.ScrollIntoView(viewModel.SelectedProfile);
+        if (profileEditorOpen || closing) return;
+        profileEditorOpen = true;
+        try
+        {
+            var saved = await Dialogs.ProfileSubmissionAsync(owner: this, ct: windowLifetime.Token);
+            if (saved is null) return;
+            RefreshHome(); viewModel.SelectedProfile = viewModel.VisibleProfiles.FirstOrDefault(p => p.Profile.Id == saved.Profile.Id);
+            if (viewModel.SelectedProfile is not null) servers.ScrollIntoView(viewModel.SelectedProfile);
+            if (saved.CleanupWarning is { } warning) Ui.Error(warning);
+            if (saved.ConnectNow) await OpenServerCore(saved.Profile, null, saved.Credentials, null);
+        }
+        finally { profileEditorOpen = false; }
     }
     async Task EditSelected()
     {
-        if (viewModel.SelectedProfile is not { } row) return; if (await Dialogs.ProfileAsync(row.Profile) is not null) RefreshHome();
+        if (profileEditorOpen || closing || viewModel.SelectedProfile is not { } row) return;
+        profileEditorOpen = true;
+        try { if (await Dialogs.ProfileAsync(row.Profile) is not null) { RefreshHome(); if (App.Store.LastProfileCleanupWarning is { } warning) Ui.Error(warning); } }
+        finally { profileEditorOpen = false; }
     }
     async Task RemoveSelected()
     {
@@ -95,21 +115,109 @@ public sealed partial class MainWindow : Window
     Task ConnectSelected() => viewModel.SelectedProfile is { } row ? OpenServer(row.Profile) : Task.CompletedTask;
     void AddMenu()
     {
-        var menu = new ContextMenu(); foreach (var p in App.Store.Profiles.OrderBy(p => p.Name)) menu.Items.Add(Ui.AsyncMenu(p.Name + "  ·  " + p.Endpoint, () => OpenServer(p)));
-        if (menu.Items.Count > 0) menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile)); menu.IsOpen = true;
+        var menu = new ContextMenu();
+        foreach (var profile in App.Store.Profiles.OrderBy(p => p.Name))
+        {
+            var item = new MenuItem { Header = profile.Name + "  ·  " + profile.Endpoint };
+            item.Items.Add(Ui.AsyncMenu("Подключиться", () => OpenServer(profile), glyph: Ui.TerminalGlyph));
+            item.Items.Add(Ui.AsyncMenu("Новая независимая сессия", () => OpenServerCore(profile, null, null, null, independent: true), glyph: Ui.NewTabGlyph));
+            item.Items.Add(Ui.AsyncMenu("Ввести другой пароль…", () => OpenServerCore(profile, null, null, null, forceCredentials: true), glyph: Ui.SettingsGlyph));
+            menu.Items.Add(item);
+        }
+        if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+        menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph));
+        Ui.OpenFlyout(openServerButton!, menu);
     }
-    public async Task OpenServer(ServerProfile profile, string? directory = null, SessionCredentials? suppliedCredentials = null, Func<HostKeyPrompt, Task<TrustDecision>>? trustOverride = null)
+    // This overload is retained for explicit integration fixtures. The ordinary Add/Connect commands
+    // below never inject a trust decision and always use the actual dialog coordinator.
+    public Task OpenServer(ServerProfile profile, string? directory = null, SessionCredentials? suppliedCredentials = null, Func<HostKeyPrompt, Task<TrustDecision>>? trustOverride = null)
+        => OpenServerCore(profile, directory, suppliedCredentials, trustOverride);
+    async Task OpenServerCore(ServerProfile profile, string? directory, SessionCredentials? initialCredentials,
+        Func<HostKeyPrompt, Task<TrustDecision>>? trustOverride, bool independent = false, bool forceCredentials = false,
+        TabItem? replacement = null, SessionView? previous = null)
     {
-        var saved = suppliedCredentials is null ? await App.Store.ReadSecretAsync(profile.Id) : null; var credentials = suppliedCredentials ?? Dialogs.Credentials(profile, saved); if (credentials is null) return;
-        if (suppliedCredentials is null) credentials = credentials with { Prompt = prompt => Dispatcher.InvokeAsync(() => Dialogs.Interactive(prompt)).Task };
-        if (profile.SaveSecret) await App.Store.SaveSecretAsync(profile.Id, credentials.Secret);
-        var session = new ServerSession(profile, App.Store); var view = new SessionView(session, this, directory); var tab = new TabItem { Content = view, ToolTip = profile.Username + "@" + profile.Endpoint };
+        if (closing) return;
+        using var attempt = connectionAttempts.TryBegin(profile.Id, independent);
+        if (attempt is null) return;
+        ServerSession? session = null; SessionView? view = null; ConnectionInteraction? interaction = null;
+        string? saved = null; bool secretUnavailable = false;
+        await attempt.RecordAsync("connect.command", "started");
+        try
+        {
+            if (previous is not null && App.Transfers.HasActive(previous.Session.Id) && !Ui.Confirm("В этой сессии выполняются передачи. Прервать их и переподключить вкладку?")) return;
+            var credentials = initialCredentials;
+            if (credentials is null)
+            {
+                await attempt.RecordAsync("secret.read", "started");
+                try { saved = profile.SaveSecret ? await App.Store.ReadSecretAsync(profile.Id, attempt.Token) : null; await attempt.RecordAsync("secret.read", "succeeded"); }
+                catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or IOException or UnauthorizedAccessException or FormatException)
+                { await attempt.RecordAsync("secret.read", "failed", ex); forceCredentials = true; secretUnavailable = true; }
+                if (saved is not null && !forceCredentials && !requireCredentials.Contains(profile.Id)) credentials = new SessionCredentials(saved);
+                else
+                {
+                    await attempt.RecordAsync("credentials.dialog", "started");
+                    credentials = Dialogs.Credentials(profile, null, this, attempt.Token, secretUnavailable ? "Защищённый секрет недоступен. Введите его заново; профиль сохранён." : null);
+                    await attempt.RecordAsync("credentials.dialog", credentials is null ? "cancelled" : "succeeded");
+                }
+            }
+            attempt.Token.ThrowIfCancellationRequested();
+            if (credentials is null) { await attempt.RecordAsync("connect.command", "cancelled"); return; }
+            await attempt.RecordAsync("credentials.accepted", "succeeded");
+            session = new ServerSession(profile, App.Store);
+            interaction = new ConnectionInteraction(this, session, attempt);
+            credentials = credentials with { Prompt = null, CancellablePrompt = interaction.PromptAsync };
+            EventHandler<ConnectionStageEvent> diagnostics = (_, stage) =>
+            {
+                if (!attempt.IsFinished) attempt.Observe(stage); else _ = LocalDiagnostics.RecordStageAsync(stage);
+                if (stage.Stage == ConnectionStage.Authentication && stage.Outcome == ConnectionStageOutcome.Failed && !Dispatcher.HasShutdownStarted)
+                    Dispatcher.BeginInvoke(() => requireCredentials.Add(profile.Id));
+            };
+            session.StageChanged += diagnostics;
+            object? context = previous?.CaptureContext();
+            if (previous is not null) { App.Transfers.CancelSession(previous.Session.Id); await previous.DisposeAsync(); }
+            await attempt.RecordAsync("view.construct", "started");
+            view = new SessionView(session, this, directory); view.AttachConnection(interaction, diagnostics, attempt);
+            await attempt.RecordAsync("view.construct", "succeeded");
+            if (replacement is null) AddSessionTab(profile, session, view);
+            else { replacement.Content = view; sessions[replacement] = view; tabs.SelectedItem = replacement; }
+            session.StateChanged += (_, _) => { if (!closing && !Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(RefreshHome); };
+            attempt.BeginNetworkTimeout(profile.TimeoutSeconds);
+            bool ready = await view.ConnectAsync(credentials, interaction, attempt, trustOverride);
+            if (ready)
+            {
+                attempt.Token.ThrowIfCancellationRequested();
+                requireCredentials.Remove(profile.Id); view.RestoreContext(context);
+                if (profile.SaveSecret && (initialCredentials is not null || saved is null || saved != credentials.Secret))
+                {
+                    await attempt.RecordAsync("secret.commit", "started");
+                    try { bool committed = await App.Store.SaveAuthenticatedSecretAsync(profile, credentials.Secret, attempt.Token); await attempt.RecordAsync("secret.commit", committed ? "succeeded" : "stale"); }
+                    catch (Exception ex) { await attempt.RecordAsync("secret.commit", "failed", ex); view.SetNotice("Подключение установлено, но пароль не сохранён. Проверьте доступ к папке настроек."); }
+                }
+                await attempt.RecordAsync("connect.command", "succeeded");
+            }
+            else await attempt.RecordAsync("connect.command", attempt.Token.IsCancellationRequested ? "cancelled" : "failed");
+        }
+        catch (Exception ex)
+        {
+            await attempt.RecordAsync("connect.command", ex is OperationCanceledException ? "cancelled" : "failed", ex);
+            if (session is not null) await session.DisposeAsync();
+            interaction?.Dispose();
+            if (!closing) { if (view is not null) view.SetConnectionFailure(ex, attempt.TimedOut); else Ui.Error(ErrorMessages.Describe(ex)); }
+        }
+        finally
+        {
+            interaction?.InitialFinished(); await attempt.FlushAsync(); RefreshHome();
+        }
+    }
+    void AddSessionTab(ServerProfile profile, ServerSession session, SessionView view)
+    {
+        var tab = new TabItem { Content = view, ToolTip = profile.Username + "@" + profile.Endpoint };
         var number = sessionNumbers.GetValueOrDefault(profile.Id) + 1; sessionNumbers[profile.Id] = number; var title = profile.Name + (number > 1 ? $" ({number})" : "");
         var close = Ui.Button("", async () => await CloseTab(tab), "Закрыть сессию"); close.Content = Ui.Icon(Ui.CloseGlyph, 11, false); close.SetResourceReference(StyleProperty, "TabCloseButtonStyle"); WindowChrome.SetIsHitTestVisibleInChrome(close, true);
         var label = Ui.Text(title); label.TextTrimming = TextTrimming.CharacterEllipsis; label.MaxWidth = 155; var header = Ui.Row(Ui.Icon("\uE968", 16), label, close); header.ToolTip = tab.ToolTip; tab.ClearValue(ToolTipProperty); tab.Header = header; WindowChrome.SetIsHitTestVisibleInChrome(header, true);
         Point? start = null;
         header.PreviewMouseLeftButtonDown += (_, e) => start = e.GetPosition(header);
-        header.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && start is Point a && (e.GetPosition(header) - a).Length > 12 && !close.IsMouseOver) { start = null; DragDrop.DoDragDrop(header, TabDragData(tab), DragDropEffects.Move); } };
+        header.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && start is Point a && (e.GetPosition(header) - a).Length > 12 && !close.IsMouseOver) { start = null; try { DragDrop.DoDragDrop(header, TabDragData(tab), DragDropEffects.Move); } finally { CancelDragFeedback(); } } };
         header.AllowDrop = true;
         var hover = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) }; tabHoverTimers[tab] = hover; hover.Tick += (_, _) => { hover.Stop(); if (sessions.ContainsKey(tab)) tabs.SelectedItem = tab; };
         header.Drop += async (_, e) =>
@@ -122,8 +230,6 @@ public sealed partial class MainWindow : Window
         header.DragLeave += (_, _) => hover.Stop();
         header.DragOver += (_, e) => { if (IsFileDrag(e.Data)) { e.Effects = sessions.GetValueOrDefault(tab)?.TabDropEffect(e.Data, e.KeyStates) ?? DragDropEffects.None; e.Handled = true; } };
         sessions[tab] = view; tabs.Items.Add(tab); tabs.SelectedItem = tab;
-        session.StateChanged += (_, _) => Dispatcher.BeginInvoke(RefreshHome);
-        await view.ConnectAsync(credentials, trustOverride); RefreshHome();
     }
     static bool IsFileDrag(IDataObject data) => data.GetDataPresent("SSHExplorer.RemoteFiles", false) || data.GetDataPresent(DataFormats.FileDrop);
     DataObject TabDragData(TabItem tab)
@@ -138,34 +244,43 @@ public sealed partial class MainWindow : Window
     }
     public async Task Reconnect(SessionView previous, string? path)
     {
-        var pair = sessions.FirstOrDefault(x => ReferenceEquals(x.Value, previous)); if (pair.Key is null) return; var profile = previous.Session.Profile;
-        if (App.Transfers.HasActive(previous.Session.Id) && !Ui.Confirm("В этой сессии выполняются передачи. Прервать их и переподключить вкладку?")) return;
-        var credentials = Dialogs.Credentials(profile, await App.Store.ReadSecretAsync(profile.Id)); if (credentials is null) return;
-        credentials = credentials with { Prompt = prompt => Dispatcher.InvokeAsync(() => Dialogs.Interactive(prompt)).Task };
-        if (profile.SaveSecret) await App.Store.SaveSecretAsync(profile.Id, credentials.Secret);
-        App.Transfers.CancelSession(previous.Session.Id); var context = previous.CaptureContext(); await previous.DisposeAsync();
-        var session = new ServerSession(profile, App.Store); var next = new SessionView(session, this, path); pair.Key.Content = next; sessions[pair.Key] = next; next.SetActive(tabs.SelectedItem == pair.Key); session.StateChanged += (_, _) => Dispatcher.BeginInvoke(RefreshHome);
-        await next.ConnectAsync(credentials); next.RestoreContext(context); RefreshHome();
+        var pair = sessions.FirstOrDefault(x => ReferenceEquals(x.Value, previous));
+        if (pair.Key is null) return;
+        await OpenServerCore(previous.Session.Profile, path, null, null, replacement: pair.Key, previous: previous);
     }
     async Task CloseTab(TabItem tab)
     {
         if (!sessions.TryGetValue(tab, out var view)) return;
         if (App.Transfers.HasActive(view.Session.Id) && !Ui.Confirm("В этой сессии выполняется передача. Прервать передачу и закрыть сессию?")) return;
-        App.Transfers.CancelSession(view.Session.Id); if (tabHoverTimers.Remove(tab, out var timer)) timer.Stop(); await view.DisposeAsync(); sessions.Remove(tab); tabs.Items.Remove(tab); RefreshHome();
+        CancelDragFeedback(); App.Transfers.CancelSession(view.Session.Id); if (tabHoverTimers.Remove(tab, out var timer)) timer.Stop(); await view.DisposeAsync(); sessions.Remove(tab); tabs.Items.Remove(tab); RefreshHome();
     }
     async void OnClosing(object? sender, CancelEventArgs e)
     {
         if (closing) return; e.Cancel = true;
         if (sessions.Values.Any(v => App.Transfers.HasActive(v.Session.Id)) && !Ui.Confirm("Есть активные передачи. Прервать их и выйти?")) return;
-        closing = true;
-        foreach (var timer in tabHoverTimers.Values) timer.Stop(); tabHoverTimers.Clear(); tabDragTokens.Clear(); foreach (var view in sessions.Values.ToArray()) { App.Transfers.CancelSession(view.Session.Id); await view.DisposeAsync(); }
-        await App.Store.SaveAsync(); transferWindow?.Close(); Close();
+        closing = true; connectionAttempts.CancelAll(); windowLifetime.Cancel();
+        await LocalDiagnostics.RecordAsync("app.close.requested");
+        CancelDragFeedback(); tabHoverTimers.Clear(); tabDragTokens.Clear();
+        foreach (var view in sessions.Values.ToArray())
+        {
+            App.Transfers.CancelSession(view.Session.Id);
+            try { await view.DisposeAsync(); } catch (Exception ex) { await LocalDiagnostics.RecordAsync("app.close.session.failed", ex); }
+        }
+        try { await App.Store.SaveAsync(); }
+        catch (Exception ex) { await LocalDiagnostics.RecordAsync("app.close.settings.failed", ex); Ui.Error("Не удалось сохранить последние настройки окна. " + ErrorMessages.Describe(ex)); }
+        finally { await LocalDiagnostics.RecordAsync("app.close.completed"); transferWindow?.Close(); Close(); }
     }
     void OnKey(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape) CancelDragFeedback();
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && e.Key == Key.Tab) { e.Handled = true; var delta = (Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? -1 : 1; tabs.SelectedIndex = (tabs.SelectedIndex + delta + tabs.Items.Count) % tabs.Items.Count; }
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && e.Key == Key.F4 && tabs.SelectedItem is TabItem tab && tab != home) { e.Handled = true; _ = Ui.Guard(() => CloseTab(tab)); }
         if (!e.Handled && tabs.SelectedItem is TabItem current && sessions.TryGetValue(current, out var session)) session.RouteFileKey(e);
+    }
+    internal void CancelDragFeedback()
+    {
+        foreach (var timer in tabHoverTimers.Values) timer.Stop();
+        foreach (var view in sessions.Values) view.CancelDragFeedback();
     }
     public void ShowTransfers()
     {
@@ -183,6 +298,8 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
     FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; readonly Button reconnect;
+    ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
+    bool disposed, failed, initialFolderFailed;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
     string section { get => viewModel.CurrentSection; set => viewModel.CurrentSection = value; }
     public SessionView(ServerSession session, MainWindow main, string? startPath)
@@ -211,30 +328,100 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         var b = Ui.Button("", () => Show(key), text); b.Content = Ui.Row(Ui.Icon(glyph), Ui.Text(text)); b.SetResourceReference(StyleProperty, "NavigationButtonStyle"); navigationButtons[key] = b; return b;
     }
-    void StateChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
+    internal void AttachConnection(ConnectionInteraction value, EventHandler<ConnectionStageEvent> handler, ConnectionAttempt attempt) { interaction = value; diagnostics = handler; connecting = attempt; }
+    void StateChanged(object? sender, EventArgs e)
     {
-        viewModel.Update(Session);
-        files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected);
-    });
-    public async Task ConnectAsync(SessionCredentials credentials, Func<HostKeyPrompt, Task<TrustDecision>>? trustOverride = null)
+        if (disposed || Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (disposed || failed) return;
+            viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected);
+        });
+    }
+    internal async Task<bool> ConnectAsync(SessionCredentials credentials, ConnectionInteraction prompts, ConnectionAttempt attempt, Func<HostKeyPrompt, Task<TrustDecision>>? trustOverride = null)
     {
+        string stage = "connection.transport";
         try
         {
-            await Session.ConnectAsync(credentials, trustOverride ?? (prompt => Dispatcher.InvokeAsync(() => Dialogs.Trust(prompt)).Task));
-            files = new FileBrowserView(Session, main); files.FileNavigationRequested += () => Show("files"); terminal = new TerminalView(Session); monitor = new MonitorView(Session);
-            addressHost.Content = files.AddressBar; commandHost.Content = files.CommandBar; fileStatusHost.Content = files.StatusBar; side.Children.Add(files.Navigation); Show("files");
-            if (Session.SftpAvailable) await files.NavigateAsync(startPath ?? Session.Profile.InitialPath);
+            await Session.ConnectAsync(credentials, (key, ct) => trustOverride is null ? prompts.TrustAsync(key, ct) : trustOverride(key).WaitAsync(ct), attempt.Token, attempt.Id);
+            attempt.Token.ThrowIfCancellationRequested();
+            navigationButtons["terminal"].IsEnabled = Session.ShellAvailable;
+            navigationButtons["monitor"].IsEnabled = Session.ShellAvailable;
+            if (Session.SftpAvailable)
+            {
+                stage = "view.files"; await attempt.RecordAsync(stage, "started");
+                attempt.Token.ThrowIfCancellationRequested();
+                files = new FileBrowserView(Session, main); files.FileNavigationRequested += () => Show("files");
+                files.NavigationCommitted += () => { if (initialFolderFailed && !disposed) { initialFolderFailed = false; viewModel.Update(Session); } };
+                addressHost.Content = files.AddressBar; commandHost.Content = files.CommandBar; fileStatusHost.Content = files.StatusBar; side.Children.Add(files.Navigation);
+                await attempt.RecordAsync(stage, "succeeded"); Show("files");
+                stage = "navigation.initial"; await attempt.RecordAsync(stage, "started");
+                await files.InitializeAsync(startPath ?? Session.Profile.InitialPath, attempt.Token);
+                await attempt.RecordAsync(stage, "succeeded");
+            }
+            else
+            {
+                screen.Content = new TextBlock { Text = "Файловая подсистема недоступна. Можно открыть терминал или диспетчер задач; переподключение доступно после закрытия этой сессии.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(24) };
+                SetNotice("Вход выполнен; SFTP недоступен. " + Session.SftpError);
+            }
+            viewModel.Update(Session); return true;
         }
-        catch (Exception ex) { viewModel.StatusText = ErrorMessages.Describe(ex); screen.Content = new TextBlock { Text = viewModel.StatusText, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(30), MaxWidth = 720, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top }; }
+        catch (Exception ex)
+        {
+            await attempt.RecordAsync(stage, ex is OperationCanceledException ? "cancelled" : "failed", ex);
+            if (stage == "navigation.initial" && ex is not OperationCanceledException && !disposed)
+            {
+                // The authenticated SFTP connection is still usable. Keep explicit navigation recovery.
+                initialFolderFailed = true;
+                SetNotice("Вход выполнен, начальная папка недоступна. Выберите домашнюю папку или корень. " + ErrorMessages.Describe(ex));
+                return false;
+            }
+            prompts.Dispose();
+            files?.Dispose(); files = null; terminal?.Dispose(); terminal = null; monitor?.Dispose(); monitor = null;
+            await Session.DisposeAsync();
+            if (!disposed) SetConnectionFailure(ex, attempt.TimedOut);
+            return false;
+        }
+    }
+    internal void SetNotice(string text) => viewModel.StatusText = text;
+    internal void SetConnectionFailure(Exception error, bool timeout)
+    {
+        failed = true; viewModel.Update(Session);
+        viewModel.StatusText = timeout ? "Время подключения истекло. Повторите попытку." : error is OperationCanceledException ? "Подключение отменено. Можно повторить попытку." : ErrorMessages.Describe(error);
+        addressHost.Content = commandHost.Content = fileStatusHost.Content = null;
+        screen.Content = new TextBlock { Text = viewModel.StatusText, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(24), MaxWidth = 720, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     }
     void Show(string key)
     {
+        if (disposed || (section == key && screen.Content is not null)) return;
         section = key; monitor?.SetActive(false);
         addressHost.Visibility = commandHost.Visibility = fileStatusHost.Visibility = key == "files" ? Visibility.Visible : Visibility.Collapsed;
         foreach (var (name, button) in navigationButtons) { button.SetResourceReference(BackgroundProperty, name == key ? "Selected" : "NavigationSurface"); button.SetResourceReference(BorderBrushProperty, "Accent"); button.BorderThickness = name == key ? new Thickness(2, 0, 0, 0) : new Thickness(0); }
-        if (key == "terminal") { screen.Content = terminal; if (terminal is not null) _ = Ui.Guard(() => terminal.StartAsync()); }
-        else if (key == "monitor") { screen.Content = monitor; monitor?.SetActive(active); }
+        if (key == "terminal") { _ = OpenTerminalAsync(); return; }
+        if (key == "monitor")
+        {
+            if (!Session.ShellAvailable) return;
+            try { monitor ??= new MonitorView(Session); screen.Content = monitor; monitor.SetActive(active); }
+            catch (Exception ex) { _ = LocalDiagnostics.RecordAsync("monitor.construct.failed", ex); SetNotice(ErrorMessages.Describe(ex)); }
+        }
         else screen.Content = files;
+        UiMotion.SurfaceChanged(screen);
+    }
+    async Task OpenTerminalAsync()
+    {
+        if (!Session.ShellAvailable || disposed) return;
+        var operation = Guid.NewGuid();
+        try
+        {
+            await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", "started");
+            if (disposed) throw new OperationCanceledException();
+            terminal ??= new TerminalView(Session); screen.Content = terminal;
+            // WebView2 is an HWND host: do not animate/reposition it or delay its input.
+            UiMotion.Stop(screen); screen.Opacity = 1; screen.RenderTransform = Transform.Identity;
+            await terminal.StartAsync();
+            await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", "succeeded");
+        }
+        catch (Exception ex) { await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", ex is OperationCanceledException ? "cancelled" : "failed", ex); if (!disposed) SetNotice(ErrorMessages.Describe(ex)); }
     }
     public void SetActive(bool value) { active = value; monitor?.SetActive(value && section == "monitor"); }
     public void RouteFileKey(KeyEventArgs e) { if (section == "files") files?.RouteGlobalKey(e); }
@@ -243,12 +430,21 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     internal Task ReceiveTabDropAsync(IDataObject data, DragDropKeyStates keys) { if (!CanReceiveFileDrop) throw new InvalidOperationException("Файловая сессия не готова к приёму файлов."); Show("files"); return files!.ReceiveDropAsync(data, keys); }
     public object? CaptureContext() => files?.CaptureContext();
     public void RestoreContext(object? context) => files?.RestoreContext(context);
-    public async ValueTask DisposeAsync() { Session.StateChanged -= StateChanged; monitor?.Dispose(); files?.Dispose(); terminal?.Dispose(); await Session.DisposeAsync(); }
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed) return; disposed = true; connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        Session.StateChanged -= StateChanged;
+        monitor?.Dispose(); files?.Dispose(); terminal?.Dispose();
+        try { await Session.DisposeAsync(); }
+        finally { if (diagnostics is not null) Session.StageChanged -= diagnostics; }
+    }
+    internal void CancelDragFeedback() => files?.CancelDragFeedback();
 }
 
 public sealed class TransfersWindow : Window
 {
     readonly DataGrid grid = new();
+    readonly TransferListViewModel transfers = new();
     readonly System.Windows.Threading.DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     public TransfersWindow()
     {
@@ -256,10 +452,7 @@ public sealed class TransfersWindow : Window
         Title = "Передачи — SSH Explorer"; Width = 1050; Height = 440; MinWidth = 700; MinHeight = 300; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var p = new DockPanel { Margin = new Thickness(18) }; var buttons = Ui.Row(Ui.Button("Отменить", () => (grid.SelectedItem as TransferRow)?.Job.Cancel()), Ui.AsyncButton("Повторить", async () => { if (grid.SelectedItem is TransferRow row) await row.Job.RetryAsync(); })); DockPanel.SetDock(buttons, Dock.Bottom); p.Children.Add(buttons);
         MainWindow.AddColumn(grid, "Название", "Name", 220); MainWindow.AddColumn(grid, "Состояние", "State", 150); MainWindow.AddColumn(grid, "Передано", "Transferred", 120); MainWindow.AddColumn(grid, "Всего", "Total", 120); MainWindow.AddColumn(grid, "Прогресс", "Progress", 100); MainWindow.AddColumn(grid, "Скорость", "Speed", 120); MainWindow.AddColumn(grid, "Осталось", "Remaining", 120); MainWindow.AddColumn(grid, "Источник", "Source", 280); MainWindow.AddColumn(grid, "Назначение", "Destination", 280); MainWindow.AddColumn(grid, "Результат / ошибка", "Result", 380); p.Children.Add(grid); Content = p;
-        timer.Tick += (_, _) => { var id = (grid.SelectedItem as TransferRow)?.Job.Id; var rows = App.Transfers.Jobs.Select(j => new TransferRow(j)).ToList(); grid.ItemsSource = rows; grid.SelectedItem = rows.FirstOrDefault(r => r.Job.Id == id); }; timer.Start(); Closed += (_, _) => timer.Stop();
-    }
-    sealed class TransferRow(TransferJob job)
-    {
-        public TransferJob Job => job; public string Name => job.Name; public string State => job.State switch { TransferState.Queued => "В очереди", TransferState.Running => "Передача", TransferState.Completed => "Завершено", TransferState.Cancelled => "Отменено", _ => "Ошибка" }; public string Transferred => Ui.Size(job.BytesTransferred); public string Total => job.TotalBytes is { } n ? Ui.Size(n) : "Подсчёт…"; public string Progress => job.Progress is { } n ? $"{n:0.0}%" : "Неизвестно"; public string Speed => job.BytesPerSecond > 0 ? Ui.Size((long)job.BytesPerSecond) + "/с" : "—"; public string Remaining => job.Remaining is { } t ? t.ToString(@"hh\:mm\:ss") : "—"; public string Source => job.Source; public string Destination => job.Destination; public string Result => job.Error ?? job.Summary;
+        grid.ItemsSource = transfers.Rows;
+        timer.Tick += (_, _) => transfers.Refresh(App.Transfers.Jobs); transfers.Refresh(App.Transfers.Jobs); timer.Start(); Closed += (_, _) => timer.Stop();
     }
 }

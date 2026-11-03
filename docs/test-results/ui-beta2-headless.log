@@ -1,0 +1,27 @@
+PASS actual application Fluent styles and parity tokens: Light
+PASS actual application Fluent styles and parity tokens: Dark
+PASS actual application Fluent styles and parity tokens: System
+PASS bundled native Fluent High Contrast resource dictionary loads
+PASS inherited Fluent cell visuals are replaced while whole-row keyboard focus remains defined
+PASS empty message collapses and nonempty status remains available
+PASS filled vector categories preserve special/link identity and preview refusal
+PASS flyout placement and explicit command icons do not depend on translated labels
+PASS MVVM late navigation cannot replace the current path or listing
+PASS MVVM failed navigation preserves path, listing and selection
+PASS MVVM POSIX selection keeps uppercase and lowercase identities distinct
+PASS MVVM failed history traversal does not advance the history cursor
+PASS MVVM successful history traversal restores the original selection and scroll position
+PASS MVVM navigation from history prunes the abandoned forward branch
+PASS MVVM refresh drops selections whose objects disappeared
+PASS MVVM file filtering hides dotfiles and sorts numeric names naturally
+PASS MVVM closed navigation ignores in-flight replies
+PASS MVVM home never calls an unchecked profile unavailable
+PASS MVVM real WPF two-way search binding drives profile filtering
+PASS MVVM property notifications update a real WPF bound status element
+PASS MVVM monitoring preserves exact process identity and does not invent missing I/O
+PASS MVVM repeated process snapshots preserve collection, row identity and selection without table reset
+PASS MVVM changed process measurements update existing selected row without replacing the collection
+PASS MVVM process selection rejects a reused PID with a new start time
+PASS MVVM process search filters the snapshot without changing server metrics
+PASS MVVM monitor failure marks existing measurements stale and keeps their values
+RESULT: 8 resource/contract + 18 MVVM checks passed; no Windows were created; layout, focus and live UI are separate

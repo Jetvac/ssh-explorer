@@ -39,8 +39,11 @@ internal static class ViewModelTests
         var message = new TextBlock { DataContext = files }; message.SetBinding(TextBlock.TextProperty, new Binding(nameof(FileBrowserViewModel.Message))); files.Message = "Ошибка тестового пути";
         Check(message.Text == "Ошибка тестового пути", "MVVM property notifications update a real WPF bound status element");
         var monitor = new MonitorViewModel(); var identity = new ProcessIdentity(42, 123, 1000);
-        monitor.ApplySnapshot(Snapshot(identity), []); monitor.SelectedIdentity = identity; monitor.ApplySnapshot(Snapshot(identity), []);
+        monitor.ApplySnapshot(Snapshot(identity), []); monitor.SelectedIdentity = identity; var processCollection = monitor.Processes; var processRow = monitor.Processes.Single(); var resets = 0; monitor.Processes.CollectionChanged += (_, e) => { if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset) resets++; }; monitor.ApplySnapshot(Snapshot(identity), []);
         Check(monitor.SelectedIdentity == identity && monitor.Processes.Single().ReadText == "Недоступно", "MVVM monitoring preserves exact process identity and does not invent missing I/O");
+        Check(ReferenceEquals(processCollection, monitor.Processes) && ReferenceEquals(processRow, monitor.Processes.Single()) && resets == 0, "MVVM repeated process snapshots preserve collection, row identity and selection without table reset");
+        var changedSample = Snapshot(identity); monitor.ApplySnapshot(changedSample with { Processes = [changedSample.Processes[0] with { CpuPercent = 22, MemoryBytes = 300 }] }, []);
+        Check(ReferenceEquals(processRow, monitor.Processes.Single()) && processRow.Cpu == 22 && processRow.MemoryText == SSHExplorer.App.Ui.Size(300) && monitor.SelectedIdentity == identity && resets == 0, "MVVM changed process measurements update existing selected row without replacing the collection");
         monitor.ApplySnapshot(Snapshot(new ProcessIdentity(42, 999, 1000)), []); Check(monitor.SelectedIdentity is null, "MVVM process selection rejects a reused PID with a new start time");
         monitor.SearchQuery = "nobody"; Check(monitor.Processes.Count == 0, "MVVM process search filters the snapshot without changing server metrics");
         monitor.ReportFailure("timeout"); Check(monitor.Snapshot is not null && monitor.Freshness.Contains("устарели") && monitor.CpuText != "Недоступно", "MVVM monitor failure marks existing measurements stale and keeps their values");

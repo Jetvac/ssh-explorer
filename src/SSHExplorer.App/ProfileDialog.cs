@@ -12,18 +12,22 @@ using SSHExplorer.Core;
 namespace SSHExplorer.App;
 
 /// <summary>A compact, owner-bound form. Expected validation/persistence errors stay inline.</summary>
-public sealed class ProfileDialog:Window
+public sealed class ProfileDialog:Window,ICancellableModal
 {
     private readonly ProfileViewModel _model;
-    private readonly PasswordBox _secret=new();
+    private readonly SecretEntry _secret=new("Пароль или парольная фраза ключа");
     private readonly Dictionary<string,Control> _fields=[];
     private readonly CancellationTokenSource _lifetime=new();
     private readonly Expander _advanced=new();
     private readonly Button _save;
+    private readonly bool _allowConnect;
+    private bool _cancelRequested,_loadedSavedSecret;
     public ProfileViewModel Model=>_model;
     public ServerProfile? SavedProfile=>_model.SavedProfile;
-    public ProfileDialog(IProfilePersistence persistence,ServerProfile? old=null,Window? owner=null)
+    public ProfileSubmission? Submission{get;private set;}
+    public ProfileDialog(IProfilePersistence persistence,ServerProfile? old=null,Window? owner=null,bool allowConnect=false)
     {
+        _allowConnect=allowConnect;
         _model=new(persistence,old);DataContext=_model;
         Title=old is null?"Добавить сервер":"Изменить сервер";Width=540;MinWidth=430;
         MaxHeight=Math.Max(320,SystemParameters.WorkArea.Height-48);SizeToContent=SizeToContent.Height;
@@ -32,10 +36,16 @@ public sealed class ProfileDialog:Window
         var root=new DockPanel();root.SetResourceReference(Panel.BackgroundProperty,"Surface");
         var footer=new StackPanel{Margin=new(24,14,24,18)};DockPanel.SetDock(footer,Dock.Bottom);
         var status=Ui.Text("",12);status.TextWrapping=TextWrapping.Wrap;status.Margin=new(0,0,0,10);status.SetBinding(TextBlock.TextProperty,new Binding(nameof(_model.Status)));footer.Children.Add(status);
-        _save=Ui.Button("Сохранить",()=>{});_save.IsDefault=true;_save.MinWidth=112;_save.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));_save.Click+=SaveClicked;
-        if(TryFindResource("PrimaryButtonStyle")is Style primary)_save.Style=primary;
+        _save=Ui.Button("Сохранить",()=>{});_save.IsDefault=!allowConnect;_save.MinWidth=104;_save.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));_save.Click+=SaveClicked;
         var cancel=Ui.Button("Отмена",()=>DialogResult=false);cancel.IsCancel=true;cancel.MinWidth=100;cancel.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));
-        var buttons=Ui.Row(cancel,_save);buttons.HorizontalAlignment=HorizontalAlignment.Right;footer.Children.Add(buttons);root.Children.Add(footer);
+        var buttons=Ui.Row(cancel,_save);
+        if(allowConnect)
+        {
+            var connect=Ui.Button("Сохранить и подключиться",()=>{});connect.IsDefault=true;connect.MinWidth=198;connect.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));connect.Click+=ConnectClicked;
+            if(TryFindResource("PrimaryButtonStyle")is Style primary)connect.Style=primary;buttons.Children.Add(connect);
+        }
+        else if(TryFindResource("PrimaryButtonStyle")is Style primary)_save.Style=primary;
+        buttons.HorizontalAlignment=HorizontalAlignment.Right;footer.Children.Add(buttons);root.Children.Add(footer);
         var panel=new StackPanel{Margin=new(24,18,24,0)};panel.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));
         panel.Children.Add(Ui.Text(old is null?"Новый сервер":"Параметры сервера",20,true));
         panel.Children.Add(Field("Название",nameof(_model.ProfileName),nameof(_model.NameError)));
@@ -50,7 +60,8 @@ public sealed class ProfileDialog:Window
         var keyField=Field("Приватный ключ",nameof(_model.PrivateKeyPath),nameof(_model.KeyError));keyPanel.Children.Add(keyField);
         var choose=Ui.Button("Выбрать файл…",()=>{var dialog=new OpenFileDialog{Title="Приватный ключ SSH",CheckFileExists=true};if(dialog.ShowDialog(this)==true)_model.PrivateKeyPath=dialog.FileName;});choose.HorizontalAlignment=HorizontalAlignment.Left;choose.Margin=new(0,0,0,8);keyPanel.Children.Add(choose);panel.Children.Add(keyPanel);
         var secretLabel=Label("");secretLabel.SetBinding(TextBlock.TextProperty,new Binding(nameof(_model.SecretLabel)));panel.Children.Add(secretLabel);
-        _secret.MinHeight=34;_secret.Margin=new(0,0,0,2);AutomationProperties.SetName(_secret,"Пароль или парольная фраза ключа");_secret.PasswordChanged+=(_,_)=>_model.SecretChanged();_fields["Secret"]=_secret;panel.Children.Add(_secret);panel.Children.Add(Error(nameof(_model.SecretError)));
+        _secret.MinHeight=34;_secret.Margin=new(0,0,0,2);_secret.ValueChanged+=(_,_)=>_model.SecretChanged();_fields["Secret"]=_secret;panel.Children.Add(_secret);panel.Children.Add(Error(nameof(_model.SecretError)));
+        _model.PropertyChanged+=(_,e)=>{if(e.PropertyName==nameof(_model.AuthenticationIndex)){_secret.Clear();_loadedSavedSecret=false;}};
         var secretInfo=Ui.Text("",12);secretInfo.TextWrapping=TextWrapping.Wrap;secretInfo.SetResourceReference(TextBlock.ForegroundProperty,"Muted");secretInfo.SetBinding(TextBlock.TextProperty,new Binding(nameof(_model.SecretExplanation)));secretInfo.Margin=new(0,2,0,4);panel.Children.Add(secretInfo);
         var remember=new CheckBox{Content="Сохранять секрет с защитой Windows",Margin=new(0,6,0,8)};remember.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,new Binding(nameof(_model.SaveSecret)){Mode=BindingMode.TwoWay});AutomationProperties.SetName(remember,"Сохранять пароль или парольную фразу с защитой Windows");panel.Children.Add(remember);
         _advanced.Header="Дополнительные параметры";_advanced.Margin=new(0,4,0,0);var advanced=new StackPanel{Margin=new(0,8,0,0)};
@@ -61,15 +72,16 @@ public sealed class ProfileDialog:Window
         {
             try
             {
+                _fields[nameof(_model.ProfileName)].Focus();
                 int originalAuthentication=_model.AuthenticationIndex;
+                int originalRevision=_secret.EditRevision;
                 string? saved=await _model.LoadSecretAsync(_lifetime.Token);
                 if(_lifetime.IsCancellationRequested)return;
-                if(_model.AuthenticationIndex==originalAuthentication&&string.IsNullOrEmpty(_secret.Password)&&saved is not null)_secret.Password=saved;
-                _fields[nameof(_model.ProfileName)].Focus();
+                if(_model.AuthenticationIndex==originalAuthentication&&_secret.EditRevision==originalRevision&&saved is not null){_secret.Password=saved;_loadedSavedSecret=true;}
             }
             catch(OperationCanceledException)when(_lifetime.IsCancellationRequested){}
         };
-        Closing+=(_,e)=>{if(_model.IsSaving){e.Cancel=true;return;}_lifetime.Cancel();};
+        Closing+=(_,e)=>{if(_model.IsSaving&&!_cancelRequested){e.Cancel=true;return;}_lifetime.Cancel();};
         Closed+=(_,_)=>{_secret.Clear();_lifetime.Dispose();};
     }
     static TextBlock Label(string text){var label=Ui.Text(text,12);label.Margin=new(0,9,0,5);label.SetResourceReference(TextBlock.ForegroundProperty,"Muted");return label;}
@@ -83,16 +95,23 @@ public sealed class ProfileDialog:Window
         var style=new Style(typeof(TextBlock));var empty=new DataTrigger{Binding=new Binding(property),Value=""};empty.Setters.Add(new Setter(VisibilityProperty,Visibility.Collapsed));style.Triggers.Add(empty);text.Style=style;return text;
     }
     async void SaveClicked(object sender,RoutedEventArgs args)
+        =>await SubmitAsync(false);
+    async void ConnectClicked(object sender,RoutedEventArgs args)
+        =>await SubmitAsync(true);
+    async Task SubmitAsync(bool connectNow)
     {
-        if(await _model.SaveAsync(_secret.Password,_lifetime.Token))
+        var result=await _model.SubmitAsync(_secret.Password,connectNow&&_allowConnect,_secret.EditRevision>0||_loadedSavedSecret,_lifetime.Token);
+        if(_lifetime.IsCancellationRequested||!IsVisible)return;
+        if(result is not null)
         {
-            if(_model.CleanupWarning is not null)MessageBox.Show(this,_model.CleanupWarning,"Профиль сохранён",MessageBoxButton.OK,MessageBoxImage.Warning);
+            Submission=result;
             DialogResult=true;
         }
         else if(_model.FirstInvalidField is string key)
         {
             if(key is nameof(_model.Timeout) or nameof(_model.InitialPath))_advanced.IsExpanded=true;
-            if(_fields.TryGetValue(key,out var field)){field.Focus();field.BringIntoView();}
+            if(_fields.TryGetValue(key,out var field)){if(field is SecretEntry secret)secret.FocusInput();else field.Focus();field.BringIntoView();}
         }
     }
+    public void CancelModal(){_cancelRequested=true;_lifetime.Cancel();if(IsVisible)Close();}
 }

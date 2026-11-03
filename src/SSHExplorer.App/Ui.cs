@@ -2,17 +2,31 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Automation;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Threading;
+using System.Globalization;
+using System.Windows.Data;
 using Microsoft.Win32;
 
 namespace SSHExplorer.App;
 
 public static class Ui
 {
-    public const string AddGlyph = "\uE710", BackGlyph = "\uE72B", ForwardGlyph = "\uE72A", UpGlyph = "\uE74A", RefreshGlyph = "\uE72C", HomeGlyph = "\uE80F", FolderGlyph = "\uE8B7", CutGlyph = "\uE8C6", CopyGlyph = "\uE8C8", PasteGlyph = "\uE77F", RenameGlyph = "\uE8AC", DeleteGlyph = "\uE74D", UploadGlyph = "\uE898", DownloadGlyph = "\uE896", SortGlyph = "\uE8CB", ViewGlyph = "\uE8A9", MoreGlyph = "\uE712", SettingsGlyph = "\uE713", CloseGlyph = "\uE711", SearchGlyph = "\uE721";
+    public const string AddGlyph = "\uE710", BackGlyph = "\uE72B", ForwardGlyph = "\uE72A", UpGlyph = "\uE74A", RefreshGlyph = "\uE72C", HomeGlyph = "\uE80F", FolderGlyph = "\uE8B7", CutGlyph = "\uE8C6", CopyGlyph = "\uE8C8", PasteGlyph = "\uE77F", RenameGlyph = "\uE8AC", DeleteGlyph = "\uE74D", UploadGlyph = "\uE898", DownloadGlyph = "\uE896", SortGlyph = "\uE8CB", ViewGlyph = "\uE8A9", MoreGlyph = "\uE712", SettingsGlyph = "\uE713", CloseGlyph = "\uE711", SearchGlyph = "\uE721", FileGlyph = "\uE8A5", TerminalGlyph = "\uE756", PinGlyph = "\uE718", PropertiesGlyph = "\uE946", UndoGlyph = "\uE7A7", NewTabGlyph = "\uE8A7";
+    public static readonly DependencyProperty IsCurrentFolderProperty = DependencyProperty.RegisterAttached("IsCurrentFolder", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(false));
+    public static void SetIsCurrentFolder(DependencyObject target, bool value) => target.SetValue(IsCurrentFolderProperty, value);
+    public static bool GetIsCurrentFolder(DependencyObject target) => (bool)target.GetValue(IsCurrentFolderProperty);
+    public static readonly DependencyProperty TreeDepthProperty = DependencyProperty.RegisterAttached("TreeDepth", typeof(int), typeof(Ui), new FrameworkPropertyMetadata(0));
+    public static void SetTreeDepth(DependencyObject target, int value) => target.SetValue(TreeDepthProperty, value);
+    public static int GetTreeDepth(DependencyObject target) => (int)target.GetValue(TreeDepthProperty);
+    public static readonly DependencyProperty IsDropTargetProperty = DependencyProperty.RegisterAttached("IsDropTarget", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(false));
+    public static void SetIsDropTarget(DependencyObject target, bool value) => target.SetValue(IsDropTargetProperty, value);
+    public static bool GetIsDropTarget(DependencyObject target) => (bool)target.GetValue(IsDropTargetProperty);
+    static readonly DependencyProperty FlyoutOwnerProperty = DependencyProperty.RegisterAttached("FlyoutOwner", typeof(FrameworkElement), typeof(Ui));
     public static Button Button(string text, Action action, string? tooltip = null)
     {
-        var symbols = new Dictionary<string, string> { ["←"] = BackGlyph, ["→"] = ForwardGlyph, ["↑"] = UpGlyph, ["↓"] = DownloadGlyph, ["＋"] = AddGlyph, ["+"] = AddGlyph, ["−"] = "\uE738", ["×"] = CloseGlyph, ["⚙"] = SettingsGlyph, ["⇄"] = "\uE8AB" };
-        var b = new Button { Content = symbols.TryGetValue(text, out var glyph) ? Icon(glyph, 16, false) : text, ToolTip = tooltip ?? text };
+        var b = new Button { Content = text, ToolTip = tooltip ?? text };
         AutomationProperties.SetName(b, tooltip ?? text);
         b.Click += (_, _) => action();
         return b;
@@ -28,18 +42,91 @@ public static class Ui
     public static Button AsyncCommandButton(string glyph, string label, Func<Task> action, string? tooltip = null, bool chevron = false) => CommandButton(glyph, label, async () => await Guard(action), tooltip, chevron);
     public static Button IconButton(string glyph, Action action, string tooltip) { var b = CommandButton(glyph, "", action, tooltip); b.Width = 36; b.Padding = new Thickness(0); return b; }
     public static Button AsyncIconButton(string glyph, Func<Task> action, string tooltip) => IconButton(glyph, async () => await Guard(action), tooltip);
+    public static Button FlyoutButton(string glyph, string label, Func<ContextMenu> createMenu, string? tooltip = null)
+    {
+        Button? button = null;
+        button = CommandButton(glyph, label, () => OpenFlyout(button!, createMenu()), tooltip, label.Length > 0);
+        if (label.Length == 0) { button.Width = 36; button.Padding = new Thickness(0); }
+        button.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Down && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Alt))
+            { e.Handled = true; OpenFlyout(button, createMenu()); }
+        };
+        return button;
+    }
+    // Used by command flyouts and normal context menus. WPF's popup service
+    // constrains placement to the monitor work area; no screen pixel offsets.
+    public static void ConfigureFlyout(FrameworkElement owner, ContextMenu menu, bool command = false)
+    {
+        menu.PlacementTarget = owner; menu.Placement = command ? PlacementMode.Bottom : PlacementMode.MousePoint;
+        menu.StaysOpen = false; menu.DataContext ??= owner.DataContext;
+        if (ReferenceEquals(menu.GetValue(FlyoutOwnerProperty), owner)) return;
+        menu.SetValue(FlyoutOwnerProperty, owner);
+        menu.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape && !menu.Items.OfType<MenuItem>().Any(i => i.IsSubmenuOpen)) { e.Handled = true; menu.IsOpen = false; } };
+        RoutedEventHandler unloaded = (_, _) => menu.IsOpen = false;
+        menu.Opened += (_, _) => { owner.Unloaded += unloaded; UiMotion.OpenFlyout(menu); };
+        menu.Closed += (_, _) => owner.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            owner.Unloaded -= unloaded;
+            // Do not steal focus from an async command's dialog or another field.
+            var window = Window.GetWindow(owner);
+            if (!owner.IsLoaded || !owner.IsEnabled || window?.IsActive != true) return;
+            if (Keyboard.FocusedElement is null or MenuItem or ContextMenu) owner.Focus();
+        });
+    }
+    public static void AttachContextMenu(FrameworkElement owner, ContextMenu menu)
+    {
+        ConfigureFlyout(owner, menu); owner.ContextMenu = menu;
+        owner.ContextMenuOpening += (_, e) =>
+        {
+            menu.PlacementTarget = e.CursorLeft < 0 && owner is System.Windows.Controls.Primitives.Selector selector && selector.SelectedItem is { } selected && selector.ItemContainerGenerator.ContainerFromItem(selected) is FrameworkElement item ? item : owner;
+            menu.Placement = e.CursorLeft < 0 ? PlacementMode.Bottom : PlacementMode.MousePoint;
+        };
+    }
+    public static void AttachContextMenu(FrameworkElement owner, Func<ContextMenu> createMenu)
+    {
+        var menu = new ContextMenu(); AttachContextMenu(owner, menu);
+        owner.ContextMenuOpening += (_, _) =>
+        {
+            var fresh = createMenu(); menu.Items.Clear();
+            while (fresh.Items.Count > 0) { var item = fresh.Items[0]; fresh.Items.RemoveAt(0); menu.Items.Add(item); }
+        };
+    }
+    public static void OpenContextMenu(FrameworkElement owner, ContextMenu menu)
+    {
+        ConfigureFlyout(owner, menu);
+        if (owner is System.Windows.Controls.Primitives.Selector selector && selector.SelectedItem is { } selected && selector.ItemContainerGenerator.ContainerFromItem(selected) is FrameworkElement item) menu.PlacementTarget = item;
+        menu.Placement = PlacementMode.Bottom; menu.IsOpen = true;
+        menu.Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { if (menu.IsOpen) menu.MoveFocus(new TraversalRequest(FocusNavigationDirection.First)); });
+    }
+    public static void OpenFlyout(FrameworkElement owner, ContextMenu menu)
+    {
+        ConfigureFlyout(owner, menu, true); menu.IsOpen = true;
+        menu.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            if (menu.IsOpen) menu.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        });
+    }
     public static async Task Guard(Func<Task> action)
     {
         try { await action(); }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _ = LocalDiagnostics.RecordAsync("ui.operation.failure", ex); Error(ex.Message); }
     }
-    public static TextBlock Text(string text, double size = 14, bool bold = false) => new() { Text = text, FontSize = size, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, VerticalAlignment = VerticalAlignment.Center };
-    public static TextBlock Icon(string glyph, double size = 18, bool trailingSpace = true) => new() { Text = glyph, FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"), FontSize = size, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = trailingSpace ? new Thickness(0, 0, 9, 0) : new Thickness(0) };
+    public static TextBlock Text(string text, double size = 14, bool bold = false)
+    {
+        var block = new TextBlock { Text = text, FontSize = size, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, VerticalAlignment = VerticalAlignment.Center };
+        if (size is 14 or 12 or 18) block.SetResourceReference(TextBlock.FontSizeProperty, size == 12 ? "UICaptionSize" : size == 18 ? "UIHeadingSize" : "UIFontSize");
+        return block;
+    }
+    public static TextBlock Icon(string glyph, double size = 18, bool trailingSpace = true)
+    {
+        var block = new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"), FontSize = size, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = trailingSpace ? new Thickness(0, 0, 9, 0) : new Thickness(0) };
+        if (size == 18) block.SetResourceReference(TextBlock.FontSizeProperty, "IconSize"); return block;
+    }
     public static StackPanel Row(params UIElement[] items) { var p = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var x in items) p.Children.Add(x); return p; }
-    public static MenuItem Menu(string text, Action action, string shortcut = "") { var m = new MenuItem { Header = text, InputGestureText = shortcut, Icon = Icon(MenuGlyph(text), 16, false) }; m.Click += (_, _) => action(); return m; }
-    static string MenuGlyph(string text) => text switch { var t when t.StartsWith("Создать") => AddGlyph, var t when t.StartsWith("Вырезать") => CutGlyph, var t when t.StartsWith("Копировать") => CopyGlyph, var t when t.StartsWith("Вставить") => PasteGlyph, var t when t.StartsWith("Переименовать") => RenameGlyph, var t when t.StartsWith("Удалить") => DeleteGlyph, var t when t.StartsWith("Скачать") => DownloadGlyph, var t when t.StartsWith("Загрузить") => UploadGlyph, var t when t.StartsWith("Обновить") => RefreshGlyph, var t when t.StartsWith("Свойства") => "\uE946", var t when t.Contains("терминале") => "\uE756", var t when t.Contains("Поиск") || t.Contains("Искать") => SearchGlyph, var t when t.Contains("Закрепить") || t.Contains("Открепить") => "\uE718", var t when t.StartsWith("Открыть") => FolderGlyph, _ => "\uE8A5" };
-    public static MenuItem AsyncMenu(string text, Func<Task> action, string shortcut = "") => Menu(text, async () => await Guard(action), shortcut);
+    public static MenuItem Menu(string text, Action action, string shortcut = "", string? glyph = null) { var m = new MenuItem { Header = text, InputGestureText = shortcut }; if (glyph is not null) m.Icon = Icon(glyph, 16, false); m.Click += (_, _) => action(); return m; }
+    public static MenuItem AsyncMenu(string text, Func<Task> action, string shortcut = "", string? glyph = null) => Menu(text, async () => await Guard(action), shortcut, glyph);
     public static Border Line() { var b = new Border { Width = 1, Height = 26, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 5, 9, 5) }; b.SetResourceReference(Border.BackgroundProperty, "Edge"); return b; }
     public static void Error(string message) => MessageBox.Show(Application.Current.MainWindow, message, "SSH Explorer", MessageBoxButton.OK, MessageBoxImage.Warning);
     public static bool Confirm(string message, string title = "SSH Explorer") => MessageBox.Show(Application.Current.MainWindow, message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
@@ -61,6 +148,18 @@ public static class Ui
         w.Loaded += (_, _) => { t.Focus(); t.SelectAll(); };
         return w.ShowDialog() == true ? t.Text : null;
     }
+}
+
+public sealed class NonEmptyTextVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is string text && !string.IsNullOrWhiteSpace(text) ? Visibility.Visible : Visibility.Collapsed;
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
+public sealed class TreeIndentConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => new Thickness((value is int depth ? Math.Max(0, depth) : 0) * (Application.Current?.TryFindResource("TreeIndent") is double indent ? indent : 16), 0, 0, 0);
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
 public static class Theme
@@ -100,6 +199,7 @@ public static class Theme
         {
             r["Paper"] = SystemColors.WindowBrush; r["Surface"] = SystemColors.ControlBrush; r["NavigationSurface"] = SystemColors.WindowBrush; r["CaptionSurface"] = SystemColors.ControlBrush; r["Ink"] = SystemColors.WindowTextBrush; r["SelectedInk"] = SystemColors.HighlightTextBrush; r["AccentInk"] = SystemColors.HighlightTextBrush; r["Muted"] = SystemColors.GrayTextBrush; r["Edge"] = SystemColors.WindowTextBrush; r["Hover"] = SystemColors.ControlBrush; r["Pressed"] = SystemColors.HighlightBrush; r["Selected"] = SystemColors.HighlightBrush; r["SelectedInactive"] = SystemColors.ControlBrush; r["Accent"] = SystemColors.HighlightBrush; r["DropTarget"] = SystemColors.HighlightBrush; r["DisabledInk"] = SystemColors.GrayTextBrush;
             r["AccentHover"] = SystemColors.HighlightBrush; r["AccentPressed"] = SystemColors.HighlightBrush;
+            r["FocusStroke"] = SystemColors.WindowTextBrush; r["SelectedFocusStroke"] = SystemColors.HighlightTextBrush; r["PrimaryFocusStroke"] = SystemColors.HighlightTextBrush;
             Changed?.Invoke();
             return;
         }
@@ -113,6 +213,7 @@ public static class Theme
         static Color Mix(Color a, Color b, double amount) => Color.FromRgb((byte)(a.R * amount + b.R * (1 - amount)), (byte)(a.G * amount + b.G * (1 - amount)), (byte)(a.B * amount + b.B * (1 - amount)));
         r["Accent"] = new SolidColorBrush(accent); r["AccentInk"] = accent.R * .299 + accent.G * .587 + accent.B * .114 > 165 ? Brushes.Black : Brushes.White; r["Selected"] = new SolidColorBrush(Mix(accent, dark ? Color.FromRgb(32, 32, 32) : Colors.White, dark ? .34 : .16)); r["DropTarget"] = new SolidColorBrush(Mix(accent, dark ? Color.FromRgb(32, 32, 32) : Colors.White, dark ? .55 : .28));
         r["AccentHover"] = new SolidColorBrush(Mix(accent, Colors.Black, .92)); r["AccentPressed"] = new SolidColorBrush(Mix(accent, Colors.Black, .84));
+        r["FocusStroke"] = r["Accent"]; r["SelectedFocusStroke"] = r["Accent"]; r["PrimaryFocusStroke"] = r["AccentInk"];
         Changed?.Invoke();
     }
 }

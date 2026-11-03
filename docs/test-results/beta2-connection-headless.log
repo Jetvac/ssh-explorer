@@ -1,0 +1,14 @@
+PASS duplicate profile command is rejected before credentials/trust can queue
+PASS explicit independent connection owns a separate operation and cancellation
+PASS cancelling one operation leaves the independent attempt alive
+PASS completed attempt releases its registry slot for a retry
+PASS owner shutdown cancels all remaining operations
+PASS operation, fatal and termination records are durable before returning
+PASS diagnostics retain exception type and method stack while excluding message, inner message and Data secrets
+PASS safe diagnostic records identify build, runtime environment and process
+PASS credential record string cannot expose its secret
+PASS unchanged transfer refresh preserves row identity without collection reset or property churn
+PASS transfer completion updates displayed properties on the existing row
+PASS transfer pruning and additions preserve surviving rows and selection identity
+PASS connection and diagnostics checks create no Window
+RESULT: 13 headless operation/diagnostics/transfer checks passed

@@ -1,0 +1,20 @@
+{
+  "dateUtc": "2026-11-03T13:17:57.6196306Z",
+  "version": "0.2.0-beta.1+eda137a734e8fc259eb97fca300b2072d11232a8",
+  "baseCommit": "b1746b6e96733d44020156200f65733ccc5d91d4",
+  "dirty": true,
+  "sdk": "10.0.403",
+  "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
+  "appSha256": "118BAB8A3C6675678883489EC7CCC100855AAD7436A4138A97C70A7F0FD7CF91",
+  "testSha256": "966DAB853F9E30CE4EA0AA01CB35A93A5BB60DA16E6E8AEC98F4D21774E216AD",
+  "commands": [
+    "SSHExplorer.UiTests.exe --resources-only",
+    "SSHExplorer.UiTests.exe --motion-only"
+  ],
+  "exitCodes": [
+    0,
+    0
+  ],
+  "windowsCreated": 0,
+  "scope": "8 resource/contract + 18 MVVM; 17 real-clock/contract assertions. No HWND layout/focus/live test."
+}

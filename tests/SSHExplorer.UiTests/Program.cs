@@ -9,9 +9,13 @@ internal static class Program
     static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--resources-only") return ThemeResourceTests.Run();
+        if (args.Length == 1 && args[0] == "--motion-only") return MotionTests.Run();
+        if (args.Length == 1 && args[0] == "--connection-only") return ConnectionTests.Run();
+        if (!string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase))
+        { Console.Error.WriteLine("Window checks require CI; use --resources-only, --motion-only or --connection-only for headless checks."); return 2; }
         try
         {
-            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            var app = new App(); app.InitializeComponent(); app.ShutdownMode = ShutdownMode.OnExplicitShutdown; Theme.Apply("Light");
             var list = new ListBox { Width = 800, Height = 500, ItemsSource = Enumerable.Range(0, 10_000).Select(i => "item-" + i).ToList() };
             var factory = new FrameworkElementFactory(typeof(VirtualizingWrapPanel)); factory.SetValue(VirtualizingWrapPanel.ItemWidthProperty, 100d); factory.SetValue(VirtualizingWrapPanel.ItemHeightProperty, 80d); list.ItemsPanel = new ItemsPanelTemplate(factory); list.SetValue(ScrollViewer.CanContentScrollProperty, true);
             var host = new Window { Content = list, Width = 820, Height = 550, ShowInTaskbar = false, Left = -10_000, Top = -10_000 }; host.Show();
@@ -23,7 +27,8 @@ internal static class Program
             list.Width = 350; list.Height = 250; Layout(list); Assert(Count<ListBoxItem>(list) is > 0 and < 40, "resize limits realized containers");
             panel.SetVerticalOffset(-100); Layout(list); Assert(panel.VerticalOffset == 0, "negative scroll is clamped");
             var stateChecks = ViewModelTests.Run(Assert);
-            host.Close(); app.Shutdown(); Console.WriteLine($"RESULT: 6 WPF layout/virtualization + {stateChecks} MVVM state/binding checks passed"); return 0;
+            var componentChecks = UiComponentTests.Run(host, Assert);
+            host.Close(); app.Shutdown(); Console.WriteLine($"RESULT: 6 WPF layout/virtualization + {stateChecks} MVVM state/binding + {componentChecks} UI component checks passed"); return 0;
         }
         catch (Exception ex) { Console.WriteLine(ex); return 1; }
     }

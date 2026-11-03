@@ -1,0 +1,18 @@
+PASS real motion resources use project durations 83/167/250 ms
+PASS hover attaches one real opacity clock with the final base value already set
+PASS real WPF hover clock reaches an intermediate opacity without a Window
+PASS opposite hover replaces the old clock and retargets from its current value
+PASS rapid hover reversal does not accumulate clocks
+PASS hover finishes at its latest requested value without retained clocks
+PASS 64 repeated section transitions retain only the current opacity/translation clocks
+PASS real section clocks advance opacity and small presentation translation
+PASS motion preserves command object, focusability, hit-test flags and layout transform; no real keyboard input is claimed
+PASS disabling motion during a section transition snaps final values and removes clocks
+PASS disabled hover applies its final state immediately
+PASS disabled section transition has no residual opacity, transform or command delay
+PASS Unloaded cancels a real transition and restores its final presentation state
+PASS theme change during an active hover transition snaps and clears clocks
+PASS flyout presentation clock can be tested without opening a Popup
+PASS flyout Closed cleanup removes its clock without opening a Window or Popup
+PASS headless motion test created no Window
+RESULT: 17 real clock/contract assertions passed; no Windows or Popups opened; live motion/focus/HC remain separate

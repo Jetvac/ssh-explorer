@@ -41,6 +41,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     bool disposed, restoringSelection;
     public string CurrentPath => viewModel.CurrentPath;
     public event Action? FileNavigationRequested;
+    public event Action? NavigationCommitted;
     public UIElement Navigation => navigation;
     public FrameworkElement AddressBar => addressBar;
     public FrameworkElement CommandBar => commandBar;
@@ -52,6 +53,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         viewModel.Available = session.SftpAvailable;
         status.SetBinding(TextBlock.TextProperty, new Binding(nameof(FileBrowserViewModel.StatusText)));
         message.SetBinding(TextBlock.TextProperty, new Binding(nameof(FileBrowserViewModel.Message)));
+        message.SetBinding(VisibilityProperty, new Binding(nameof(FileBrowserViewModel.Message)) { Converter = new NonEmptyTextVisibilityConverter() });
         SetResourceReference(BackgroundProperty, "Paper");
         BuildNavigation(); BuildAddress(); BuildCommands(); BuildTable(); BuildTiles();
         var lower = new Grid(); lower.ColumnDefinitions.Add(new ColumnDefinition()); lower.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); lower.Children.Add(content); Grid.SetColumn(preview, 1); lower.Children.Add(preview); preview.SetResourceReference(Border.BorderBrushProperty, "Edge"); root.Children.Add(lower);
@@ -65,14 +67,15 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     {
         navigation.DataContext = viewModel;
         var home = Ui.AsyncCommandButton(Ui.HomeGlyph, "Домашняя папка", () => NavigateAsync("~")); home.SetResourceReference(StyleProperty, "NavigationButtonStyle"); navigation.Children.Add(home);
-        var rootButton = Ui.AsyncCommandButton(Ui.FolderGlyph, "Корень", () => NavigateAsync("/")); rootButton.ToolTip = "Корень, доступный этой учётной записи (с учётом SFTP chroot)"; rootButton.SetResourceReference(StyleProperty, "NavigationButtonStyle"); navigation.Children.Add(rootButton);
+        var homeMenu = new ContextMenu(); homeMenu.Items.Add(Ui.AsyncMenu("Открыть", () => NavigateAsync("~"), glyph: Ui.HomeGlyph)); homeMenu.Items.Add(Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, "~"), glyph: Ui.NewTabGlyph)); homeMenu.Items.Add(Ui.Menu("Копировать путь", () => Clipboard.SetText(session.Files.HomeDirectory), glyph: Ui.CopyGlyph)); Ui.AttachContextMenu(home, homeMenu);
         navigation.Children.Add(pins); RefreshPins(); navigation.Children.Add(tree);
-        var rootNode = Node("/", "/"); tree.Items.Add(rootNode);
+        var rootNode = Node("Корень /", "/"); rootNode.ToolTip = "Корень файловой системы, доступный этой учётной записи (с учётом SFTP chroot)"; tree.Items.Add(rootNode);
         tree.SelectedItemChanged += async (_, e) => { if (!syncingTree && e.NewValue is TreeViewItem { Tag: string path } && path != CurrentPath) await Ui.Guard(() => NavigateAsync(path)); };
     }
     TreeViewItem Node(string name, string path)
     {
-        var node = new TreeViewItem { Header = Ui.Row(Ui.Icon("\uE8B7", 16), Ui.Text(name)), Tag = path, ToolTip = path, AllowDrop = true }; node.Items.Add(new TreeViewItem { Header = "Загрузка…", IsEnabled = false });
+        var header = new DockPanel { LastChildFill = true }; var image = new Image { Source = FileSystemIcons.For(new RemoteEntry { IsDirectory = true }), Width = 18, Height = 18, Margin = new Thickness(0, 0, 8, 0) }; DockPanel.SetDock(image, Dock.Left); header.Children.Add(image); var label = Ui.Text(name); label.TextTrimming = TextTrimming.CharacterEllipsis; header.Children.Add(label);
+        var node = new TreeViewItem { Header = header, Tag = path, ToolTip = path, AllowDrop = true }; Ui.SetTreeDepth(node, path.Split('/', StringSplitOptions.RemoveEmptyEntries).Length); Ui.SetIsCurrentFolder(node, path == CurrentPath); node.Items.Add(new TreeViewItem { Header = "Загрузка…", IsEnabled = false });
         node.Expanded += async (_, e) =>
         {
             if (!ReferenceEquals(e.OriginalSource, node)) return;
@@ -81,7 +84,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         node.DragOver += (_, e) => DropOver(e, path, node);
         node.DragLeave += (_, _) => ClearDropTarget();
         node.Drop += async (_, e) => { e.Handled = true; var effect = CanDropTo(e.Data, path, e.KeyStates); e.Effects = effect; ClearDropTarget(); if (effect != DragDropEffects.None) await Ui.Guard(() => DropData(e.Data, path, e.KeyStates)); };
-        var menu = new ContextMenu(); menu.Items.Add(Ui.AsyncMenu("Открыть", () => NavigateAsync(path))); menu.Items.Add(Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, path))); menu.Items.Add(Ui.AsyncMenu("Открыть в терминале", () => OpenTerminal(path))); menu.Items.Add(Ui.AsyncMenu("Закрепить / открепить", () => TogglePin(path))); menu.Items.Add(Ui.Menu("Копировать путь", () => Clipboard.SetText(path))); node.ContextMenu = menu; return node;
+        var menu = new ContextMenu(); menu.Items.Add(Ui.AsyncMenu("Открыть", () => NavigateAsync(path), glyph: Ui.FolderGlyph)); menu.Items.Add(Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, path), glyph: Ui.NewTabGlyph)); menu.Items.Add(Ui.AsyncMenu("Открыть в терминале", () => OpenTerminal(path), glyph: Ui.TerminalGlyph)); menu.Items.Add(Ui.AsyncMenu("Закрепить / открепить", () => TogglePin(path), glyph: Ui.PinGlyph)); menu.Items.Add(Ui.Menu("Копировать путь", () => Clipboard.SetText(path), glyph: Ui.CopyGlyph)); Ui.AttachContextMenu(node, menu); return node;
     }
     async Task LoadNode(TreeViewItem node)
     {
@@ -99,7 +102,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         pins.Children.Clear(); foreach (var path in session.Profile.Bookmarks)
         {
             var b = Ui.AsyncCommandButton("\uE718", PosixPath.Name(path) is { Length: > 0 } n ? n : path, () => NavigateAsync(path)); b.SetResourceReference(StyleProperty, "NavigationButtonStyle"); b.ToolTip = path;
-            var menu = new ContextMenu(); menu.Items.Add(Ui.AsyncMenu("Открепить", () => TogglePin(path))); b.ContextMenu = menu; pins.Children.Add(b);
+            var menu = new ContextMenu(); menu.Items.Add(Ui.AsyncMenu("Открепить", () => TogglePin(path), glyph: Ui.PinGlyph)); Ui.AttachContextMenu(b, menu); pins.Children.Add(b);
         }
     }
     async Task TogglePin(string path) { if (!session.Profile.Bookmarks.Remove(path)) session.Profile.Bookmarks.Add(path); await App.Store.SaveAsync(); RefreshPins(); }
@@ -115,29 +118,29 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         address.Visibility = Visibility.Collapsed; address.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(() => NavigateAsync(address.Text)); address.Visibility = Visibility.Collapsed; } if (e.Key == Key.Escape) { address.Visibility = Visibility.Collapsed; table.Focus(); e.Handled = true; } }; address.LostKeyboardFocus += (_, _) => address.Visibility = Visibility.Collapsed; pathHost.Children.Add(address); Grid.SetColumn(pathHost, 1); bar.Children.Add(pathHost);
         search.SetBinding(TextBox.TextProperty, new Binding(nameof(FileBrowserViewModel.SearchQuery)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
         search.TextChanged += (_, _) => { viewModel.SearchQuery = search.Text; ApplyItems(); }; System.Windows.Automation.AutomationProperties.SetName(search, "Поиск в текущей папке");
-        var searchMenu = new ContextMenu(); searchMenu.Items.Add(Ui.AsyncMenu("Искать во вложенных папках…", RecursiveSearch)); searchMenu.Items.Add(Ui.Menu("Отменить рекурсивный поиск", () => recursiveSearchCts?.Cancel())); searchMenu.Items.Add(Ui.AsyncMenu("Вернуться к содержимому папки", RefreshAsync)); search.ContextMenu = searchMenu;
+        var searchMenu = new ContextMenu(); searchMenu.Items.Add(Ui.AsyncMenu("Искать во вложенных папках…", RecursiveSearch, glyph: Ui.SearchGlyph)); searchMenu.Items.Add(Ui.Menu("Отменить рекурсивный поиск", () => recursiveSearchCts?.Cancel(), glyph: Ui.CloseGlyph)); searchMenu.Items.Add(Ui.AsyncMenu("Вернуться к содержимому папки", RefreshAsync, glyph: Ui.RefreshGlyph)); Ui.AttachContextMenu(search, searchMenu);
         var searchHost = new Grid(); searchHost.Children.Add(search); var hint = Ui.Text("Поиск в этой папке", 13); hint.Margin = new Thickness(9, 0, 6, 0); hint.IsHitTestVisible = false; hint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(hint); search.TextChanged += (_, _) => hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         Grid.SetColumn(searchHost, 2); bar.Children.Add(searchHost); addressBar = bar;
     }
     void BuildCommands()
     {
         var commands = new WrapPanel { Margin = new Thickness(10, 3, 10, 5) };
-        var create = Ui.CommandButton(Ui.AddGlyph, "Создать", () => { var m = new ContextMenu(); m.Items.Add(Ui.AsyncMenu("Папку", () => Create(true), "Ctrl+Shift+N")); m.Items.Add(Ui.AsyncMenu("Файл", () => Create(false))); m.IsOpen = true; }, chevron: true); create.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.CanCreate))); commands.Children.Add(create); commands.Children.Add(Ui.Line());
+        var create = Ui.FlyoutButton(Ui.AddGlyph, "Создать", () => { var m = new ContextMenu(); m.Items.Add(Ui.AsyncMenu("Папку", () => Create(true), "Ctrl+Shift+N", Ui.FolderGlyph)); m.Items.Add(Ui.AsyncMenu("Файл", () => Create(false), glyph: Ui.FileGlyph)); return m; }); create.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.CanCreate))); commands.Children.Add(create); commands.Children.Add(Ui.Line());
         foreach (var button in new[] { Ui.AsyncIconButton(Ui.CutGlyph, () => CopySelection(true), "Вырезать · Ctrl+X"), Ui.AsyncIconButton(Ui.CopyGlyph, () => CopySelection(false), "Копировать · Ctrl+C"), Ui.AsyncIconButton(Ui.DeleteGlyph, Delete, "Окончательно удалить · Delete") }) { button.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.HasSelection))); commands.Children.Add(button); }
         var paste = Ui.AsyncIconButton(Ui.PasteGlyph, Paste, "Вставить · Ctrl+V"); paste.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.CanCreate))); commands.Children.Insert(4, paste);
         var rename = Ui.AsyncIconButton(Ui.RenameGlyph, Rename, "Переименовать · F2"); rename.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.CanRename))); commands.Children.Insert(5, rename); commands.Children.Add(Ui.Line());
         var upload = Ui.AsyncIconButton(Ui.UploadGlyph, Upload, "Загрузить файлы с Windows"); upload.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.CanCreate))); commands.Children.Add(upload);
         var download = Ui.AsyncIconButton(Ui.DownloadGlyph, Download, "Скачать выделенные объекты"); download.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.HasSelection))); commands.Children.Add(download);
-        commands.Children.Add(Ui.CommandButton(Ui.SortGlyph, "Сортировать", SortMenu, chevron: true)); commands.Children.Add(Ui.CommandButton(Ui.ViewGlyph, "Просмотреть", ViewMenu, chevron: true));
-        var more = Ui.IconButton(Ui.MoreGlyph, () => { var m = BuildContextMenu(Selected().Count > 0); m.IsOpen = true; }, "Дополнительные действия"); commands.Children.Add(more);
+        commands.Children.Add(Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu)); commands.Children.Add(Ui.FlyoutButton(Ui.ViewGlyph, "Просмотреть", BuildViewMenu));
+        var more = Ui.FlyoutButton(Ui.MoreGlyph, "", () => BuildContextMenu(Selected().Count > 0), "Дополнительные действия"); commands.Children.Add(more);
         var border = new Border { Child = commands, DataContext = viewModel, BorderThickness = new Thickness(0, 0, 0, 1) }; border.SetResourceReference(Border.BorderBrushProperty, "Edge"); commandBar = border;
-        var bottom = new DockPanel { DataContext = viewModel, Margin = new Thickness(14, 5, 14, 5), MinHeight = 20 }; status.FontSize = 12; status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); bottom.Children.Add(status); statusBar = bottom;
-        message.Margin = new Thickness(18, 8, 18, 8); message.TextWrapping = TextWrapping.Wrap; message.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); DockPanel.SetDock(message, Dock.Top); root.Children.Add(message);
+        var bottom = new Grid { DataContext = viewModel, Margin = new Thickness(14, 5, 14, 5), Height = 20 }; bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); bottom.ColumnDefinitions.Add(new ColumnDefinition()); status.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); bottom.Children.Add(status); statusBar = bottom;
+        message.Margin = new Thickness(16, 0, 0, 0); message.TextWrapping = TextWrapping.NoWrap; message.TextTrimming = TextTrimming.CharacterEllipsis; message.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); message.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); message.SetBinding(ToolTipProperty, new Binding(nameof(FileBrowserViewModel.Message))); Grid.SetColumn(message, 1); bottom.Children.Add(message);
     }
     void BuildTable()
     {
         table.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(FileBrowserViewModel.VisibleEntries)));
-        var template = new DataTemplate(); var row = new FrameworkElementFactory(typeof(DockPanel)); row.SetValue(DockPanel.LastChildFillProperty, true); var glyph = new FrameworkElementFactory(typeof(TextBlock)); glyph.SetBinding(TextBlock.TextProperty, new Binding("Glyph")); glyph.SetValue(TextBlock.FontFamilyProperty, new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets")); glyph.SetValue(TextBlock.FontSizeProperty, 18d); glyph.SetValue(TextBlock.WidthProperty, 26d); glyph.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); glyph.SetBinding(TextBlock.ForegroundProperty, new Binding("IconBrush")); glyph.SetValue(DockPanel.DockProperty, Dock.Left); row.AppendChild(glyph); var name = new FrameworkElementFactory(typeof(TextBlock)); name.SetBinding(TextBlock.TextProperty, new Binding("DisplayName")); name.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); name.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); row.AppendChild(name); template.VisualTree = row;
+        var template = new DataTemplate(); var row = new FrameworkElementFactory(typeof(DockPanel)); row.SetValue(DockPanel.LastChildFillProperty, true); var icon = new FrameworkElementFactory(typeof(Image)); icon.SetBinding(Image.SourceProperty, new Binding(nameof(FileItemViewModel.FileIcon))); icon.SetValue(Image.WidthProperty, 20d); icon.SetValue(Image.HeightProperty, 20d); icon.SetValue(MarginProperty, new Thickness(0, 0, 8, 0)); icon.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetValue(DockPanel.DockProperty, Dock.Left); row.AppendChild(icon); var name = new FrameworkElementFactory(typeof(TextBlock)); name.SetBinding(TextBlock.TextProperty, new Binding("DisplayName")); name.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); name.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); row.AppendChild(name); template.VisualTree = row;
         table.Columns.Add(new DataGridTemplateColumn { Header = "Имя", CellTemplate = template, Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 220, SortMemberPath = "Name" });
         MainWindow.AddColumn(table, "Дата изменения", "Modified", 180, "{0:dd.MM.yyyy HH:mm}"); MainWindow.AddColumn(table, "Тип", "Type", 150); MainWindow.AddColumn(table, "Размер", "Size", 104); MainWindow.AddColumn(table, "Права", "Permissions", 90); MainWindow.AddColumn(table, "Владелец", "Owner", 90); MainWindow.AddColumn(table, "Группа", "Group", 90);
         foreach (var column in table.Columns.OfType<DataGridTextColumn>().Where(c => c.SortMemberPath is "Size" or "Owner" or "Group")) column.ElementStyle = new Style(typeof(TextBlock)) { Setters = { new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right) } };
@@ -150,12 +153,12 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         table.Sorting += (_, e) => { e.Handled = true; var key = e.Column.SortMemberPath; descending = key == sortKey && !descending; sortKey = key; foreach (var c in table.Columns) c.SortDirection = c == e.Column ? descending ? ListSortDirection.Descending : ListSortDirection.Ascending : null; ApplyItems(); };
         table.SelectionChanged += (_, _) => SelectionChanged(); table.MouseDoubleClick += async (_, e) => { if (FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) is not null) await Ui.Guard(Open); };
         var rowStyle = new Style(typeof(DataGridRow), (Style)FindResource(typeof(DataGridRow))); rowStyle.Setters.Add(new Setter(OpacityProperty, new Binding("Opacity"))); table.RowStyle = rowStyle;
-        ConfigureDrag(table); ConfigureRightClick(table); table.ContextMenu = BuildContextMenu(false); table.ContextMenuOpening += (_, _) => table.ContextMenu = BuildContextMenu(Selected().Count > 0);
+        ConfigureDrag(table); ConfigureRightClick(table); Ui.AttachContextMenu(table, () => BuildContextMenu(Selected().Count > 0));
     }
     void BuildTiles()
     {
         tiles.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(FileBrowserViewModel.VisibleEntries)));
-        tiles.SelectionChanged += (_, _) => SelectionChanged(); tiles.MouseDoubleClick += async (_, e) => { if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is not null) await Ui.Guard(Open); }; ConfigureDrag(tiles); ConfigureRightClick(tiles); ConfigureLasso(); tiles.ContextMenu = BuildContextMenu(false); tiles.ContextMenuOpening += (_, _) => tiles.ContextMenu = BuildContextMenu(Selected().Count > 0);
+        tiles.SelectionChanged += (_, _) => SelectionChanged(); tiles.MouseDoubleClick += async (_, e) => { if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is not null) await Ui.Guard(Open); }; ConfigureDrag(tiles); ConfigureRightClick(tiles); ConfigureLasso(); Ui.AttachContextMenu(tiles, () => BuildContextMenu(Selected().Count > 0));
     }
     void ConfigureRightClick(Control control)
     {
@@ -205,25 +208,26 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     void EditAddress() { address.Text = CurrentPath; address.Visibility = Visibility.Visible; address.Focus(); address.SelectAll(); }
     public async Task NavigateAsync(string path) { FileNavigationRequested?.Invoke(); await Navigate(path, true); }
-    async Task Navigate(string path, bool addHistory, BrowserHistoryItem? restore = null, int? targetHistoryIndex = null)
+    public Task InitializeAsync(string path, CancellationToken ct) => Navigate(path, true, requestToken: ct, throwOnFailure: true);
+    async Task Navigate(string path, bool addHistory, BrowserHistoryItem? restore = null, int? targetHistoryIndex = null, CancellationToken requestToken = default, bool throwOnFailure = false)
     {
         recursiveSearchCts?.Cancel();
         thumbnailCts.Cancel(); thumbnailCts.Dispose(); thumbnailCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, session.Lifetime);
         if (!session.SftpAvailable) throw new InvalidOperationException("SFTP-подсистема недоступна. Откройте терминал или проверьте доступ сервера без изменения его конфигурации.");
-        navigationCts.Cancel(); navigationCts.Dispose(); navigationCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, session.Lifetime); var ct = navigationCts.Token; var version = viewModel.BeginNavigation();
+        navigationCts.Cancel(); navigationCts.Dispose(); navigationCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, session.Lifetime, requestToken); var ct = navigationCts.Token; var version = viewModel.BeginNavigation();
         var oldSelected = viewModel.SelectedPaths.ToList(); var oldOffset = GetScrollOffset();
         try
         {
             var normalized = await session.Files.ResolvePathAsync(path.StartsWith('/') || path.StartsWith('~') ? path : PosixPath.Combine(string.IsNullOrEmpty(CurrentPath) ? session.Files.HomeDirectory : CurrentPath, path), ct);
-            var entries = await session.Files.ListAsync(normalized, ct); if (version != generation || ct.IsCancellationRequested) return;
-            if (!viewModel.CommitNavigation(version, normalized, entries, addHistory, oldSelected, oldOffset, targetHistoryIndex)) return;
+            var entries = await session.Files.ListAsync(normalized, ct); if (version != generation || ct.IsCancellationRequested) { if (throwOnFailure) throw new OperationCanceledException("Начальная навигация отменена или заменена новым запросом.", ct); return; }
+            if (!viewModel.CommitNavigation(version, normalized, entries, addHistory, oldSelected, oldOffset, targetHistoryIndex)) { if (throwOnFailure) throw new OperationCanceledException("Начальная навигация заменена новым запросом.", ct); return; }
             ApplyItems(); RestoreSelection(viewModel.SelectedPaths.ToList());
             if (restore is not null) _ = Dispatcher.BeginInvoke(() => FindVisualChild<ScrollViewer>(mode == "Details" ? table : tiles)?.ScrollToVerticalOffset(restore.Offset));
-            UpdateBreadcrumbs();
-            _ = SyncTree(normalized, version); UpdateStatus();
+            UpdateBreadcrumbs(); UpdateCurrentTree();
+            _ = SyncTree(normalized, version); UpdateStatus(); NavigationCommitted?.Invoke();
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { viewModel.FailNavigation(version, path, "Операция отменена."); }
-        catch (Exception ex) { viewModel.FailNavigation(version, path, ErrorMessages.Describe(ex)); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { viewModel.FailNavigation(version, path, "Операция отменена."); if (throwOnFailure) throw; }
+        catch (Exception ex) { viewModel.FailNavigation(version, path, ErrorMessages.Describe(ex)); if (throwOnFailure) throw; }
     }
     async Task Back() { if (viewModel.HistoryTarget(-1) is { } target) await Navigate(target.Item.Path, false, target.Item, target.Index); }
     async Task Forward() { if (viewModel.HistoryTarget(1) is { } target) await Navigate(target.Item.Path, false, target.Item, target.Index); }
@@ -243,9 +247,17 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             {
                 await LoadNode(node); if (version != generation || disposed) return; node.IsExpanded = true; full += "/" + part; var next = node.Items.OfType<TreeViewItem>().FirstOrDefault(x => (x.Tag as string) == full); if (next is null) return; node = next;
             }
-            if (version == generation && !disposed) { syncingTree = true; node.IsSelected = true; syncingTree = false; }
+            if (version == generation && !disposed) { syncingTree = true; try { node.IsSelected = true; UpdateCurrentTree(); } finally { syncingTree = false; } }
         }
         catch (OperationCanceledException) { }
+    }
+    void UpdateCurrentTree()
+    {
+        void Visit(ItemsControl parent)
+        {
+            foreach (var node in parent.Items.OfType<TreeViewItem>()) { Ui.SetIsCurrentFolder(node, node.Tag is string path && path == CurrentPath); Visit(node); }
+        }
+        Visit(tree);
     }
     double GetScrollOffset() => FindVisualChild<ScrollViewer>(mode == "Details" ? table : tiles)?.VerticalOffset ?? 0;
     public object CaptureContext() => viewModel.Capture(GetScrollOffset());
@@ -281,17 +293,22 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             var width = mode switch { "Huge" => 180d, "Large" => 144d, "Medium" => 112d, "Small" => 180d, "List" => 250d, "Tile" => 310d, _ => 800d };
             var height = mode switch { "Huge" => 192d, "Large" => 156d, "Medium" => 126d, "Small" => 38d, "List" => 30d, "Tile" => 82d, _ => 92d };
             var factory = new FrameworkElementFactory(mode is "List" or "Content" ? typeof(VirtualizingStackPanel) : typeof(VirtualizingWrapPanel)); if (mode is not "List" and not "Content") { factory.SetValue(VirtualizingWrapPanel.ItemWidthProperty, width); factory.SetValue(VirtualizingWrapPanel.ItemHeightProperty, height); } tiles.ItemsPanel = new ItemsPanelTemplate(factory);
-            tiles.ItemTemplate = TileTemplate(mode); tiles.ItemContainerStyle = new Style(typeof(ListBoxItem)) { Setters = { new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch), new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Stretch), new Setter(FrameworkElement.MarginProperty, new Thickness(3)), new Setter(Control.PaddingProperty, new Thickness(5)), new Setter(OpacityProperty, new Binding("Opacity")) } };
-            if (mode is "List" or "Content") tiles.ItemContainerStyle.Setters.Add(new Setter(HeightProperty, height));
+            tiles.ItemTemplate = TileTemplate(mode); tiles.ItemContainerStyle = CreateFileItemContainerStyle(mode);
         }
         RestoreSelection(selection); UpdatePreviewVisibility(); if (save) _ = App.Store.SaveAsync();
+    }
+    static Style CreateFileItemContainerStyle(string view)
+    {
+        var style = new Style(typeof(ListBoxItem), (Style)Application.Current.FindResource(typeof(ListBoxItem))) { Setters = { new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch), new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Stretch), new Setter(FrameworkElement.MarginProperty, new Thickness(3)), new Setter(Control.PaddingProperty, new Thickness(5)), new Setter(OpacityProperty, new Binding(nameof(FileItemViewModel.Opacity))) } };
+        if (view is "List" or "Content") style.Setters.Add(new Setter(HeightProperty, view == "List" ? 32d : 92d)); return style;
     }
     DataTemplate TileTemplate(string view)
     {
         bool horizontal = view is "Small" or "List" or "Tile" or "Content"; var iconSize = view switch { "Huge" => 120d, "Large" => 88d, "Medium" => 56d, "Small" => 22d, "List" => 18d, _ => 48d };
-        var template = new DataTemplate(); var panel = new FrameworkElementFactory(typeof(StackPanel)); panel.SetValue(StackPanel.OrientationProperty, horizontal ? Orientation.Horizontal : Orientation.Vertical);
+        var template = new DataTemplate(); var panel = new FrameworkElementFactory(horizontal ? typeof(DockPanel) : typeof(StackPanel)); if (horizontal) panel.SetValue(DockPanel.LastChildFillProperty, true);
         var iconHost = new FrameworkElementFactory(typeof(Grid)); iconHost.SetValue(FrameworkElement.WidthProperty, iconSize); iconHost.SetValue(FrameworkElement.HeightProperty, iconSize); iconHost.SetValue(FrameworkElement.MarginProperty, horizontal ? new Thickness(0, 0, 12, 0) : new Thickness(0, 5, 0, 8));
-        var icon = new FrameworkElementFactory(typeof(TextBlock)); icon.SetBinding(TextBlock.TextProperty, new Binding("Glyph")); icon.SetValue(TextBlock.FontFamilyProperty, new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets")); icon.SetValue(TextBlock.FontSizeProperty, iconSize * .82); icon.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center); icon.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetBinding(TextBlock.ForegroundProperty, new Binding("IconBrush")); icon.SetBinding(VisibilityProperty, new Binding("Thumbnail") { Converter = new IconVisibilityConverter() }); iconHost.AppendChild(icon);
+        if (horizontal) iconHost.SetValue(DockPanel.DockProperty, Dock.Left);
+        var icon = new FrameworkElementFactory(typeof(Image)); icon.SetBinding(Image.SourceProperty, new Binding(nameof(FileItemViewModel.FileIcon))); icon.SetValue(Image.StretchProperty, Stretch.Uniform); icon.SetValue(WidthProperty, iconSize); icon.SetValue(HeightProperty, iconSize); icon.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center); icon.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetBinding(VisibilityProperty, new Binding("Thumbnail") { Converter = new IconVisibilityConverter() }); iconHost.AppendChild(icon);
         var image = new FrameworkElementFactory(typeof(Image)); image.SetBinding(Image.SourceProperty, new Binding("Thumbnail")); image.SetValue(Image.StretchProperty, Stretch.Uniform); image.AddHandler(FrameworkElement.LoadedEvent, new RoutedEventHandler(async (s, _) => { if (((FrameworkElement)s).DataContext is FileItemViewModel r && IsImage(r.Entry)) await Ui.Guard(() => LoadThumbnail(r)); })); iconHost.AppendChild(image); panel.AppendChild(iconHost);
         var texts = new FrameworkElementFactory(typeof(StackPanel)); texts.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
         var name = new FrameworkElementFactory(typeof(TextBlock)); name.SetBinding(TextBlock.TextProperty, new Binding("DisplayName")); name.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); name.SetValue(TextBlock.TextWrappingProperty, horizontal ? TextWrapping.NoWrap : TextWrapping.Wrap); name.SetValue(TextBlock.MaxHeightProperty, horizontal ? 24d : 44d); name.SetValue(TextBlock.TextAlignmentProperty, horizontal ? TextAlignment.Left : TextAlignment.Center); texts.AppendChild(name);
@@ -299,17 +316,17 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (view == "Content") { var path = new FrameworkElementFactory(typeof(TextBlock)); path.SetBinding(TextBlock.TextProperty, new Binding("Entry.FullPath")); path.SetValue(TextBlock.FontSizeProperty, 12d); path.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); texts.AppendChild(path); }
         panel.AppendChild(texts); template.VisualTree = panel; return template;
     }
-    void ViewMenu()
+    ContextMenu BuildViewMenu()
     {
-        var m = new ContextMenu(); foreach (var (key, label) in new[] { ("Huge", "Огромные значки"), ("Large", "Крупные значки"), ("Medium", "Обычные значки"), ("Small", "Мелкие значки"), ("List", "Список"), ("Details", "Таблица"), ("Tile", "Плитка"), ("Content", "Содержимое") }) { var item = Ui.Menu(label, () => SetMode(key)); item.IsCheckable = true; item.IsChecked = mode == key; m.Items.Add(item); }
+        var m = new ContextMenu(); foreach (var (key, label) in new[] { ("Huge", "Огромные значки"), ("Large", "Крупные значки"), ("Medium", "Обычные значки"), ("Small", "Мелкие значки"), ("List", "Список"), ("Details", "Таблица"), ("Tile", "Плитка"), ("Content", "Содержимое") }) { var item = Ui.Menu(label, () => SetMode(key), glyph: Ui.ViewGlyph); item.IsCheckable = true; item.IsChecked = mode == key; m.Items.Add(item); }
         m.Items.Add(new Separator()); void Toggle(string label, bool initial, Action<bool> action) { var i = new MenuItem { Header = label, IsCheckable = true, IsChecked = initial }; i.Click += (_, _) => { action(i.IsChecked); _ = App.Store.SaveAsync(); }; m.Items.Add(i); }
         Toggle("Скрытые элементы", App.Store.Settings.ShowHidden, x => { App.Store.Settings.ShowHidden = x; ApplyItems(); }); Toggle("Расширения имён файлов", App.Store.Settings.ShowExtensions, x => { App.Store.Settings.ShowExtensions = x; ApplyItems(); }); Toggle("Область сведений", App.Store.Settings.DetailsPane, x => { App.Store.Settings.DetailsPane = x; UpdatePreviewVisibility(); _ = Ui.Guard(UpdatePreview); }); Toggle("Область просмотра", App.Store.Settings.PreviewPane, x => { App.Store.Settings.PreviewPane = x; UpdatePreviewVisibility(); _ = Ui.Guard(UpdatePreview); });
-        var columns = new MenuItem { Header = "Колонки таблицы" }; foreach (var c in table.Columns) { var i = new MenuItem { Header = c.Header, IsCheckable = true, IsChecked = c.Visibility == Visibility.Visible, IsEnabled = c != table.Columns[0] }; i.Click += (_, _) => { c.Visibility = i.IsChecked ? Visibility.Visible : Visibility.Collapsed; SaveColumns(); }; columns.Items.Add(i); } m.Items.Add(columns); m.IsOpen = true;
+        var columns = new MenuItem { Header = "Колонки таблицы" }; foreach (var c in table.Columns) { var i = new MenuItem { Header = c.Header, IsCheckable = true, IsChecked = c.Visibility == Visibility.Visible, IsEnabled = c != table.Columns[0] }; i.Click += (_, _) => { c.Visibility = i.IsChecked ? Visibility.Visible : Visibility.Collapsed; SaveColumns(); }; columns.Items.Add(i); } m.Items.Add(columns); return m;
     }
-    void SortMenu()
+    ContextMenu BuildSortMenu()
     {
-        var m = new ContextMenu(); foreach (var (key, title) in new[] { ("Name", "Имя"), ("Modified", "Дата изменения"), ("Type", "Тип"), ("Size", "Размер") }) { var i = Ui.Menu(title, () => { sortKey = key; ApplyItems(); }); i.IsCheckable = true; i.IsChecked = key == sortKey; m.Items.Add(i); }
-        m.Items.Add(new Separator()); var desc = new MenuItem { Header = "По убыванию", IsCheckable = true, IsChecked = descending }; desc.Click += (_, _) => { descending = desc.IsChecked; ApplyItems(); }; m.Items.Add(desc); m.IsOpen = true;
+        var m = new ContextMenu(); foreach (var (key, title) in new[] { ("Name", "Имя"), ("Modified", "Дата изменения"), ("Type", "Тип"), ("Size", "Размер") }) { var i = Ui.Menu(title, () => { sortKey = key; ApplyItems(); }, glyph: Ui.SortGlyph); i.IsCheckable = true; i.IsChecked = key == sortKey; m.Items.Add(i); }
+        m.Items.Add(new Separator()); var desc = new MenuItem { Header = "По убыванию", IsCheckable = true, IsChecked = descending }; desc.Click += (_, _) => { descending = desc.IsChecked; ApplyItems(); }; m.Items.Add(desc); return m;
     }
     async Task RecursiveSearch()
     {
@@ -339,13 +356,22 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     ContextMenu BuildContextMenu(bool selected)
     {
-        var m = new ContextMenu(); if (selected)
+        var m = new ContextMenu(); var chosen = Selected(); var first = chosen.FirstOrDefault()?.Entry;
+        if (selected && first is not null)
         {
-            m.Items.Add(Ui.AsyncMenu("Открыть", Open, "Enter")); var first = Selected().FirstOrDefault()?.Entry; var newTab = Ui.AsyncMenu("Открыть в новой вкладке", () => first is not null ? main.OpenServer(session.Profile, first.FullPath) : Task.CompletedTask); newTab.IsEnabled = Selected().Count == 1 && first?.IsDirectory == true && !first.IsSymbolicLink; newTab.ToolTip = newTab.IsEnabled ? "Открыть каталог в независимой сессии" : "Доступно для одного обычного каталога"; m.Items.Add(newTab); m.Items.Add(Ui.AsyncMenu(first?.IsDirectory == true ? "Открыть в терминале" : "Открыть родительскую папку в терминале", () => OpenTerminal(first?.IsDirectory == true && !first.IsSymbolicLink ? first.FullPath : first is not null ? PosixPath.Parent(first.FullPath) : CurrentPath)));
-            m.Items.Add(new Separator()); m.Items.Add(Ui.AsyncMenu("Вырезать", () => CopySelection(true), "Ctrl+X")); m.Items.Add(Ui.AsyncMenu("Копировать", () => CopySelection(false), "Ctrl+C")); m.Items.Add(Ui.AsyncMenu("Скачать…", Download)); m.Items.Add(Ui.AsyncMenu("Переименовать", Rename, "F2")); m.Items.Add(Ui.AsyncMenu("Удалить окончательно…", Delete, "Delete")); m.Items.Add(Ui.Menu("Копировать путь", () => { var p = Selected().Select(r => r.Entry.FullPath); Clipboard.SetText(string.Join(Environment.NewLine, p)); })); m.Items.Add(Ui.AsyncMenu("Свойства", Properties, "Alt+Enter"));
+            var open = Ui.AsyncMenu("Открыть", Open, "Enter", Ui.FolderGlyph); open.IsEnabled = chosen.Count == 1 && (first.IsDirectory || first.IsSymbolicLink || first.IsRegularFile); open.ToolTip = open.IsEnabled ? "Открыть папку или встроенный просмотр" : "Специальные Linux-объекты не открываются как документы"; m.Items.Add(open);
+            var newTab = Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, first.FullPath), glyph: Ui.NewTabGlyph); newTab.IsEnabled = chosen.Count == 1 && first.IsDirectory && !first.IsSymbolicLink; newTab.ToolTip = newTab.IsEnabled ? "Открыть каталог в независимой сессии" : "Доступно для одного обычного каталога"; m.Items.Add(newTab);
+            m.Items.Add(Ui.AsyncMenu(first.IsDirectory ? "Открыть в терминале" : "Открыть родительскую папку в терминале", () => OpenTerminal(first.IsDirectory && !first.IsSymbolicLink ? first.FullPath : PosixPath.Parent(first.FullPath)), glyph: Ui.TerminalGlyph));
+            m.Items.Add(new Separator());
+            m.Items.Add(Ui.AsyncMenu("Вырезать", () => CopySelection(true), "Ctrl+X", Ui.CutGlyph)); m.Items.Add(Ui.AsyncMenu("Копировать", () => CopySelection(false), "Ctrl+C", Ui.CopyGlyph)); m.Items.Add(Ui.AsyncMenu("Скачать…", Download, glyph: Ui.DownloadGlyph));
+            var rename = Ui.AsyncMenu("Переименовать", Rename, "F2", Ui.RenameGlyph); rename.IsEnabled = chosen.Count == 1; m.Items.Add(rename);
+            m.Items.Add(Ui.AsyncMenu("Удалить окончательно…", Delete, "Delete", Ui.DeleteGlyph)); m.Items.Add(Ui.Menu("Копировать путь", () => Clipboard.SetText(string.Join(Environment.NewLine, Selected().Select(r => r.Entry.FullPath))), glyph: Ui.CopyGlyph)); m.Items.Add(Ui.AsyncMenu("Свойства", Properties, "Alt+Enter", Ui.PropertiesGlyph));
         }
-        else { m.Items.Add(Ui.AsyncMenu("Создать папку", () => Create(true), "Ctrl+Shift+N")); m.Items.Add(Ui.AsyncMenu("Создать файл", () => Create(false))); m.Items.Add(Ui.AsyncMenu("Обновить", RefreshAsync, "F5")); m.Items.Add(Ui.AsyncMenu("Загрузить файлы…", Upload)); m.Items.Add(Ui.AsyncMenu("Загрузить папку…", UploadFolder)); m.Items.Add(Ui.AsyncMenu("Поиск во вложенных папках…", RecursiveSearch)); m.Items.Add(Ui.AsyncMenu("Открыть папку в терминале", () => OpenTerminal(CurrentPath))); }
-        m.Items.Add(Ui.AsyncMenu("Вставить", Paste, "Ctrl+V")); m.Items.Add(Ui.AsyncMenu("Отменить последнее переименование / перемещение", Undo, "Ctrl+Z")); m.Items.Add(new Separator()); m.Items.Add(Ui.AsyncMenu("Закрепить / открепить папку", () => TogglePin(Selected().FirstOrDefault(r => r.Entry.IsDirectory)?.Entry.FullPath ?? CurrentPath))); return m;
+        else
+        {
+            m.Items.Add(Ui.AsyncMenu("Создать папку", () => Create(true), "Ctrl+Shift+N", Ui.FolderGlyph)); m.Items.Add(Ui.AsyncMenu("Создать файл", () => Create(false), glyph: Ui.FileGlyph)); m.Items.Add(Ui.AsyncMenu("Обновить", RefreshAsync, "F5", Ui.RefreshGlyph)); m.Items.Add(Ui.AsyncMenu("Загрузить файлы…", Upload, glyph: Ui.UploadGlyph)); m.Items.Add(Ui.AsyncMenu("Загрузить папку…", UploadFolder, glyph: Ui.UploadGlyph)); m.Items.Add(Ui.AsyncMenu("Поиск во вложенных папках…", RecursiveSearch, glyph: Ui.SearchGlyph)); m.Items.Add(Ui.AsyncMenu("Открыть папку в терминале", () => OpenTerminal(CurrentPath), glyph: Ui.TerminalGlyph));
+        }
+        m.Items.Add(Ui.AsyncMenu("Вставить", Paste, "Ctrl+V", Ui.PasteGlyph)); m.Items.Add(Ui.AsyncMenu("Отменить последнее переименование / перемещение", Undo, "Ctrl+Z", Ui.UndoGlyph)); m.Items.Add(new Separator()); m.Items.Add(Ui.AsyncMenu("Закрепить / открепить папку", () => TogglePin(chosen.FirstOrDefault(r => r.Entry.IsDirectory && !r.Entry.IsSymbolicLink)?.Entry.FullPath ?? CurrentPath), glyph: Ui.PinGlyph)); return m;
     }
     async Task Open()
     {
@@ -475,7 +501,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         void SizeImage() { if (image.Source is not BitmapSource b) return; if (fit) { image.Width = Math.Max(1, scroller.ViewportWidth); image.Height = Math.Max(1, scroller.ViewportHeight); image.Stretch = Stretch.Uniform; } else { var dpi = VisualTreeHelper.GetDpi(image); image.Width = b.PixelWidth / dpi.DpiScaleX; image.Height = b.PixelHeight / dpi.DpiScaleY; } }
         async Task Load() { var version = ++frameGeneration; frameCts?.Cancel(); frameCts?.Dispose(); frameCts = CancellationTokenSource.CreateLinkedTokenSource(localCts.Token); var ct = frameCts.Token; var e = images[index]; info.Text = e.Name + " · загрузка…"; try { var bitmap = await ReadImage(e, 0, ct); if (version != frameGeneration || ct.IsCancellationRequested) return; image.Source = bitmap; w.Title = e.Name + " — просмотр изображения"; info.Text = e.Name + " · " + e.SizeText; SizeImage(); } catch (OperationCanceledException) when (ct.IsCancellationRequested) { } catch (Exception ex) { if (version == frameGeneration) { image.Source = null; w.Title = e.Name + " — ошибка просмотра"; info.Text = e.Name + ": " + ErrorMessages.Describe(ex); } } }
         scroller.SizeChanged += (_, _) => { if (fit) SizeImage(); };
-        var controls = Ui.Row(Ui.AsyncButton("←", async () => { index = (index - 1 + images.Count) % images.Count; await Load(); }), Ui.AsyncButton("→", async () => { index = (index + 1) % images.Count; await Load(); }), Ui.Button("Вписать", () => { fit = true; SizeImage(); }), Ui.Button("100%", () => { fit = false; SizeImage(); }), Ui.Button("＋", () => { fit = false; image.Width = (double.IsNaN(image.Width) ? image.ActualWidth : image.Width) * 1.25; image.Height = (double.IsNaN(image.Height) ? image.ActualHeight : image.Height) * 1.25; }), Ui.Button("−", () => { fit = false; image.Width = Math.Max(32, (double.IsNaN(image.Width) ? image.ActualWidth : image.Width) / 1.25); image.Height = Math.Max(32, (double.IsNaN(image.Height) ? image.ActualHeight : image.Height) / 1.25); }), Ui.AsyncButton("Скачать", async () => { var f = new OpenFolderDialog { Title = "Скачать изображение" }; if (f.ShowDialog(w) == true) { var job = App.Transfers.Download(session, [images[index].FullPath], f.FolderName); main.ShowTransfers(); await App.Transfers.WaitAsync(job, lifetime.Token); ReportTransfer(job); } })); DockPanel.SetDock(controls, Dock.Top); p.Children.Add(controls); info.Margin = new Thickness(14, 9, 14, 9); DockPanel.SetDock(info, Dock.Bottom); p.Children.Add(info); p.Children.Add(scroller); w.Content = p; w.Closed += (_, _) => { frameGeneration++; frameCts?.Cancel(); frameCts?.Dispose(); localCts.Cancel(); localCts.Dispose(); }; TrackWindow(w); w.Show(); await Load();
+        var controls = Ui.Row(Ui.AsyncIconButton(Ui.BackGlyph, async () => { index = (index - 1 + images.Count) % images.Count; await Load(); }, "Предыдущее изображение"), Ui.AsyncIconButton(Ui.ForwardGlyph, async () => { index = (index + 1) % images.Count; await Load(); }, "Следующее изображение"), Ui.Button("Вписать", () => { fit = true; SizeImage(); }), Ui.Button("100%", () => { fit = false; SizeImage(); }), Ui.IconButton(Ui.AddGlyph, () => { fit = false; image.Width = (double.IsNaN(image.Width) ? image.ActualWidth : image.Width) * 1.25; image.Height = (double.IsNaN(image.Height) ? image.ActualHeight : image.Height) * 1.25; }, "Увеличить"), Ui.IconButton("\uE738", () => { fit = false; image.Width = Math.Max(32, (double.IsNaN(image.Width) ? image.ActualWidth : image.Width) / 1.25); image.Height = Math.Max(32, (double.IsNaN(image.Height) ? image.ActualHeight : image.Height) / 1.25); }, "Уменьшить"), Ui.AsyncCommandButton(Ui.DownloadGlyph, "Скачать", async () => { var f = new OpenFolderDialog { Title = "Скачать изображение" }; if (f.ShowDialog(w) == true) { var job = App.Transfers.Download(session, [images[index].FullPath], f.FolderName); main.ShowTransfers(); await App.Transfers.WaitAsync(job, lifetime.Token); ReportTransfer(job); } })); DockPanel.SetDock(controls, Dock.Top); p.Children.Add(controls); info.Margin = new Thickness(14, 9, 14, 9); DockPanel.SetDock(info, Dock.Bottom); p.Children.Add(info); p.Children.Add(scroller); w.Content = p; w.Closed += (_, _) => { frameGeneration++; frameCts?.Cancel(); frameCts?.Dispose(); localCts.Cancel(); localCts.Dispose(); }; TrackWindow(w); w.Show(); await Load();
     }
     void HandleKey(object sender, KeyEventArgs e)
     {
@@ -484,17 +510,31 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (ctrl && key == Key.F) { e.Handled = true; search.Focus(); search.SelectAll(); return; }
         if (key == Key.Escape) recursiveSearchCts?.Cancel();
         if (e.OriginalSource is TextBox or PasswordBox) return;
+        if (navigation.IsKeyboardFocusWithin)
+        {
+            if (shift && key == Key.F10 || key == Key.Apps)
+            {
+                if (FindAncestor<Control>(e.OriginalSource as DependencyObject) is { ContextMenu: { } menu } owner) { Ui.OpenContextMenu(owner, menu); e.Handled = true; }
+                return;
+            }
+            // A tree/pin keyboard action must not delete/open the stale table selection.
+            if (!(alt && key is Key.Left or Key.Right or Key.Up) && key != Key.F5 && key != Key.Escape) return;
+        }
         Func<Task>? action = null;
         if (key == Key.F5) action = RefreshAsync; else if (key == Key.F2) action = Rename; else if (key == Key.Delete) action = Delete; else if (key == Key.Enter && alt) action = Properties; else if (key == Key.Enter) action = Open; else if (key == Key.Left && alt) action = Back; else if (key == Key.Right && alt) action = Forward; else if (key == Key.Up && alt) action = Up; else if (ctrl && key == Key.C) action = () => CopySelection(false); else if (ctrl && key == Key.X) action = () => CopySelection(true); else if (ctrl && key == Key.V) action = Paste; else if (ctrl && key == Key.Z) action = Undo; else if (ctrl && shift && key == Key.N) action = () => Create(true);
         else if (ctrl && key == Key.A) { if (mode == "Details") table.SelectAll(); else tiles.SelectAll(); e.Handled = true; }
         else if (key == Key.Escape) { navigationCts.Cancel(); recursiveSearchCts?.Cancel(); viewModel.SearchQuery = ""; if (mode == "Details") table.UnselectAll(); else tiles.UnselectAll(); e.Handled = true; }
-        else if (shift && key == Key.F10) { var menu = BuildContextMenu(Selected().Count > 0); menu.PlacementTarget = mode == "Details" ? table : tiles; menu.IsOpen = true; e.Handled = true; }
+        else if (shift && key == Key.F10) { var menu = BuildContextMenu(Selected().Count > 0); Ui.OpenContextMenu(mode == "Details" ? table : tiles, menu); e.Handled = true; }
         if (action is not null) { e.Handled = true; _ = Ui.Guard(action); }
     }
     public void RouteGlobalKey(KeyEventArgs e) => HandleKey(this, e);
     public void SetAvailability(bool available) => viewModel.Available = available;
     internal Task ReceiveDropAsync(IDataObject data, DragDropKeyStates keys) => DropData(data, CurrentPath, keys);
-    void RefreshPalette() { if (!disposed) foreach (var row in viewModel.VisibleEntries) row.Notify(); }
+    void RefreshPalette()
+    {
+        if (disposed) return; foreach (var row in viewModel.VisibleEntries) row.Notify();
+        void Visit(ItemsControl parent) { foreach (var node in parent.Items.OfType<TreeViewItem>()) { if (node.Header is DockPanel header && header.Children.OfType<Image>().FirstOrDefault() is Image icon) icon.Source = FileSystemIcons.For(new RemoteEntry { IsDirectory = true }); Visit(node); } } Visit(tree);
+    }
     static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject { while (node is not null) { if (node is T t) return t; node = node is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node); } return null; }
     static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject { for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++) { var child = VisualTreeHelper.GetChild(parent, i); if (child is T t) return t; var found = FindVisualChild<T>(child); if (found is not null) return found; } return null; }
     static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject { for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++) { var child = VisualTreeHelper.GetChild(parent, i); if (child is T t) yield return t; else foreach (var nested in FindVisualChildren<T>(child)) yield return nested; } }

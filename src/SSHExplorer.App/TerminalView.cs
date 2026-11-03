@@ -37,10 +37,10 @@ public sealed class TerminalView : UserControl, IDisposable
         _font = App.Store.Settings.TerminalFontSize;
         var root = new DockPanel();
         var tools = Ui.Row(_status, new Border { Width = 24 }, _search,
-            Ui.AsyncButton("↑", () => FindAsync(true), "Предыдущее совпадение"),
-            Ui.AsyncButton("↓", () => FindAsync(false), "Следующее совпадение"),
-            Ui.AsyncButton("−", () => ChangeFontAsync(-1), "Уменьшить шрифт"),
-            Ui.AsyncButton("+", () => ChangeFontAsync(1), "Увеличить шрифт"),
+            Ui.AsyncIconButton(Ui.UpGlyph, () => FindAsync(true), "Предыдущее совпадение"),
+            Ui.AsyncIconButton("\uE74B", () => FindAsync(false), "Следующее совпадение"),
+            Ui.AsyncIconButton("\uE738", () => ChangeFontAsync(-1), "Уменьшить шрифт"),
+            Ui.AsyncIconButton(Ui.AddGlyph, () => ChangeFontAsync(1), "Увеличить шрифт"),
             Ui.AsyncButton("Вставить", PasteAsync, "Вставить • Ctrl+Shift+V"));
         tools.Margin = new Thickness(12, 6, 12, 6); DockPanel.SetDock(tools, Dock.Top);
         root.Children.Add(tools); root.Children.Add(_web); Content = root;
@@ -109,6 +109,13 @@ public sealed class TerminalView : UserControl, IDisposable
                     e.Response = env.CreateWebResourceResponse(new MemoryStream(), 403, "Forbidden", "Content-Type: text/plain");
             };
             core.WebMessageReceived += MessageReceived;
+            core.ProcessFailed += (_, e) =>
+            {
+                if (_disposed) return;
+                LocalDiagnostics.RecordSynchronous("terminal.component.failed", e.ProcessFailedKind.ToString());
+                _status.Text = "Компонент терминала завершился. Переподключите сессию для повторного запуска.";
+                _ready.TrySetException(new IOException("Компонент терминала завершился."));
+            };
             core.Navigate("https://terminal.local/index.html");
             await _ready.Task.WaitAsync(TimeSpan.FromSeconds(20), _stop.Token);
             await RunScriptAsync($"window.sshExplorer.font({_font})");
@@ -118,7 +125,7 @@ public sealed class TerminalView : UserControl, IDisposable
             _status.Text = $"SSH • {_session.Profile.Username}@{_session.Profile.Host} • новая оболочка";
             _ = ReadLoopAsync(_shell);
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _status.Text = ErrorMessages.Describe(ex); throw; }
     }
 

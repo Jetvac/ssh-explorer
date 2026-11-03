@@ -15,7 +15,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     private readonly Dictionary<string,string> _errors=[];
     private string _profileName,_host,_port,_username,_keyPath,_initialPath,_timeout,_status="";
     private int _authenticationIndex;
-    private bool _saveSecret,_isSaving;
+    private bool _saveSecret,_isSaving,_hasStoredSecret;
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     public ProfileViewModel(IProfilePersistence persistence,ServerProfile? old=null)
     {
@@ -40,12 +40,14 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public int AuthenticationIndex
     {
         get=>_authenticationIndex;
-        set{Set(ref _authenticationIndex,value);Changed(nameof(IsKeyAuthentication));Changed(nameof(SecretLabel));Changed(nameof(SecretExplanation));ClearError(nameof(PrivateKeyPath));ClearError("Secret");}
+        set{if(_authenticationIndex!=value)_hasStoredSecret=false;Set(ref _authenticationIndex,value);Changed(nameof(IsKeyAuthentication));Changed(nameof(SecretLabel));Changed(nameof(SecretExplanation));ClearError(nameof(PrivateKeyPath));ClearError("Secret");}
     }
-    public bool SaveSecret{get=>_saveSecret;set{Set(ref _saveSecret,value);ClearError("Secret");}}
+    public bool SaveSecret{get=>_saveSecret;set{Set(ref _saveSecret,value);Changed(nameof(SecretExplanation));ClearError("Secret");}}
     public bool IsKeyAuthentication=>AuthenticationIndex==(int)AuthenticationKind.PrivateKey;
     public string SecretLabel=>IsKeyAuthentication?"Парольная фраза ключа (если задана)":AuthenticationIndex==2?"Пароль для первоначального запроса":"Пароль";
-    public string SecretExplanation=>IsKeyAuthentication?"Для незашифрованного ключа оставьте поле пустым. Ключ не копируется в настройки.":AuthenticationIndex==2?"Дополнительные запросы и одноразовые коды вводятся при подключении и не сохраняются.":"Можно оставить пустым и ввести при подключении. Сохранение профиля не проверяет доступность сервера.";
+    public string SecretExplanation=>(IsKeyAuthentication?"Для незашифрованного ключа парольная фраза не нужна. ":AuthenticationIndex==2?"Дополнительные запросы и одноразовые коды вводятся отдельно и не сохраняются. ":"Пустое поле можно заполнить при подключении. ")+
+        (SaveSecret?"«Сохранить» записывает введённый секрет без проверки. «Сохранить и подключиться» обновит его только после успешного входа.":"«Сохранить» записывает только профиль; пароль потребуется при будущем входе. «Сохранить и подключиться» использует введённое значение в этой попытке.")+
+        (_hasStoredSecret?" Пустое поле при отдельном сохранении оставит прежний защищённый секрет.":"");
     public bool IsSaving{get=>_isSaving;private set{Set(ref _isSaving,value);Changed(nameof(CanEdit));}}
     public bool CanEdit=>!IsSaving;
     public string Status{get=>_status;private set=>Set(ref _status,value);}
@@ -60,6 +62,8 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     void RaiseErrors(){foreach(var name in new[]{nameof(NameError),nameof(HostError),nameof(PortError),nameof(UserError),nameof(KeyError),nameof(InitialPathError),nameof(TimeoutError),nameof(SecretError)})Changed(name);}
     public void SecretChanged()=>ClearError("Secret");
     public bool Validate(string secret)
+        =>Validate(secret,deferSecretUntilAuthentication:false);
+    private bool Validate(string secret,bool deferSecretUntilAuthentication)
     {
         _errors.Clear();
         if(string.IsNullOrWhiteSpace(ProfileName))_errors[nameof(ProfileName)]="Введите название сервера.";
@@ -73,29 +77,39 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         if(!int.TryParse(Timeout.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out int timeout)||timeout is <3 or >120)_errors[nameof(Timeout)]="Таймаут: число от 3 до 120 секунд.";
         try{_ = PosixPath.Normalize(string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim());}
         catch(ArgumentException){_errors[nameof(InitialPath)]="Используйте абсолютный POSIX-путь или ~ домашней папки.";}
-        if(SaveSecret&&!IsKeyAuthentication&&string.IsNullOrEmpty(secret))_errors["Secret"]="Введите пароль для сохранения или отключите сохранение секрета.";
+        if(SaveSecret&&!IsKeyAuthentication&&string.IsNullOrEmpty(secret)&&!_hasStoredSecret&&!deferSecretUntilAuthentication)_errors["Secret"]="Введите пароль для сохранения или отключите сохранение секрета.";
         RaiseErrors();Status=_errors.Count==0?"":"Проверьте отмеченные поля. Введённые значения сохранены.";return _errors.Count==0;
     }
     public async Task<string?> LoadSecretAsync(CancellationToken ct=default)
     {
         if(!SaveSecret)return null;
-        try{return await _persistence.ReadSecretAsync(_id,ct);}
+        int authentication=AuthenticationIndex;
+        try{var secret=await _persistence.ReadSecretAsync(_id,ct);if(AuthenticationIndex!=authentication)return null;_hasStoredSecret=secret is not null;Changed(nameof(SecretExplanation));return secret;}
         catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or CryptographicException or FormatException)
         {Status="Не удалось прочитать сохранённый секрет. Введите новый пароль или отключите его сохранение.";_ = LocalDiagnostics.RecordAsync("profile.secret.read.failed",ex);return null;}
     }
     public async Task<bool> SaveAsync(string secret,CancellationToken ct=default)
+        =>await SaveCoreAsync(secret,false,ct);
+    public async Task<ProfileSubmission?> SubmitAsync(string secret,bool connectNow,bool secretWasProvided=true,CancellationToken ct=default)
     {
-        if(IsSaving||!Validate(secret))return false;
+        if(!await SaveCoreAsync(secret,connectNow,ct))return null;
+        return new ProfileSubmission(SavedProfile!,connectNow,connectNow&&(secretWasProvided||IsKeyAuthentication)?new SessionCredentials(secret):null){CleanupWarning=CleanupWarning};
+    }
+    private async Task<bool> SaveCoreAsync(string secret,bool deferSecretUntilAuthentication,CancellationToken ct)
+    {
+        if(IsSaving||!Validate(secret,deferSecretUntilAuthentication))return false;
         IsSaving=true;Status="Сохранение…";
         try
         {
             TryNormalizeHost(Host,out string host);
             var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret,Bookmarks=_bookmarks.ToList()};
-            var result=await _persistence.SaveAsync(profile,SaveSecret?secret:null,ct);
+            var result=deferSecretUntilAuthentication
+                ?await _persistence.SaveForConnectionAsync(profile,ct)
+                :await _persistence.SaveAsync(profile,SaveSecret&&!(secret.Length==0&&_hasStoredSecret)?secret:null,ct);
             SavedProfile=result.Profile;CleanupWarning=result.CleanupWarning;Status=CleanupWarning??"Профиль сохранён.";return true;
         }
         catch(OperationCanceledException){Status="Сохранение отменено. Ввод сохранён.";return false;}
-        catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or CryptographicException or ArgumentException or NotSupportedException)
+        catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or CryptographicException or ArgumentException or InvalidOperationException or NotSupportedException)
         {Status="Не удалось сохранить профиль и защищённый секрет. Проверьте доступ к папке настроек. Введённые значения сохранены.";_ = LocalDiagnostics.RecordAsync("profile.save.failed",ex);return false;}
         finally{IsSaving=false;}
     }

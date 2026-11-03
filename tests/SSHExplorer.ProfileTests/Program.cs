@@ -1,6 +1,8 @@
 using System.IO;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.Loader;
+using System.Runtime.CompilerServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
@@ -8,6 +10,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using SSHExplorer.App;
@@ -32,12 +35,26 @@ internal static class Program
             var windowStyle=new Style(typeof(Window),(Style)_app.Resources[typeof(Window)]);
             windowStyle.Setters.Add(new Setter(Window.ShowActivatedProperty,false));windowStyle.Setters.Add(new Setter(Window.WindowStateProperty,WindowState.Minimized));_app.Resources[typeof(Window)]=windowStyle;
             bool noWindows=args.Contains("--no-windows",StringComparer.Ordinal);
+            if(!noWindows&&!string.Equals(Environment.GetEnvironmentVariable("CI"),"true",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Window scenarios run only in CI. Use --no-windows on the host.");
             _owner=new Window{Title="Isolated STA profile regression",ShowInTaskbar=false,ShowActivated=false,WindowState=WindowState.Minimized};_app.MainWindow=_owner;if(!noWindows)_owner.Show();
-            ValidateFields();StorageTransactions();ViewModelFailures();
-            if(noWindows)UnshownMainSelectionScenario();else{DialogScenarios();MainWindowScenario();}
+            int reuseIndex=Array.IndexOf(args,"--saved-reuse");
+            if(reuseIndex>=0)
+            {
+                if(noWindows||reuseIndex+2>=args.Length)throw new ArgumentException("--saved-reuse requires CI fixture and isolated store paths");
+                SavedReuseScenario(args[reuseIndex+1],args[reuseIndex+2]);_owner.Close();_app.Shutdown();Console.WriteLine($"RESULT: {_passed} ordinary saved-credential restart checks passed");return 0;
+            }
+            if(!args.Contains("--ordinary-only",StringComparer.Ordinal))
+            {
+                ValidateFields();StorageTransactions();ViewModelFailures();SecretControls();SubmissionTransactions();CloneCompatibility();CancelledPrompts();DelayedSecretComponents();
+                if(noWindows)UnshownMainSelectionScenario();else{DialogScenarios();MainWindowScenario();ModalCancellationScenarios();}
+            }
             int fixtureIndex=Array.IndexOf(args,"--ssh-fixture");
             if(fixtureIndex>=0){if(fixtureIndex+1>=args.Length)throw new ArgumentException("--ssh-fixture requires isolated configuration path");ProfileConnectionScenario(args[fixtureIndex+1]);}
-            _owner.Close();_app.Shutdown();Console.WriteLine($"RESULT: {_passed} profile validation, persistence and STA dialog checks passed");return 0;
+            int baselineIndex=Array.IndexOf(args,"--baseline-core");
+            if(baselineIndex>=0){if(!noWindows||baselineIndex+1>=args.Length)throw new ArgumentException("--baseline-core requires --no-windows and published beta.1 Core path");PublishedBaselineCompatibility(args[baselineIndex+1]);}
+            int ordinaryIndex=Array.IndexOf(args,"--ordinary-fixture");
+            if(ordinaryIndex>=0){if(noWindows||ordinaryIndex+1>=args.Length)throw new ArgumentException("--ordinary-fixture requires CI dialog mode and fixture.json");OrdinaryPasswordScenario(args[ordinaryIndex+1]);}
+            _owner.Close();_app.Shutdown();Console.WriteLine($"RESULT: {_passed} profile validation, persistence and {(noWindows?"unshown WPF component":"STA dialog")} checks passed");return 0;
         }
         catch(Exception ex){Console.WriteLine(ex);return 1;}
     }
@@ -115,6 +132,178 @@ internal static class Program
         var first=reentrant.SaveAsync("");Check(reentrant.IsSaving&&!Pump(reentrant.SaveAsync(""))&&blocked.SaveCalls==1,"rapid double-save performs exactly one persistence operation");
         blocked.Release.TrySetResult();Check(Pump(first)&&reentrant.SavedProfile is not null,"original save completes after duplicate click is ignored");
     }
+    static void SecretControls()
+    {
+        const string exact="  пароль ' \" Ω\t  ";var entry=new SecretEntry();
+        var masked=Logical<PasswordBox>(entry).Single();var text=Logical<TextBox>(entry).Single();var toggle=Logical<ToggleButton>(entry).Single();
+        masked.Password=exact;Check(entry.Password==exact&&text.Text==exact,"actual masked control preserves Unicode, quotes and surrounding whitespace");
+        int revision=entry.EditRevision;toggle.IsChecked=true;Check(entry.IsRevealed&&entry.Password==exact&&entry.EditRevision==revision,"reveal preserves exact value without editing or network work");
+        string edited=exact+"new ";text.Text=edited;toggle.IsChecked=false;
+        Check(entry.Password==edited&&masked.Password==edited&&!entry.IsRevealed,"editing revealed control synchronizes exact secret back to masked control");
+        entry.Clear();Check(entry.Password.Length==0&&text.Text.Length==0&&!entry.IsRevealed,"clearing secret control clears both presentations");
+        var dialog=new ProfileDialog(new ProfilePersistence(NewStore("control-profile")),allowConnect:true);
+        Check(FindButton(dialog,"Сохранить и подключиться").IsDefault&&!FindButton(dialog,"Сохранить").IsDefault,"new profile has explicit connect default and separate Save action without showing a window");dialog.Close();
+    }
+    static void SubmissionTransactions()
+    {
+        const string exact="  точный ' \" Ω пароль  ";var store=NewStore("submissions");var model=ValidModel(new ProfilePersistence(store));
+        var submission=Pump(model.SubmitAsync(exact,true));Check(submission is {ConnectNow:true}&&submission.Credentials?.Secret==exact,"save-and-connect returns the exact in-memory credential");
+        Check(Pump(store.ReadSecretAsync(submission!.Profile.Id))is null&&!Directory.EnumerateFiles(store.DirectoryPath,"secret-*.dpapi").Any(),"without opt-in save-and-connect writes no secret file");
+        Check(!submission.ToString().Contains(exact,StringComparison.Ordinal),"profile submission diagnostic text contains no secret");
+        var optedStore=NewStore("deferred");var opted=ValidModel(new ProfilePersistence(optedStore));opted.SaveSecret=true;
+        var pending=Pump(opted.SubmitAsync(exact,true))!;Check(pending.Credentials?.Secret==exact&&Pump(optedStore.ReadSecretAsync(pending.Profile.Id))is null,"new opted-in profile defers secret persistence until authenticated");
+        Check(Pump(optedStore.SaveAuthenticatedSecretAsync(pending.Profile,exact))&&Pump(new AppStore(optedStore.DirectoryPath).ReadSecretAsync(pending.Profile.Id))==exact,"successful authentication commits exact DPAPI secret transactionally");
+        var editing=new ProfileViewModel(new ProfilePersistence(optedStore),pending.Profile);Check(Pump(editing.LoadSecretAsync())==exact,"existing saved secret is available without manual re-entry");
+        var retry=Pump(editing.SubmitAsync("wrong entered value",true))!;
+        Check(Pump(optedStore.ReadSecretAsync(retry.Profile.Id))==exact,"unverified replacement credentials never overwrite a good saved secret");
+        using(var locked=new FileStream(Path.Combine(optedStore.DirectoryPath,"settings.json"),FileMode.Open,FileAccess.Read,FileShare.Read))
+        {
+            bool failed=false;try{Pump(optedStore.SaveAuthenticatedSecretAsync(retry.Profile,"other authenticated value"));}catch(IOException){failed=true;}
+            Check(failed&&Pump(optedStore.ReadSecretAsync(retry.Profile.Id))==exact,"failed post-auth settings commit preserves old good secret");
+        }
+        Check(Directory.EnumerateFiles(optedStore.DirectoryPath,"secret-*.dpapi").Count()==1,"post-auth failure removes its unreferenced secret file");
+        Check(Pump(editing.SaveAsync(""))&&Pump(optedStore.ReadSecretAsync(pending.Profile.Id))==exact,"separate Save with blank field preserves existing protected secret");
+        var changed=new ProfileViewModel(new ProfilePersistence(optedStore),retry.Profile){Username="different-user"};Pump(changed.SubmitAsync("",true,false));
+        Check(!Pump(optedStore.SaveAuthenticatedSecretAsync(retry.Profile,"late response"))&&Pump(optedStore.ReadSecretAsync(retry.Profile.Id))==exact,"late authenticated result cannot update a changed authentication identity");
+        var current=optedStore.Profiles.Single();Pump(optedStore.DeleteProfileAsync(current.Id));
+        Check(!Pump(optedStore.SaveAuthenticatedSecretAsync(current,exact)),"late success cannot recreate a deleted profile");
+        var separate=ValidModel(new ProfilePersistence(NewStore("save-only")));separate.SaveSecret=true;
+        var only=Pump(separate.SubmitAsync(exact,false));Check(only is {ConnectNow:false,Credentials:null},"separate Save has no connection side effect or credential result");
+        var missing=ValidModel(new ProfilePersistence(NewStore("omitted")));var without=Pump(missing.SubmitAsync("",true,false));
+        Check(without is {ConnectNow:true,Credentials:null},"untouched password field requests normal credential prompt instead of invented empty password");
+        var lostStore=NewStore("removed-secret");var lostProfile=new ServerProfile{Name="removed secret",Host="lost.invalid",Username="tester",SaveSecret=true};Pump(lostStore.SaveProfileAsync(lostProfile,exact));
+        var lostModel=new ProfileViewModel(new ProfilePersistence(lostStore),lostProfile);Pump(lostModel.LoadSecretAsync());foreach(var file in Directory.EnumerateFiles(lostStore.DirectoryPath,"secret-*.dpapi"))File.Delete(file);
+        Check(!Pump(lostModel.SaveAsync(""))&&lostModel.Status.Contains("Не удалось",StringComparison.Ordinal)&&!lostModel.IsSaving,"removed saved-secret file is an inline recoverable error instead of an async handler crash");
+        Check(Pump(lostModel.SaveAsync(exact))&&Pump(lostStore.ReadSecretAsync(lostProfile.Id))==exact,"same form recovers by entering a replacement secret after missing-file error");
+        var keyStore=NewStore("empty-passphrase");var keyModel=ValidModel(new ProfilePersistence(keyStore));keyModel.AuthenticationIndex=1;keyModel.PrivateKeyPath=Path.Combine(_root,"key-placeholder");keyModel.SaveSecret=true;
+        var keySubmission=Pump(keyModel.SubmitAsync("",true,false))!;Check(keySubmission.Credentials?.Secret==""&&Pump(keyStore.ReadSecretAsync(keySubmission.Profile.Id))is null,"explicit empty key passphrase remains an in-memory credential distinct from missing secret");
+        Check(Pump(keyStore.SaveAuthenticatedSecretAsync(keySubmission.Profile,""))&&Pump(new AppStore(keyStore.DirectoryPath).ReadSecretAsync(keySubmission.Profile.Id))=="","empty authenticated passphrase survives DPAPI restart without becoming null");
+    }
+    static void CloneCompatibility()
+    {
+        const string exact="  beta.1 сохранённый секрет Ω  ";var original=NewStore("beta1-source");
+        var profile=new ServerProfile{Name="Beta.1 clone",Host="clone.invalid",Username="tester",SaveSecret=true};Pump(original.SaveProfileAsync(profile,exact));original.Settings.Theme="Dark";original.Settings.PollIntervalSeconds=7;Pump(original.SaveAsync());
+        byte[] key=Encoding.UTF8.GetBytes("isolated-generated-trust-fixture");
+        var trusted=new[]{new TrustedHostKey{Host=profile.Host,Port=22,Algorithm="fixture-algorithm",PublicKey=Convert.ToBase64String(key),Fingerprint=HostTrustStore.Fingerprint(key),TrustedAtUtc=DateTime.UtcNow}};
+        File.WriteAllText(Path.Combine(original.DirectoryPath,"hostkeys.json"),System.Text.Json.JsonSerializer.Serialize(trusted));
+        var sourceHashes=Directory.EnumerateFiles(original.DirectoryPath).ToDictionary(p=>Path.GetFileName(p),p=>SHA256.HashData(File.ReadAllBytes(p)));
+        var target=Path.Combine(_root,"beta2-clone");Directory.CreateDirectory(target);foreach(var path in Directory.EnumerateFiles(original.DirectoryPath))File.Copy(path,Path.Combine(target,Path.GetFileName(path)));
+        var clone=new AppStore(target);Check(clone.Profiles.Single().Id==profile.Id&&clone.Settings.Theme=="Dark"&&clone.Settings.PollIntervalSeconds==7,"schema1 beta.1 fixture clone retains profile ID and settings");
+        Check(Pump(clone.ReadSecretAsync(profile.Id))==exact&&clone.Trust.Records.Single().Fingerprint==HostTrustStore.Fingerprint(key),"schema1 cloned DPAPI secret and trusted key remain readable");
+        Pump(clone.SaveProfileAsync(clone.Profiles.Single(),null));Check(Pump(new AppStore(target).ReadSecretAsync(profile.Id))==exact,"beta.2 save and restart keep cloned protected secret reference");
+        Check(sourceHashes.All(pair=>SHA256.HashData(File.ReadAllBytes(Path.Combine(original.DirectoryPath,pair.Key!))).SequenceEqual(pair.Value)),"clone compatibility checks never alter original isolated beta.1 fixture bytes");
+    }
+    static void PublishedBaselineCompatibility(string baselineCore)
+    {
+        baselineCore=Path.GetFullPath(baselineCore);string baselineDirectory=Path.GetDirectoryName(baselineCore)!;
+        var binaries=Directory.EnumerateFiles(baselineDirectory,"*.dll").ToDictionary(p=>p,p=>SHA256.HashData(File.ReadAllBytes(p)));
+        string original=Path.Combine(_root,"published-beta1-source");Directory.CreateDirectory(original);
+        const string secret="  published beta.1 ' \" пароль Ω  ";Guid profileId=Guid.NewGuid();byte[] key=Encoding.UTF8.GetBytes("isolated-published-beta1-host-key");
+        CreatePublishedBaselineStore(baselineCore,original,profileId,secret,key);
+        var sourceHashes=Directory.EnumerateFiles(original).ToDictionary(p=>Path.GetFileName(p),p=>SHA256.HashData(File.ReadAllBytes(p)));
+        string cloneDirectory=Path.Combine(_root,"published-beta1-clone");Directory.CreateDirectory(cloneDirectory);
+        foreach(var source in Directory.EnumerateFiles(original))File.Copy(source,Path.Combine(cloneDirectory,Path.GetFileName(source)));
+        var clone=new AppStore(cloneDirectory);var profile=clone.Profiles.Single();
+        Check(profile.Id==profileId&&profile.Bookmarks.SequenceEqual(new[]{"/baseline bookmark Ω"})&&clone.Settings.Theme=="Dark"&&clone.Settings.PollIntervalSeconds==7,"exact published beta.1 Core store clone retains profile ID, bookmarks and settings");
+        Check(Pump(clone.ReadSecretAsync(profileId))==secret&&clone.Trust.Records.Single().Fingerprint==HostTrustStore.Fingerprint(key),"exact published beta.1 Core DPAPI secret and persisted host trust remain readable");
+        profile.Name="Beta.2 edited clone";Pump(clone.SaveProfileAsync(profile,null));var reopened=new AppStore(cloneDirectory);
+        Check(reopened.Profiles.Single().Name=="Beta.2 edited clone"&&reopened.Profiles.Single().Id==profileId&&Pump(reopened.ReadSecretAsync(profileId))==secret,"beta.2 edit and restart preserve exact published beta.1 credential reference");
+        Check(sourceHashes.All(p=>SHA256.HashData(File.ReadAllBytes(Path.Combine(original,p.Key))).SequenceEqual(p.Value)),"exact published beta.1 source store bytes stay unchanged while its clone is edited");
+        Check(binaries.All(p=>SHA256.HashData(File.ReadAllBytes(p.Key)).SequenceEqual(p.Value)),"published beta.1 Core and sibling DLL bytes are unchanged after Core-only loading");
+    }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void CreatePublishedBaselineStore(string baselineCore,string directory,Guid profileId,string secret,byte[] key)
+    {
+        var context=new AssemblyLoadContext("PublishedBeta1Core-"+Guid.NewGuid().ToString("N"),isCollectible:true);
+        context.Resolving+=(_,name)=>
+        {
+            // The legacy application assembly is never loaded or invoked. Only Core dependencies
+            // can resolve from its already-published directory; writes go to our isolated fixture.
+            if(name.Name is "SSHExplorer" or "SSHExplorer.App")throw new InvalidOperationException("Baseline compatibility must remain Core-only");
+            string candidate=Path.Combine(Path.GetDirectoryName(baselineCore)!,name.Name+".dll");return File.Exists(candidate)?context.LoadFromAssemblyPath(candidate):null;
+        };
+        try
+        {
+            var assembly=context.LoadFromAssemblyPath(baselineCore);
+            Check(AssemblyLoadContext.GetLoadContext(assembly)==context&&assembly.GetName().Name=="SSHExplorer.Core","published beta.1 Core loads in a separate assembly context without its application");
+            Console.WriteLine("BASELINE Core informational version: "+assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+            Console.WriteLine("BASELINE Core SHA256: "+Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(baselineCore))).ToLowerInvariant());
+            Type storeType=assembly.GetType("SSHExplorer.Core.AppStore",true)!,profileType=assembly.GetType("SSHExplorer.Core.ServerProfile",true)!;
+            object store=Activator.CreateInstance(storeType,[directory])!,profile=Activator.CreateInstance(profileType)!;
+            void Set(object target,string property,object value)=>target.GetType().GetProperty(property)!.SetValue(target,value);
+            Set(profile,"Id",profileId);Set(profile,"Name","Published beta.1 fixture");Set(profile,"Host","published-beta1.invalid");Set(profile,"Username","fixture");Set(profile,"SaveSecret",true);
+            ((ICollection<string>)profileType.GetProperty("Bookmarks")!.GetValue(profile)!).Add("/baseline bookmark Ω");
+            var save=storeType.GetMethods().Single(m=>m.Name=="SaveProfileAsync"&&m.GetParameters().Length==3);Pump((Task)save.Invoke(store,[profile,secret,CancellationToken.None])!);
+            object settings=storeType.GetProperty("Settings")!.GetValue(store)!;Set(settings,"Theme","Dark");Set(settings,"PollIntervalSeconds",7);
+            Pump((Task)storeType.GetMethod("SaveAsync")!.Invoke(store,[CancellationToken.None])!);
+            Type promptType=assembly.GetType("SSHExplorer.Core.HostKeyPrompt",true)!,decisionType=assembly.GetType("SSHExplorer.Core.TrustDecision",true)!;
+            var callbackMethod=typeof(Program).GetMethod(nameof(BaselineAccept),BindingFlags.NonPublic|BindingFlags.Static)!.MakeGenericMethod(promptType,decisionType);
+            Type callbackType=typeof(Func<,>).MakeGenericType(promptType,typeof(Task<>).MakeGenericType(decisionType));var callback=Delegate.CreateDelegate(callbackType,callbackMethod);
+            object trust=storeType.GetProperty("Trust")!.GetValue(store)!;
+            var verify=trust.GetType().GetMethod("VerifyAsync",BindingFlags.Instance|BindingFlags.NonPublic)!;
+            Pump((Task)verify.Invoke(trust,["published-beta1.invalid",22,"fixture-algorithm",key,new HashSet<string>(),callback,CancellationToken.None])!);
+            Check(!context.Assemblies.Any(a=>a.GetName().Name is "SSHExplorer" or "SSHExplorer.App"),"legacy store creation invokes Core persistence and trust APIs without loading App or constructing windows");
+        }
+        finally{context.Unload();}
+    }
+    static Task<TDecision> BaselineAccept<TPrompt,TDecision>(TPrompt _)where TDecision:struct,Enum=>Task.FromResult(Enum.Parse<TDecision>("Permanent"));
+    static void CancelledPrompts()
+    {
+        using var cancelled=new CancellationTokenSource();cancelled.Cancel();var profile=new ServerProfile{Name="cancelled",Host="cancelled.invalid",Username="tester"};int before=_app.Windows.Count;
+        Check(Dialogs.Credentials(profile,null,_owner,cancelled.Token)is null&&Dialogs.Interactive(new InteractivePrompt("","One-time password:",false),_owner,cancelled.Token)is null,"pre-cancelled credentials and interactive prompts return without opening windows");
+        Check(Dialogs.Trust(new HostKeyPrompt(profile.Host,22,"test","SHA256:test",null,false),_owner,cancelled.Token)==TrustDecision.Reject&&Pump(Dialogs.ProfileSubmissionAsync(owner:_owner,ct:cancelled.Token))is null&&_app.Windows.Count==before,"pre-cancelled trust and profile prompts create no stale windows");
+    }
+    static void ModalCancellationScenarios()
+    {
+        var profile=new ServerProfile{Name="attempt cancellation",Host="fixture.invalid",Username="fixture"};
+        foreach(var kind in new[]{"credentials","interactive","trust","profile"})
+        {
+            using var cancelled=new CancellationTokenSource();bool observed=false;Exception? error=null;var watch=Stopwatch.StartNew();
+            var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(30)};
+            timer.Tick+=(_,_)=>
+            {
+                var modal=_app.Windows.Cast<Window>().FirstOrDefault(w=>w!=_owner&&w.IsVisible);
+                if(modal is not null)
+                {
+                    try{Check(modal.Owner==_owner,"visible "+kind+" prompt is owned by its requesting window");observed=true;}
+                    catch(Exception ex){error=ex;}
+                    timer.Stop();_ = Task.Run(cancelled.Cancel);
+                }
+                else if(watch.Elapsed>TimeSpan.FromSeconds(8)){error=new TimeoutException("CI modal was not displayed");timer.Stop();cancelled.Cancel();}
+            };
+            object? answer;timer.Start();
+            try
+            {
+                answer=kind switch
+                {
+                    "credentials"=>Dialogs.Credentials(profile,null,_owner,cancelled.Token),
+                    "interactive"=>Dialogs.Interactive(new InteractivePrompt("fixture","One-time password:",false),_owner,cancelled.Token),
+                    "trust"=>Dialogs.Trust(new HostKeyPrompt(profile.Host,22,"fixture","SHA256:fixture",null,false),_owner,cancelled.Token),
+                    _=>Pump(Dialogs.ProfileSubmissionAsync(owner:_owner,ct:cancelled.Token))
+                };
+            }
+            finally{timer.Stop();}
+            if(error is not null)throw error;
+            Check(observed&&cancelled.IsCancellationRequested&&(answer is null||answer is TrustDecision.Reject),"worker cancellation closes actual "+kind+" modal without accepting stale input");
+            Check(!_app.Windows.Cast<Window>().Any(w=>w!=_owner&&w.IsVisible),"cancelled "+kind+" leaves no visible prompt");
+        }
+        var owner=new Window{Title="Attempt owner",ShowActivated=false,ShowInTaskbar=false,WindowState=WindowState.Minimized};owner.Show();
+        var closing=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(40)};bool child=false;
+        closing.Tick+=(_,_)=>{if(_app.Windows.Cast<Window>().Any(w=>w.Owner==owner&&w.IsVisible)){child=true;closing.Stop();owner.Close();}};
+        closing.Start();SessionCredentials? result;try{result=Dialogs.Credentials(profile,null,owner);}finally{closing.Stop();if(owner.IsVisible)owner.Close();}
+        Check(child&&result is null,"closing requesting window cancels its actual credentials modal");
+    }
+    static void DelayedSecretComponents()
+    {
+        var old=new ServerProfile{Name="delayed secret",Host="delayed.invalid",Username="tester",SaveSecret=true};
+        var pending=new PendingReadPersistence();var dialog=new ProfileDialog(pending,old);var entry=Logical<SecretEntry>(dialog).Single();
+        dialog.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));Logical<PasswordBox>(dialog).Single().Password="new manual input  ";
+        pending.Read.TrySetResult("old stored value");WaitFor(()=>pending.Returned,TimeSpan.FromSeconds(3));Pump(_app.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle).Task);
+        Check(entry.Password=="new manual input  ","delayed secret load cannot overwrite manually edited actual profile control (unshown component)");dialog.Close();
+        pending=new PendingReadPersistence();dialog=new ProfileDialog(pending,old);entry=Logical<SecretEntry>(dialog).Single();dialog.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        dialog.Model.AuthenticationIndex=1;pending.Read.TrySetResult("old password");WaitFor(()=>pending.Returned,TimeSpan.FromSeconds(3));Pump(_app.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle).Task);
+        Check(entry.Password==""&&!dialog.Model.SecretExplanation.Contains("прежний защищённый",StringComparison.Ordinal),"late password load is discarded after authentication method changes (unshown component)");dialog.Close();
+    }
     static void DialogScenarios()
     {
         var store=NewStore("dialog-save");SetStore(store);
@@ -179,7 +368,7 @@ internal static class Program
             var grid=Logical<DataGrid>(main).First();Check(store.Profiles.Count==iteration+1&&grid.Items.Count==iteration+1,"full MainWindow AddProfile refreshes server list, iteration "+(iteration+1));
             grid.SelectedIndex=0;
         }
-        Check(new AppStore(store.DirectoryPath).Profiles.Count==2,"full MainWindow AddProfile persistence survives restart with current selection");main.Close();_app.MainWindow=_owner;
+        Check(new AppStore(store.DirectoryPath).Profiles.Count==2,"full MainWindow AddProfile persistence survives restart with current selection");CloseMainAndWait(main);
     }
     static void UnshownMainSelectionScenario()
     {
@@ -213,7 +402,7 @@ internal static class Program
             string privateKey=key?(cfg.TryGetProperty("PrivateKeyPath",out var keyPath)?keyPath.GetString()??"":Path.Combine(fixtureDirectory,"client-key")):"";
             string secretFile=key&&(!cfg.TryGetProperty("Authentication",out var auth)||auth.GetString()!="PrivateKey")?Path.Combine(fixtureDirectory,"key-passphrase.txt"):Read("SecretFile");
             var model=new ProfileViewModel(new ProfilePersistence(store)){ProfileName="Изолированный профиль",Host=Read("Host"),Port=cfg.GetProperty("Port").GetInt32().ToString(),Username=Read("Username"),SaveSecret=true,AuthenticationIndex=key?1:0,PrivateKeyPath=privateKey};
-            string secret=File.ReadAllText(secretFile).TrimEnd('\r','\n');
+            string secret=File.ReadAllText(secretFile);
             Check(Pump(model.SaveAsync(secret)),"connection fixture profile commits transactionally: "+(key?"encrypted key":"password"));
             var reopened=new AppStore(store.DirectoryPath);var profile=reopened.Profiles.Single();
             var session=new ServerSession(profile,reopened);
@@ -227,6 +416,90 @@ internal static class Program
             }
             finally{Pump(session.DisposeAsync().AsTask());}
         }
+    }
+    static void OrdinaryPasswordScenario(string configurationFile)
+    {
+        using var config=System.Text.Json.JsonDocument.Parse(File.ReadAllText(configurationFile));var cfg=config.RootElement;
+        string secret=File.ReadAllText(cfg.GetProperty("SecretFile").GetString()!);string fingerprint=cfg.GetProperty("ExpectedHostFingerprint").GetString()!;
+        var store=NewStore("ordinary-password");SetStore(store);var main=new MainWindow{ShowActivated=false,ShowInTaskbar=false,WindowState=WindowState.Minimized};_app.MainWindow=main;main.Show();
+        int profiles=0,trusts=0,credentials=0;Exception? failure=null;
+        var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(30)};
+        EventHandler tick=(_,_)=>
+        {
+            try
+            {
+                foreach(var window in _app.Windows.Cast<Window>().Where(w=>w!=main&&w!=_owner&&w.IsVisible).ToArray())
+                {
+                    if(window is ProfileDialog)
+                    {
+                        if(profiles++!=0)continue;Fill(window);Field(window,"Адрес сервера").Text=cfg.GetProperty("Host").GetString()!;Field(window,"Порт").Text=cfg.GetProperty("Ports").GetProperty("password").GetInt32().ToString();Field(window,"Пользователь Linux").Text=cfg.GetProperty("Username").GetString()!;
+                        Logical<PasswordBox>(window).Single().Password=secret;Logical<CheckBox>(window).Single().IsChecked=true;
+                        FindButton(window,"Сохранить и подключиться").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    else if(window.Title=="Проверка ключа сервера")
+                    {
+                        trusts++;Check(Field(window,"SHA256-отпечаток ключа сервера").Text==fingerprint,"ordinary Trust dialog displays independently generated fixture fingerprint");
+                        Check(store.Profiles.Count==1&&Pump(store.ReadSecretAsync(store.Profiles.Single().Id))is null,"ordinary Save-and-connect defers opted-in secret before authentication");
+                        FindButton(window,"Доверить и сохранить").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    else if(window.Title.StartsWith("Вход —",StringComparison.Ordinal)){credentials++;throw new Exception("Save-and-connect unexpectedly lost its entered password");}
+                }
+            }
+            catch(Exception ex){failure=ex;timer.Stop();foreach(var window in _app.Windows.Cast<Window>().Where(w=>w!=main&&w!=_owner).ToArray())window.Close();}
+        };
+        timer.Tick+=tick;timer.Start();
+        try
+        {
+            Logical<Button>(main).First(x=>AutomationProperties.GetName(x)=="Добавить сервер").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            WaitFor(()=>failure is not null||ReadyFiles(main),TimeSpan.FromSeconds(35));if(failure is not null)throw failure;
+            Check(profiles>=1&&trusts==1&&credentials==0,"ordinary MainWindow Add button reaches actual profile and Trust controls without credential or trust overrides");
+            var view=Logical<SessionView>(main).Single();Check(view.Session.State==SessionState.Connected&&view.Session.SftpAvailable,"ordinary control route authenticates exact Unicode whitespace password");
+            WaitFor(()=>Pump(store.ReadSecretAsync(store.Profiles.Single().Id))==secret,TimeSpan.FromSeconds(10));
+            Check(Pump(new AppStore(store.DirectoryPath).ReadSecretAsync(store.Profiles.Single().Id))==secret,"ordinary successful connection persists opted-in secret for restart");
+            Check(store.Trust.Records.Single().Fingerprint==fingerprint,"ordinary Trust button persists exact fixture host key");
+        }
+        finally{timer.Stop();CloseMainAndWait(main);}
+        var start=new ProcessStartInfo(Environment.ProcessPath!){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
+        start.ArgumentList.Add("--saved-reuse");start.ArgumentList.Add(Path.GetFullPath(configurationFile));start.ArgumentList.Add(store.DirectoryPath);
+        using var restarted=Process.Start(start)??throw new Exception("Cannot launch isolated STA restart check");var output=restarted.StandardOutput.ReadToEndAsync();var errors=restarted.StandardError.ReadToEndAsync();
+        if(!restarted.WaitForExit(45000)){restarted.Kill(true);throw new TimeoutException("Ordinary saved-secret restart check timed out");}
+        string summary=output.GetAwaiter().GetResult();if(restarted.ExitCode!=0)throw new Exception("Ordinary saved-secret restart failed: "+summary+errors.GetAwaiter().GetResult());
+        Check(summary.Contains("ordinary saved-credential restart checks passed",StringComparison.Ordinal),"fresh test process reuses saved credential through ordinary Connect control without prompting");
+    }
+    static bool ReadyFiles(MainWindow main)
+    {
+        var files=Logical<FileBrowserView>(main).FirstOrDefault();if(files is null||files.CurrentPath!="/")return false;
+        return Logical<DataGrid>(files).Any(g=>g.Items.Cast<object>().Any(item=>item.GetType().GetProperty("Name")?.GetValue(item)?.ToString()=="README.txt"));
+    }
+    static void SavedReuseScenario(string configurationFile,string storePath)
+    {
+        using var config=System.Text.Json.JsonDocument.Parse(File.ReadAllText(configurationFile));string fingerprint=config.RootElement.GetProperty("ExpectedHostFingerprint").GetString()!;
+        var store=new AppStore(storePath);SetStore(store);var main=new MainWindow{ShowActivated=false,ShowInTaskbar=false,WindowState=WindowState.Minimized};_app.MainWindow=main;main.Show();
+        Exception? unexpected=null;var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(25)};
+        timer.Tick+=(_,_)=>{var stale=_app.Windows.Cast<Window>().FirstOrDefault(w=>w!=main&&w!=_owner&&w.IsVisible);if(stale is not null){unexpected=new Exception("Saved-secret ordinary reuse unexpectedly displayed "+stale.GetType().Name);stale.Close();}};timer.Start();
+        try
+        {
+            var grid=Logical<DataGrid>(main).First();grid.SelectedIndex=0;
+            Logical<Button>(main).First(b=>AutomationProperties.GetName(b)=="Подключиться").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            WaitFor(()=>unexpected is not null||ReadyFiles(main),TimeSpan.FromSeconds(30));if(unexpected is not null)throw unexpected;
+            Check(Logical<SessionView>(main).Single().Session.State==SessionState.Connected&&store.Trust.Records.Single().Fingerprint==fingerprint,"fresh process ordinary Connect uses persisted DPAPI secret and host trust");
+            Check(ReadyFiles(main),"fresh process ordinary Connect navigates actual SFTP fixture and displays README");
+        }
+        finally{timer.Stop();CloseMainAndWait(main);}
+    }
+    static void CloseMainAndWait(MainWindow main)
+    {
+        main.Close();
+        // MainWindow may cancel this first Close while its asynchronous disposal/save runs.
+        // Keep its Dispatcher pumping before a fresh process or the next modal scenario starts.
+        WaitFor(()=>!main.IsVisible,TimeSpan.FromSeconds(15));
+        _app.MainWindow=_owner;
+    }
+    static void WaitFor(Func<bool> completed,TimeSpan timeout)
+    {
+        var pending=new TaskCompletionSource();var watch=Stopwatch.StartNew();var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(20)};
+        timer.Tick+=(_,_)=>{try{if(completed()){timer.Stop();pending.TrySetResult();}else if(watch.Elapsed>timeout){timer.Stop();pending.TrySetException(new TimeoutException("STA operation did not reach expected state"));}}catch(Exception ex){timer.Stop();pending.TrySetException(ex);}};
+        timer.Start();try{Pump(pending.Task);}finally{timer.Stop();}
     }
     static ServerProfile? RunStaticDialog(Action<Window> step,ServerProfile? old=null,bool repeat=false)
     {
@@ -253,5 +526,11 @@ internal static class Program
         public TaskCompletionSource Release{get;}=new(TaskCreationOptions.RunContinuationsAsynchronously);public int SaveCalls{get;private set;}
         public Task<string?> ReadSecretAsync(Guid id,CancellationToken ct=default)=>inner.ReadSecretAsync(id,ct);
         public async Task<ProfileCommitResult> SaveAsync(ServerProfile profile,string? secret,CancellationToken ct=default){SaveCalls++;await Release.Task.WaitAsync(ct);return await inner.SaveAsync(profile,secret,ct);}
+    }
+    sealed class PendingReadPersistence:IProfilePersistence
+    {
+        public TaskCompletionSource<string?> Read{get;}=new(TaskCreationOptions.RunContinuationsAsynchronously);public bool Returned{get;private set;}
+        public async Task<string?> ReadSecretAsync(Guid id,CancellationToken ct=default){var value=await Read.Task.WaitAsync(ct);Returned=true;return value;}
+        public Task<ProfileCommitResult> SaveAsync(ServerProfile profile,string? secret,CancellationToken ct=default)=>throw new InvalidOperationException("No save in this unshown component scenario");
     }
 }

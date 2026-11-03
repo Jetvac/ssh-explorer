@@ -74,7 +74,7 @@ public sealed partial class FileBrowserView
                 else if (data.Job?.State == TransferState.Completed) viewModel.Message = "Передача файлов в Windows завершена.";
             }
             catch (Exception ex) { viewModel.Message = ErrorMessages.Describe(ex); }
-            finally { preparingDrag = false; ClearDropTarget(); }
+            finally { preparingDrag = false; main.CancelDragFeedback(); }
         };
         control.DragOver += (_, e) => { var row = ItemAt(e.OriginalSource as DependencyObject); DropOver(e, row?.Entry.IsDirectory == true && !row.Entry.IsSymbolicLink ? row.Entry.FullPath : CurrentPath, control); };
         control.DragLeave += (_, _) => ClearDropTarget();
@@ -104,7 +104,7 @@ public sealed partial class FileBrowserView
     }
     void ClearDropTarget()
     {
-        dropTarget?.ClearValue(BackgroundProperty); dropTarget?.ClearValue(BorderBrushProperty); dropTarget = null;
+        if (dropTarget is not null) { Ui.SetIsDropTarget(dropTarget, false); dropTarget.ClearValue(BackgroundProperty); dropTarget.ClearValue(BorderBrushProperty); } dropTarget = null;
         hoverNode = null; NativeDragDrop.NativeFileDrag.InternalTargetSession = null;
     }
     void DropOver(DragEventArgs e, string path, Control control)
@@ -113,8 +113,9 @@ public sealed partial class FileBrowserView
         e.Handled = true; if (e.Effects != DragDropEffects.None)
         {
             var target = (Control?)FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) ?? FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) ?? control;
+            if (dropTarget != target) { ClearDropTarget(); dropTarget = target; }
             NativeDragDrop.NativeFileDrag.InternalTargetSession = session.Id;
-            if (dropTarget != target) { dropTarget?.ClearValue(BackgroundProperty); dropTarget?.ClearValue(BorderBrushProperty); dropTarget = target; }
+            Ui.SetIsDropTarget(target, true);
             target.SetResourceReference(BackgroundProperty, "DropTarget"); target.SetResourceReference(BorderBrushProperty, "Accent");
             viewModel.Message = $"{(e.Effects == DragDropEffects.Move ? "Переместить" : "Копировать")} в {session.Profile.Name}: {path}";
             if (control is TreeViewItem node) { if (hoverNode != node) { hoverNode = node; hoverSince = DateTime.UtcNow; } else if ((DateTime.UtcNow - hoverSince).TotalMilliseconds > 700) node.IsExpanded = true; }
@@ -154,9 +155,11 @@ public sealed partial class FileBrowserView
     }
     void DisposeDragDrop()
     {
+        ClearDropTarget();
         foreach (var token in remoteClipboardTokens.Where(x => x.Value.SessionId == session.Id).Select(x => x.Key).ToArray()) remoteClipboardTokens.Remove(token);
         preparedFiles.Clear();
     }
+    internal void CancelDragFeedback() { dragStart = null; ClearDropTarget(); }
     sealed record RemoteClipboard(ServerSession Session, string[] Paths, bool Cut, WeakReference<FileBrowserView>? SourceView = null);
     sealed record ClipboardToken(Guid SessionId, WeakReference<ServerSession> Session, string[] Paths, bool Cut, WeakReference<FileBrowserView>? SourceView);
 }
