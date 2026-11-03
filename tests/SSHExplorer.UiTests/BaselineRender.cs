@@ -23,20 +23,20 @@ internal static class BaselineRender
             if(!args.Contains("--render-beta2baseline",StringComparer.Ordinal))throw new ArgumentException("Explicit baseline render mode is required.");
             string output=Value(args,"--render-dir")??"artifacts/ui-beta3-before";
             var evidence=new CiVisualEvidence(output);
-            var app=new ResourceOnlyBaselineApp();app.InitializeComponent();app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var app=new App(startDesktop:false);app.InitializeComponent();app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
             var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","beta2-render-store",Guid.NewGuid().ToString("N")));
             typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);
             Pump();
-            if(!app.StartupObserved||app.Windows.Count!=0||!ReferenceEquals(App.Store,store))throw new InvalidOperationException("Baseline startup was not safely suppressed before creating windows.");
-            Console.WriteLine("SAFETY baseline subclass consumed queued startup without invoking production App.OnStartup; no windows; isolated store identity unchanged");
+            if(!app.StartupCallbackObserved||app.DesktopStartupCount!=0||app.Windows.Count!=0||!ReferenceEquals(App.Store,store))throw new InvalidOperationException("Baseline startup was not safely suppressed before creating windows.");
+            Console.WriteLine("SAFETY exact beta.2 App(false) consumed queued startup; desktop starts=0; no windows; isolated store identity unchanged");
             Theme.Apply("Light");
             var profile=new ServerProfile{Name="Linux · UI fixture",Host="127.0.0.1",Username="fixture"};
             store.Profiles.Add(profile);var session=new ServerSession(profile,store);var main=new MainWindow{Width=1320,Height=850,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-10000,Top=-10000};
             using var files=new FileBrowserView(session,main);using var monitor=new MonitorView(session);
             var fileModel=(FileBrowserViewModel)files.DataContext;
             var entries=Enumerable.Range(0,180).Select(i=>new RemoteEntry{Name=$"document-{i:000}.txt",FullPath=$"/srv/fixture/document-{i:000}.txt",IsRegularFile=true,Length=4096+i}).ToArray();
-            fileModel.CommitNavigation(fileModel.BeginNavigation(),"/srv/fixture",entries,true,[],0);fileModel.ApplyFilter(true,true);Invoke(files,"ApplyItems");
+            fileModel.CommitNavigation(fileModel.BeginNavigation(),"/srv/fixture",entries,true,[],0);fileModel.ApplyFilter(true,true);Invoke(files,"ApplyItems");Invoke(files,"UpdateBreadcrumbs");
             var tree=(TreeView)Field(files,"tree");tree.Items.Clear();
             var root=Node(files,"Корень /","/");var folder=Node(files,"fixture","/srv/fixture");root.Items.Clear();folder.Items.Clear();Ui.SetIsCurrentFolder(folder,true);root.Items.Add(folder);tree.Items.Add(root);root.IsExpanded=folder.IsExpanded=true;
             var monitorModel=(MonitorViewModel)Field(monitor,"viewModel");
@@ -46,7 +46,7 @@ internal static class BaselineRender
             var sample=new MonitorSnapshot(now,system,processes,[new NetworkMetric("eth0",4096,8192,2048,1024)],[new DiskMetric("vda",4096,8192,1024,2048)],[new StorageMetric("ext4","/",16L<<30,4L<<30,12L<<30)],["Детерминированный UI fixture; I/O недоступен для части процессов."]);
             var history=new[]{new HistoryPoint(now.AddSeconds(-120),10,35,0,0),new HistoryPoint(now.AddSeconds(-119),30,36,0,0),new HistoryPoint(now.AddSeconds(-60),20,37,0,0),new HistoryPoint(now.AddSeconds(-59),50,38,0,0),new HistoryPoint(now,46,37.5,0,0)};
             monitorModel.ApplySnapshot(sample,history);
-            var view=new SessionView(session,main,null);SetField(view,"files",files);SetField(view,"monitor",monitor);
+            var view=new SessionView(session,main,null);((SessionViewModel)Field(view,"viewModel")).StatusText="Данные стенда · без подключения";SetField(view,"files",files);SetField(view,"monitor",monitor);
             ((StackPanel)Field(view,"side")).Children.Add(files.Navigation);
             ((ContentControl)Field(view,"addressHost")).Content=files.AddressBar;((ContentControl)Field(view,"commandHost")).Content=files.CommandBar;((ContentControl)Field(view,"fileStatusHost")).Content=files.StatusBar;
             typeof(MainWindow).GetMethod("AddSessionTab",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(main,[profile,session,view]);
@@ -57,7 +57,8 @@ internal static class BaselineRender
             main.Width=1320;var innerTabs=Descendants<TabControl>(monitor).Single();innerTabs.SelectedIndex=1;Layout(main);evidence.Capture((FrameworkElement)main.Content,"performance-gap",new{theme="Light",fixtureOnly=true,actualHistoryGapsSeconds=new[]{1,59,1,59}});
             innerTabs.SelectedIndex=0;((ContentControl)Field(view,"screen")).Content=files;SetField(view,"section","files");SetNavigation(view,"files");
             foreach(string name in new[]{"addressHost","commandHost","fileStatusHost"})((ContentControl)Field(view,name)).Visibility=Visibility.Visible;
-            Layout(main);evidence.Capture((FrameworkElement)main.Content,"files-tree",new{theme="Light",fixtureOnly=true});
+            Layout(main);var fileTable=(DataGrid)Field(files,"table");fileTable.SelectedItem=fileModel.Entries[5];var fileScroll=Descendants<ScrollViewer>(fileTable).First();fileScroll.ScrollToVerticalOffset(0);Layout(main);
+            evidence.Capture((FrameworkElement)main.Content,"files-tree",new{theme="Light",fixtureOnly=true,fileCount=180,selectedFile="document-005.txt",verticalOffset=fileScroll.VerticalOffset});
             evidence.CaptureRelatedScenes(main,files,store);
             bool closed=false;main.Closed+=(_,_)=>closed=true;main.Close();WaitFor(()=>closed&&!app.Windows.Cast<Window>().Contains(main));app.Shutdown();
             Console.WriteLine("RESULT: exact published beta.2 actual-WPF client renders completed; no SSH or process signals; CI-only HWNDs");return 0;
@@ -88,10 +89,4 @@ internal static class BaselineRender
     static void Pump(){var frame=new DispatcherFrame();Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,()=>frame.Continue=false);Dispatcher.PushFrame(frame);}
     static void WaitFor(Func<bool> done){var watch=System.Diagnostics.Stopwatch.StartNew();while(!done()){if(watch.Elapsed>TimeSpan.FromSeconds(15))throw new TimeoutException("Baseline window failed to close");Pump();}}
     static IEnumerable<T> Descendants<T>(DependencyObject root)where T:DependencyObject{for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T item)yield return item;foreach(var nested in Descendants<T>(child))yield return nested;}}
-    sealed class ResourceOnlyBaselineApp:App
-    {
-        public bool StartupObserved{get;private set;}
-        protected override void OnStartup(StartupEventArgs e){StartupObserved=true;}
-        protected override void OnExit(ExitEventArgs e){/* Never call the baseline desktop's OnExit/log path. */}
-    }
 }

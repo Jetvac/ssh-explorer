@@ -52,6 +52,7 @@ internal sealed class CiVisualEvidence
             state,file=Path.GetFileName(path),sha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant(),
             scope=window is null?"actual WPF popup visual":"actual WPF client visual",settleMilliseconds=300,
             clientDip=new{width=visual.ActualWidth,height=visual.ActualHeight},pixels=new{width,height},
+            windowGeometry=window is null?null:new{actualWidth=Finite(window.ActualWidth),actualHeight=Finite(window.ActualHeight),requestedWidth=Finite(window.Width),requestedHeight=Finite(window.Height),sizeToContent=window.SizeToContent.ToString()},
             dpi=new{x=96*dpi.DpiScaleX,y=96*dpi.DpiScaleY},systemHighContrast=SystemParameters.HighContrast,
             systemClientAreaAnimation=SystemParameters.ClientAreaAnimation,
             uiFontSize=visual.TryFindResource("UIFontSize"),measurements
@@ -66,7 +67,8 @@ internal sealed class CiVisualEvidence
                 fileVersion=System.Diagnostics.FileVersionInfo.GetVersionInfo(typeof(App).Assembly.Location).FileVersion,
                 sha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(App).Assembly.Location))).ToLowerInvariant()
             },
-            renderer="RenderTargetBitmap of actual WPF client/popup visual after CI HWND Show; native caption excluded",
+            renderer="RenderTargetBitmap of actual WPF client/popup visual after CI HWND Show; native caption excluded",nativeCaptionExcluded=true,
+            primaryScreenDip=new{width=SystemParameters.PrimaryScreenWidth,height=SystemParameters.PrimaryScreenHeight},
             fixture="Deterministic offline component data; no SSH, no real process signals, no user settings",
             physicalKeyboardTested=false,liveMotionEvaluated=false,captures
         },new JsonSerializerOptions{WriteIndented=true}));
@@ -98,5 +100,6 @@ internal sealed class CiVisualEvidence
         finally{dialog.Close();Pump();}
     }
     static void Pump(){var frame=new System.Windows.Threading.DispatcherFrame();System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,()=>frame.Continue=false);System.Windows.Threading.Dispatcher.PushFrame(frame);}
+    static double? Finite(double value)=>double.IsFinite(value)?value:null;
     static IEnumerable<T> Descendants<T>(DependencyObject root)where T:DependencyObject{for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T item)yield return item;foreach(var nested in Descendants<T>(child))yield return nested;}}
 }

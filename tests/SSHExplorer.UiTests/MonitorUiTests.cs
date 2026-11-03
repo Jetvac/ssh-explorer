@@ -37,10 +37,10 @@ internal static class MonitorUiTests
             store.Profiles.Add(profile);var session=new ServerSession(profile,store);var main=new MainWindow{Width=1320,Height=850,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-10000,Top=-10000};
             using var files=new FileBrowserView(session,main);var fileModel=(FileBrowserViewModel)files.DataContext;
             var entries=Enumerable.Range(0,180).Select(i=>new RemoteEntry{Name=$"document-{i:000}.txt",FullPath=$"/srv/fixture/document-{i:000}.txt",IsRegularFile=true,Length=4096+i}).ToArray();
-            fileModel.CommitNavigation(fileModel.BeginNavigation(),"/srv/fixture",entries,true,[],0);fileModel.ApplyFilter(true,true);Invoke(files,"ApplyItems");
+            fileModel.CommitNavigation(fileModel.BeginNavigation(),"/srv/fixture",entries,true,[],0);fileModel.ApplyFilter(true,true);Invoke(files,"ApplyItems");Invoke(files,"UpdateBreadcrumbs");
             var tree=(TreeView)Field(files,"tree");tree.Items.Clear();var root=Node(files,"Корень /","/");var folder=Node(files,"fixture","/srv/fixture");root.Items.Clear();folder.Items.Clear();Ui.SetIsCurrentFolder(folder,true);root.Items.Add(folder);tree.Items.Add(root);root.IsExpanded=folder.IsExpanded=true;
             var model=new MonitorViewModel(()=>Now);using var accentProbe=new AccentProbe();using var monitor=new MonitorView(model);model.ApplySnapshot(Sample(),History());
-            var view=new SessionView(session,main,files,monitor);view.SetActive(false);
+            var view=new SessionView(session,main,files,monitor);((SessionViewModel)Field(view,"viewModel")).StatusText="Данные стенда · без подключения";view.SetActive(false);
             typeof(MainWindow).GetMethod("AddSessionTab",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(main,[profile,session,view]);
             main.Show();view.SetActive(false);view.ShowSection("processes");Layout(main);SetGraphTime(monitor);
             Assert(!Descendants<TabControl>(monitor).Any(),"process/performance pages do not introduce a second server-style TabControl");
@@ -74,7 +74,7 @@ internal static class MonitorUiTests
             var cellsBefore=table.ItemsSource;var scroll=Descendants<ScrollViewer>(table).First();scroll.ScrollToVerticalOffset(18);Layout(main);double offset=scroll.VerticalOffset;
             var next=Sample() with{Timestamp=Now.AddSeconds(1),Processes=Sample().Processes.Select(p=>p with{CpuPercent=p.CpuPercent+1}).ToArray()};
             model.ApplySnapshot(next,History());Layout(main);
-            Assert(ReferenceEquals(cellsBefore,table.ItemsSource)&&ReferenceEquals(selected,table.SelectedItem)&&Math.Abs(scroll.VerticalOffset-offset)<.1,"actual refresh preserves collection, selected row and process viewport offset");
+            Assert(offset>0&&ReferenceEquals(cellsBefore,table.ItemsSource)&&ReferenceEquals(selected,table.SelectedItem)&&Math.Abs(scroll.VerticalOffset-offset)<.1,"actual refresh preserves collection, selected row and nonzero process viewport offset");
             var collection=CollectionViewSource.GetDefaultView(table.ItemsSource);collection.SortDescriptions.Clear();collection.SortDescriptions.Add(new SortDescription(nameof(ProcessItemViewModel.Cpu),ListSortDirection.Descending));Layout(main);
             var values=collection.Cast<ProcessItemViewModel>().Select(p=>p.Cpu).Where(v=>v.HasValue).Select(v=>v!.Value).ToArray();
             Assert(values.Zip(values.Skip(1),(a,b)=>a>=b).All(x=>x),"process CPU ordering is numeric in the actual collection view");
@@ -106,9 +106,10 @@ internal static class MonitorUiTests
             Assert(monitor.Page==MonitorPage.Performance&&Ui.GetIsNavigationActive(navigation["performance"]),"performance subpage belongs to the common sidebar and uses the same monitor instance");
             evidence.Capture((FrameworkElement)main.Content,"performance-gap",new{theme="Light",fixtureOnly=true,actualHistoryGapsSeconds=new[]{1,59,1,59}});
             view.ShowSection("files");Layout(main);
-            Assert(fileModel.CurrentPath=="/srv/fixture"&&fileModel.History.Count==historyCount&&fileModel.SelectedPaths.SequenceEqual(fileSelection)&&Math.Abs(fileScroll.VerticalOffset-fileOffset)<.1&&folder.IsExpanded,"files-processes-performance-files preserves path, history, selection, scroll and expanded tree");
+            Assert(fileOffset>0&&fileModel.CurrentPath=="/srv/fixture"&&fileModel.History.Count==historyCount&&fileModel.SelectedPaths.SequenceEqual(fileSelection)&&Math.Abs(fileScroll.VerticalOffset-fileOffset)<.1&&folder.IsExpanded,"files-processes-performance-files preserves path, history, selection, nonzero scroll and expanded tree");
             Assert(Ui.GetIsFileSectionActive(files.Navigation)&&Ui.GetIsCurrentFolder(folder)&&Ui.GetIsNavigationActive(navigation["files"]),"returning to files restores active section without discarding current folder marker");
-            evidence.Capture((FrameworkElement)main.Content,"files-tree",new{theme="Light",fixtureOnly=true});
+            fileScroll.ScrollToVerticalOffset(0);Layout(main);
+            evidence.Capture((FrameworkElement)main.Content,"files-tree",new{theme="Light",fixtureOnly=true,fileCount=180,selectedFile="document-005.txt",verticalOffset=fileScroll.VerticalOffset});
             view.ShowSection("processes");model.ReportFailure("Fixture: SSH sample timed out");Layout(main);
             Assert(model.IsStale&&model.Processes.Count>0&&model.StatusDetails.Contains("Fixture",StringComparison.Ordinal),"failed sample keeps actual table rows with an explicit stale reason");
             evidence.Capture((FrameworkElement)main.Content,"processes-stale",new{theme="Light",fixtureOnly=true});

@@ -1,0 +1,34 @@
+SAFETY queued WPF startup consumed; desktop starts=0, application windows=0, ordinary settings unopened
+PASS actual graph geometry separates a long sampling pause into two segments
+PASS actual graph horizontal positions use elapsed timestamps instead of sample index
+PASS explicit history gap never receives a connecting line
+PASS missing CPU does not interpolate across unknown data
+PASS independent available memory history is preserved when CPU is missing
+PASS graph excludes past-window and future measurements rather than fabricating edge samples
+PASS process/performance pages do not introduce a second server-style TabControl
+PASS monitor navigation keeps the remembered folder while marking file section inactive
+PASS exact process subpage is active while files remain inactive
+PASS long tree scrolling cannot carry fixed section navigation out of view
+PASS folder tree has one native scrolling region without an outer competing ScrollViewer
+PASS measured monitor header title, search and commands stay inside the viewport without overlap
+PASS first-sample unknown CPU has an uncolored dash and an accessible concrete reason
+PASS actual process table selection updates the exact process identity
+PASS metric background occupies both measured cell axes rather than only its text bounds
+PASS metric value is right aligned inside fixed symmetric cell padding
+PASS selected process heat surface yields to the whole-row selection cue
+PASS theme event repaints the existing metric surface with a changed resource palette without a new sample
+PASS long process name is ellipsized with full tooltip and automation name
+PASS actual refresh preserves collection, selected row and process viewport offset
+PASS process CPU ordering is numeric in the actual collection view
+PASS measured monitor header title, search and commands stay inside the viewport without overlap
+PASS narrow viewport retains process name and CPU instead of only secondary columns
+PASS measured monitor header title, search and commands stay inside the viewport without overlap
+PASS large UI font role keeps measured process cell text within an expanded row
+PASS performance subpage belongs to the common sidebar and uses the same monitor instance
+PASS files-processes-performance-files preserves path, history, selection, scroll and expanded tree
+PASS returning to files restores active section without discarding current folder marker
+PASS failed sample keeps actual table rows with an explicit stale reason
+PASS actual file view flyout remains anchored to the invoking command
+PASS actual profile validation keeps the window open with inline errors
+PASS narrow ordinary profile footer wraps all three real actions without overlap or clipping
+RESULT: 32 monitor/shell actual WPF UI and graph checks passed; CI-only HWNDs, offline fixture, no SSH or process signals
