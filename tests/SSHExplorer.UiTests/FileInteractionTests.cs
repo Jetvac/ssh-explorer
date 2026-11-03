@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -60,6 +61,7 @@ internal static class FileInteractionTests
             var table=(DataGrid)Field(files,"table");var tiles=(ListBox)Field(files,"tiles");var address=(TextBox)Field(files,"address");
             var original=model.Entries.Single(row=>row.Name=="document-005.txt");table.SelectedItem=original;table.ScrollIntoView(original);Layout(main);
             evidence.Capture((FrameworkElement)main.Content,"files-interaction-initial",new{theme="Light",fixtureOnly=true,phase="before interaction assertions",operationBoundary="controlled list/create/rename; no live SFTP"});
+            GroupPressCase(files,table,evidence,Assert,"details",false);table.SelectedItem=original;table.ScrollIntoView(original);Layout(main);
             var originalPresenter=Descendants<FileNamePresenter>(table).Single(presenter=>ReferenceEquals(presenter.DataContext,original));
             originalPresenter.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left){RoutedEvent=Mouse.PreviewMouseDownEvent});Pump();
             Assert(Field(files,"lassoOwner") is null&&Field(files,"dragStart") is Point,"an actual item-origin mouse-down remains a file-drag candidate and does not begin blank-space lasso");
@@ -115,6 +117,7 @@ internal static class FileInteractionTests
             Assert(editor.IsVisible&&editor.SelectionLength==dotfile.Name.Length,"tile F2 uses a real editor and selects the complete dotfile name");
             evidence.Capture((FrameworkElement)main.Content,"files-inline-tiles",new{theme="Light",fixtureOnly=true,view="Medium",sourceName=dotfile.Name});
             editor.Text=".profile-new";SendKey(editor,Key.Escape);Layout(main);Assert(operations.Exists("/srv/fixture/.bashrc")&&!operations.Exists("/srv/fixture/.profile-new"),"tile Escape preserves source and does not submit the edited name");
+            GroupPressCase(files,tiles,evidence,Assert,"tiles",true);tiles.SelectedItem=dotfile;tiles.ScrollIntoView(dotfile);Layout(main);
             int listCalls=operations.ListCalls;var context=(ContextMenu)Result(files,"BuildContextMenu",true)!;Ui.OpenContextMenu(tiles,context);Pump();
             var strip=context.Items.OfType<FileContextCommandStrip>().Single();var stripButtons=Descendants<Button>(strip).ToArray();
             Assert(stripButtons.Length==5&&stripButtons.Count(button=>AutomationProperties.GetName(button).Contains("Переименовать",StringComparison.Ordinal))==1&&operations.ListCalls==listCalls,"selected tile context presents the real five-action command group without a directory request");
@@ -139,6 +142,8 @@ internal static class FileInteractionTests
             // A large model exercises the production lasso geometry without realizing all containers.
             Complete(files.RefreshAsync());Layout(main);var tileScroller=Descendants<ScrollViewer>(tiles).First();tileScroller.ScrollToVerticalOffset(0);Layout(main);
             int realizedBefore=Descendants<ListBoxItem>(tiles).Count();files.BeginLasso(tiles,new Point(3,3),false);files.UpdateLasso(new Point(Math.Min(tiles.ActualWidth-3,220),Math.Min(tiles.ActualHeight-3,250)));Layout(main);
+            var lassoDiagnostic=new{theme="Light",fixtureOnly=true,ownerMatches=ReferenceEquals(Field(files,"lassoOwner"),tiles),lassoOwnerType=Field(files,"lassoOwner")?.GetType().Name,lastEndReason=files.LastLassoEndReason,hasAdorner=Field(files,"lassoAdorner")is not null,hasLayer=Field(files,"lassoLayer")is not null,hasTimer=Field(files,"lassoTimer")is not null,discoveredAdornerLayer=AdornerLayer.GetAdornerLayer(tiles)is not null,mouseCaptured=tiles.IsMouseCaptured,mouseCaptureWithin=tiles.IsMouseCaptureWithin,capturedType=Mouse.Captured?.GetType().Name,selectedCount=tiles.SelectedItems.Count,realizedBefore,realizedAfter=Descendants<ListBoxItem>(tiles).Count(),panelOffset=tilePanel.VerticalOffset,width=tiles.ActualWidth,height=tiles.ActualHeight,panelWidth=tilePanel.ViewportWidth,panelHeight=tilePanel.ViewportHeight};
+            Console.WriteLine("DIAGNOSTIC tile lasso "+System.Text.Json.JsonSerializer.Serialize(lassoDiagnostic));evidence.Capture((FrameworkElement)main.Content,"files-lasso-before-assert",lassoDiagnostic);
             Assert(Field(files,"lassoOwner")==tiles&&tiles.SelectedItems.Count>0&&realizedBefore is >0 and <250&&Descendants<ListBoxItem>(tiles).Count() is >0 and <250,"tile lasso selects model items while keeping a ten-thousand-item listing virtualized");
             evidence.Capture((FrameworkElement)main.Content,"files-lasso-tiles",new{theme="Light",fixtureOnly=true,totalItems=model.VisibleEntries.Count,realizedContainers=Descendants<ListBoxItem>(tiles).Count(),selectedItems=tiles.SelectedItems.Count,programmaticController=true});
             tiles.ReleaseMouseCapture();Pump();Assert(Field(files,"lassoOwner") is null&&Field(files,"lassoAdorner") is null,"lost mouse capture removes tile lasso state and its adorner");
@@ -155,6 +160,31 @@ internal static class FileInteractionTests
             Console.WriteLine($"RESULT: {checks} actual file interaction checks passed; CI-only HWNDs; controlled operations; no SSH, clipboard writes or process signals");return 0;
         }
         catch(Exception ex){Console.WriteLine(ex);return 1;}
+    }
+    static void GroupPressCase(FileBrowserView files,Control owner,CiVisualEvidence evidence,Action<bool,string> assert,string mode,bool checkModifiers)
+    {
+        var model=(FileBrowserViewModel)files.DataContext;
+        IEnumerable<FrameworkElement> containers=owner is DataGrid grid?Descendants<DataGridRow>(grid):Descendants<ListBoxItem>(owner);
+        var live=containers.Where(item=>item.IsVisible&&item.ActualWidth>0&&item.ActualHeight>0&&item.DataContext is FileItemViewModel).Where(item=>{var cross=Rect.Intersect(new Rect(owner.RenderSize),item.TransformToAncestor(owner).TransformBounds(new Rect(item.RenderSize)));return !cross.IsEmpty&&cross.Width>0&&cross.Height>0;}).Take(2).ToArray();
+        if(live.Length!=2)throw new InvalidOperationException("Group press requires two real visible "+mode+" containers.");
+        var rows=live.Select(item=>item.DataContext as FileItemViewModel??throw new InvalidOperationException("Visible group row lost its file identity.")).ToArray();
+        void SelectPair(){if(owner is DataGrid table){table.UnselectAll();foreach(var row in rows)table.SelectedItems.Add(row);}else{var tiles=(ListBox)owner;tiles.UnselectAll();foreach(var row in rows)tiles.SelectedItems.Add(row);}}
+        SelectPair();var expected=rows.Select(row=>row.Entry.FullPath).ToHashSet(StringComparer.Ordinal);var target=Descendants<FileNamePresenter>(live[0]).Single();
+        MouseButtonEventArgs MouseArgs(RoutedEvent routed){var args=new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left){RoutedEvent=routed};typeof(MouseButtonEventArgs).GetProperty(nameof(MouseButtonEventArgs.ClickCount))!.SetValue(args,1);return args;}
+        var down=MouseArgs(Mouse.PreviewMouseDownEvent);target.RaiseEvent(down);bool previewHandled=down.Handled;
+        // Preserve Handled on the same args: native DataGridCell class handlers
+        // see this mouse-down even after the browser's preview handler did.
+        down.RoutedEvent=Mouse.MouseDownEvent;target.RaiseEvent(down);
+        int downCount=model.SelectedPaths.Count;bool frozenMatches=files.CaptureDragEntries().Select(entry=>entry.FullPath).ToHashSet(StringComparer.Ordinal).SetEquals(expected);
+        var up=MouseArgs(Mouse.PreviewMouseUpEvent);target.RaiseEvent(up);up.RoutedEvent=Mouse.MouseUpEvent;target.RaiseEvent(up);Pump();
+        bool singleAfterUp=model.SelectedPaths.SequenceEqual(new[]{rows[0].Entry.FullPath});
+        if(!(previewHandled&&downCount==2&&frozenMatches&&singleAfterUp)){var host=Window.GetWindow(files)??throw new InvalidOperationException("CI file view lost its host window.");evidence.Capture((FrameworkElement)host.Content,"files-group-press-failure-"+mode,new{theme="Light",fixtureOnly=true,previewHandled,downCount,frozenMatches,singleAfterUp,selectedPaths=model.SelectedPaths,physicalInput=false,oleStarted=false});}
+        assert(previewHandled&&downCount==2&&frozenMatches&&singleAfterUp,mode+" plain selected-item press survives native handled mouse-down with its full drag group, then plain mouse-up selects the clicked item");
+        if(checkModifiers)
+        {
+            SelectPair();bool ctrl=files.BeginSelectedGroupPress(owner,rows[0],ModifierKeys.Control),shift=files.BeginSelectedGroupPress(owner,rows[0],ModifierKeys.Shift);
+            assert(!ctrl&&!shift&&!owner.IsMouseCaptureWithin&&model.SelectedPaths.ToHashSet(StringComparer.Ordinal).SetEquals(expected)&&files.CaptureDragEntries().Select(entry=>entry.FullPath).ToHashSet(StringComparer.Ordinal).SetEquals(expected),"Ctrl and Shift group presses remain on the native selection path without arming the plain-press drag snapshot");
+        }
     }
     sealed class Operations:IFileBrowserOperations
     {
