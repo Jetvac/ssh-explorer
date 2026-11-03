@@ -26,6 +26,8 @@ public sealed class FileNamePresenter : Grid
     {
         VerticalAlignment = VerticalAlignment.Center;
         label.SetBinding(TextBlock.TextProperty, new Binding(nameof(FileItemViewModel.DisplayName)));
+        label.SetBinding(ToolTipProperty, new Binding(nameof(FileItemViewModel.Name)));
+        label.SetBinding(System.Windows.Automation.AutomationProperties.NameProperty, new Binding(nameof(FileItemViewModel.Name)));
         Children.Add(label); Children.Add(editor);
         editor.TextChanged += (_, _) => { if (edit is not null && !edit.IsBusy && editor.Text != edit.Text) edit.Text = editor.Text; };
         editor.PreviewKeyDown += async (_, e) =>

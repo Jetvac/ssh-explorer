@@ -63,6 +63,12 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         BuildNavigation(); BuildAddress(); BuildCommands(); BuildTable(); BuildTiles();
         var lower = new Grid(); lower.ColumnDefinitions.Add(new ColumnDefinition()); lower.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); lower.Children.Add(content); Grid.SetColumn(preview, 1); lower.Children.Add(preview); preview.SetResourceReference(Border.BorderBrushProperty, "Edge"); root.Children.Add(lower);
         Content = root; SetMode(mode, false); PreviewKeyDown += HandleKey;
+        // Finish a deferred group click before a child ListBox's class handler releases capture.
+        AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left || pressedGroupOwner is null) return;
+            FinishSelectedGroupClick(); e.Handled = true;
+        }), true);
         SizeChanged += (_, _) => UpdatePreviewVisibility();
         PreviewMouseDown += (_, e) => { if (e.ChangedButton == MouseButton.XButton1) { e.Handled = true; _ = Ui.Guard(Back); } if (e.ChangedButton == MouseButton.XButton2) { e.Handled = true; _ = Ui.Guard(Forward); } };
         if (!session.SftpAvailable) viewModel.Message = "SFTP недоступен. Терминал и мониторинг остаются доступны при наличии shell.";
@@ -178,7 +184,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     {
         table.SetResourceReference(StyleProperty, "FileTableStyle");
         table.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(FileBrowserViewModel.VisibleEntries)));
-        var template = new DataTemplate(); var row = new FrameworkElementFactory(typeof(DockPanel)); row.SetValue(DockPanel.LastChildFillProperty, true); var icon = new FrameworkElementFactory(typeof(Image)); icon.SetBinding(Image.SourceProperty, new Binding(nameof(FileItemViewModel.FileIcon))); icon.SetValue(Image.WidthProperty, 20d); icon.SetValue(Image.HeightProperty, 20d); icon.SetValue(MarginProperty, new Thickness(0, 0, 8, 0)); icon.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetValue(DockPanel.DockProperty, Dock.Left); row.AppendChild(icon); var name = new FrameworkElementFactory(typeof(FileNamePresenter)); row.AppendChild(name); template.VisualTree = row;
+        var template = new DataTemplate(); var row = new FrameworkElementFactory(typeof(DockPanel)); row.SetValue(DockPanel.LastChildFillProperty, true); var icon = new FrameworkElementFactory(typeof(Image)); icon.SetBinding(Image.SourceProperty, new Binding(nameof(FileItemViewModel.FileIcon))); icon.SetValue(Image.WidthProperty, 20d); icon.SetValue(Image.HeightProperty, 20d); icon.SetValue(MarginProperty, new Thickness(0, 0, 8, 0)); icon.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetValue(DockPanel.DockProperty, Dock.Left); row.AppendChild(icon); var name = new FrameworkElementFactory(typeof(FileNamePresenter)); name.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left); row.AppendChild(name); template.VisualTree = row;
         table.Columns.Add(new DataGridTemplateColumn { Header = "Имя", CellTemplate = template, Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 220, SortMemberPath = "Name" });
         MainWindow.AddColumn(table, "Дата изменения", "Modified", 180, "{0:dd.MM.yyyy HH:mm}"); MainWindow.AddColumn(table, "Тип", "Type", 150); MainWindow.AddColumn(table, "Размер", "Size", 104); MainWindow.AddColumn(table, "Права", "Permissions", 90); MainWindow.AddColumn(table, "Владелец", "Owner", 90); MainWindow.AddColumn(table, "Группа", "Group", 90);
         foreach (var column in table.Columns.OfType<DataGridTextColumn>().Where(c => c.SortMemberPath is "Size" or "Owner" or "Group")) column.ElementStyle = new Style(typeof(TextBlock)) { Setters = { new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right) } };
@@ -189,7 +195,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         foreach (var s in App.Store.Settings.Columns.OrderBy(x => x.Order)) { var c = table.Columns.FirstOrDefault(c => c.SortMemberPath == s.Key); if (c is not null) c.DisplayIndex = Math.Clamp(s.Order, 0, table.Columns.Count - 1); }
         table.ColumnReordered += (_, _) => SaveColumns(); table.PreviewMouseLeftButtonUp += (_, _) => SaveColumns();
         table.Sorting += (_, e) => { e.Handled = true; var key = e.Column.SortMemberPath; descending = key == sortKey && !descending; sortKey = key; foreach (var c in table.Columns) c.SortDirection = c == e.Column ? descending ? ListSortDirection.Descending : ListSortDirection.Ascending : null; ApplyItems(); };
-        table.SelectionChanged += (_, _) => SelectionChanged(); table.MouseDoubleClick += async (_, e) => { if (FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null && FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) is not null) await Ui.Guard(Open); };
+        table.SelectionChanged += (_, _) => SelectionChanged(); table.MouseDoubleClick += async (_, e) => { if (FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null && IsFileObjectHit(e.OriginalSource as DependencyObject) && FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) is not null) await Ui.Guard(Open); };
         var rowStyle = new Style(typeof(DataGridRow), (Style)FindResource(typeof(DataGridRow))); rowStyle.Setters.Add(new Setter(OpacityProperty, new Binding("Opacity"))); table.RowStyle = rowStyle;
         ConfigureDrag(table); ConfigureRightClick(table); ConfigureLasso(table); Ui.AttachContextMenu(table, () => BuildContextMenu(Selected().Count > 0));
     }
@@ -399,7 +405,8 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             var strip = new FileContextCommandStrip();
             strip.Add(Ui.CutGlyph, "Вырезать · Ctrl+X", () => CopySelection(true), viewModel.HasSelection);
             strip.Add(Ui.CopyGlyph, "Копировать · Ctrl+C", () => CopySelection(false), viewModel.HasSelection);
-            strip.Add(Ui.PasteGlyph, "Вставить · Ctrl+V", Paste, CanPaste());
+            var pasteTarget = chosen.Count == 1 && first.IsDirectory && !first.IsSymbolicLink ? first.FullPath : CurrentPath;
+            strip.Add(Ui.PasteGlyph, "Вставить в «" + pasteTarget + "» · Ctrl+V", () => PasteTo(pasteTarget), CanPaste(pasteTarget));
             strip.Add(Ui.RenameGlyph, "Переименовать · F2", Rename, viewModel.CanRename);
             strip.Add(Ui.DeleteGlyph, "Удалить окончательно… · Delete", Delete, viewModel.HasSelection);
             m.Items.Insert(0, strip); m.Items.Insert(1, new Separator());

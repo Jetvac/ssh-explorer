@@ -23,12 +23,18 @@ public sealed partial class FileBrowserView
     {
         owner.PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (nameEdit?.IsActive == true || ItemAt(e.OriginalSource as DependencyObject) is not null ||
+            if (nameEdit?.IsActive == true || IsFileObjectHit(e.OriginalSource as DependencyObject) ||
                 FindAncestor<ScrollBar>(e.OriginalSource as DependencyObject) is not null ||
                 FindAncestor<DataGridColumnHeader>(e.OriginalSource as DependencyObject) is not null) return;
             BeginLasso(owner, e.GetPosition(owner), (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != 0);
             e.Handled = lassoOwner is not null;
         };
+        owner.AddHandler(Mouse.MouseDownEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            // A DataGridCell class handler can select its row after handled PreviewDown.
+            if (e.ChangedButton != MouseButton.Left || lassoOwner != owner || lassoMoved) return;
+            RestoreSelection(lassoBaseline.Select(row => row.Entry.FullPath));
+        }), true);
         owner.PreviewMouseMove += (_, e) =>
         {
             if (lassoOwner != owner) return;

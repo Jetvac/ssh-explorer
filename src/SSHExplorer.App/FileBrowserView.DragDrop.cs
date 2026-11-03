@@ -34,17 +34,18 @@ public sealed partial class FileBrowserView
             data.SetFileDropList(files); Clipboard.SetDataObject(data, false); viewModel.Message = "Файлы скопированы. Можно вставить в Windows Explorer или серверную вкладку.";
         }
     }
-    async Task Paste()
+    Task Paste() => PasteTo(CurrentPath);
+    async Task PasteTo(string destination)
     {
-        if (!CanPaste()) return;
-        var data = Clipboard.GetDataObject(); var clipboardSequence = WindowsClipboard.CurrentSequence; if (data is null || string.IsNullOrEmpty(CurrentPath)) return;
+        if (!CanPaste(destination)) return;
+        var data = Clipboard.GetDataObject(); var clipboardSequence = WindowsClipboard.CurrentSequence; if (data is null || !CanPasteData(data, destination)) return;
         if (GetRemote(data) is RemoteClipboard remote)
         {
-            var job = App.Transfers.Copy(remote.Session, remote.Paths, session, CurrentPath, remote.Cut); main.ShowTransfers(); await WaitAndRefresh(job);
+            var job = App.Transfers.Copy(remote.Session, remote.Paths, session, destination, remote.Cut); main.ShowTransfers(); await WaitAndRefresh(job);
             if (remote.Cut && job.State == TransferState.Completed && remote.SourceView?.TryGetTarget(out var sourceView) == true && !ReferenceEquals(sourceView, this) && !sourceView.disposed) await sourceView.RefreshAsync();
             if (job.State == TransferState.Completed && remote.Cut) { foreach (var r in all) { r.IsCut = false; r.Notify(); } if (WindowsClipboard.CurrentSequence == clipboardSequence) Clipboard.Clear(); }
         }
-        else if (data.GetData(DataFormats.FileDrop) is string[] local) { var job = App.Transfers.Upload(session, local, CurrentPath); main.ShowTransfers(); await WaitAndRefresh(job); }
+        else if (data.GetData(DataFormats.FileDrop) is string[] local) { var job = App.Transfers.Upload(session, local, destination); main.ShowTransfers(); await WaitAndRefresh(job); }
         else viewModel.Message = "В буфере нет файлов для вставки.";
     }
     async Task<StringCollection?> PrepareWindowsFiles(RemoteClipboard payload)
@@ -63,7 +64,7 @@ public sealed partial class FileBrowserView
         {
             ClearPressedGroup();
             var item = ItemAt(e.OriginalSource as DependencyObject);
-            dragStart = viewModel.CanCreate && nameEdit?.IsActive != true && FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null && item is not null ? e.GetPosition(control) : null;
+            dragStart = viewModel.CanCreate && nameEdit?.IsActive != true && FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is null && item is not null && IsFileObjectHit(e.OriginalSource as DependencyObject) ? e.GetPosition(control) : null;
             if (dragStart is not null && e.ClickCount == 1 && item is not null && BeginSelectedGroupPress(control, item, Keyboard.Modifiers)) e.Handled = true;
         };
         // DataGridCell handles even already-handled mouse-down events. Restore synchronously
@@ -195,6 +196,14 @@ public sealed partial class FileBrowserView
         }
     }
     static FileItemViewModel? ItemAt(DependencyObject? source) => FindAncestor<DataGridRow>(source)?.Item as FileItemViewModel ?? FindAncestor<ListBoxItem>(source)?.DataContext as FileItemViewModel;
+    internal static bool IsFileObjectHit(DependencyObject? source)
+    {
+        if (FindAncestor<ListBoxItem>(source) is not null) return true;
+        if (FindAncestor<FileNamePresenter>(source) is not null || FindAncestor<Image>(source) is not null) return true;
+        // Empty name-cell space is available for a marquee even in a full directory.
+        // Metadata cells keep their ordinary full-row click/drag behavior.
+        return FindAncestor<DataGridCell>(source) is { Column.SortMemberPath: not "Name" };
+    }
     static DataObject RemoteData(RemoteClipboard payload)
     {
         var token = RegisterRemote(payload);
@@ -211,18 +220,19 @@ public sealed partial class FileBrowserView
         var raw = data.GetData("SSHExplorer.RemoteFiles", false); var token = raw is MemoryStream stream ? Encoding.UTF8.GetString(stream.ToArray()).TrimEnd('\0') : raw as string;
         return token is not null && remoteClipboardTokens.TryGetValue(token, out var payload) && payload.Session.TryGetTarget(out var owner) && owner.State is not SessionState.Closing and not SessionState.Closed ? new RemoteClipboard(owner, payload.Paths, payload.Cut, payload.SourceView) : null;
     }
-    bool CanPaste()
+    bool CanPaste(string? destination = null)
     {
         if (!viewModel.CanCreate || nameEdit?.IsActive == true) return false;
-        try { return Clipboard.GetDataObject() is { } data && CanPasteData(data); }
+        try { return Clipboard.GetDataObject() is { } data && CanPasteData(data, destination); }
         catch (System.Runtime.InteropServices.ExternalException) { return false; }
     }
-    internal bool CanPasteData(IDataObject data)
+    internal bool CanPasteData(IDataObject data, string? destination = null)
     {
-        if (!viewModel.CanCreate || session.Lifetime.IsCancellationRequested) return false;
+        var target = destination ?? CurrentPath;
+        if (!viewModel.CanCreate || string.IsNullOrEmpty(target) || session.Lifetime.IsCancellationRequested) return false;
         if (GetRemote(data) is { } remote)
             return remote.Paths.Length > 0 && remote.Session.Files.Available && !remote.Paths.Any(p =>
-                remote.Session.Id == session.Id && (PosixPath.IsSameOrDescendant(CurrentPath, p) || remote.Cut && PosixPath.Combine(CurrentPath, PosixPath.Name(p)) == p));
+                remote.Session.Id == session.Id && (PosixPath.IsSameOrDescendant(target, p) || remote.Cut && PosixPath.Combine(target, PosixPath.Name(p)) == p));
         return data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 };
     }
     void DisposeDragDrop()
