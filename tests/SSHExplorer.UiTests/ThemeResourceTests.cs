@@ -100,7 +100,8 @@ internal static class ThemeResourceTests
     static void MaterializeInputs()
     {
         var text=new TextBox{Text="fixture"};var password=new PasswordBox{Password=" fixture "};var combo=new ComboBox{ItemsSource=new[]{"one","two"},SelectedIndex=0};var check=new CheckBox{Content="fixture",IsThreeState=true};
-        foreach(var control in new Control[]{text,password,combo,check}){control.Style=(Style)Application.Current.FindResource(control.GetType());control.ApplyTemplate();control.Measure(new Size(280,60));control.Arrange(new Rect(0,0,280,60));control.UpdateLayout();}
+        foreach(var control in new Control[]{text,password,combo,check}){control.Style=(Style)Application.Current.FindResource(control.GetType());control.SetResourceReference(Control.FontSizeProperty,"UIFontSize");control.ApplyTemplate();control.Measure(new Size(280,double.PositiveInfinity));control.Arrange(new Rect(0,0,280,control.DesiredSize.Height));control.UpdateLayout();}
+        if(Math.Abs(text.DesiredSize.Height-password.DesiredSize.Height)>1||Math.Abs(text.DesiredSize.Height-combo.DesiredSize.Height)>1)throw new Exception("Unshown native input views requested unequal heights; padding may be counted twice.");
         foreach(var control in new Control[]{text,password})
         {
             _=Part<ScrollViewer>(control,"PART_ContentHost");_=Part<Border>(control,"FieldChrome");_=Part<Border>(control,"FocusUnderline");
