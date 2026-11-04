@@ -12,7 +12,8 @@ $required=@('SSHExplorer.exe','SSHExplorer.dll','hostfxr.dll','coreclr.dll','wpf
 $bundledRuntime=Test-Path -LiteralPath (Join-Path $packageRoot 'WebView2Runtime')
 if($build.webView2 -eq 'system-evergreen'){
     if($bundledRuntime){throw 'Evergreen package must not contain WebView2Runtime.'}
-} elseif($build.webView2 -like 'fixed-*'){
+} elseif($build.webView2 -like 'fixed-*' -or $build.webView2 -match '^\d+(\.\d+){3}$'){
+    # Packages before beta.6 (e.g. the published beta.4 baseline) recorded only the bundled Fixed runtime version.
     $required+='WebView2Runtime\msedgewebview2.exe'
 } else {throw "Unknown WebView2 packaging mode: $($build.webView2)"}
 foreach($relative in $required){
