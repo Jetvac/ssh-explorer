@@ -191,10 +191,11 @@ internal static class Beta6Tests
             var groups = CollectionViewSource.GetDefaultView(servers.ItemsSource).Groups!.Cast<CollectionViewGroup>().Select(g => $"{g.Name}:{g.ItemCount}").ToArray();
             Check(groups.SequenceEqual(["Прод:2", "Тест:1", "Без группы:1"]), "Home groups are ordered by name with «Без группы» last: " + string.Join(", ", groups));
             var headers = Descendants<GroupItem>(servers).Select(g => Descendants<Expander>(g).First()).ToArray();
-            Check(headers.Length == groups.Length && Descendants<TextBlock>(headers[0]).Any(t => t.Text.StartsWith("Прод · ", StringComparison.Ordinal)), "group headers show the name and the number of servers");
-            var test = headers.Single(h => Descendants<TextBlock>(h).Any(t => t.Text.StartsWith("Тест", StringComparison.Ordinal))); test.IsExpanded = false; Pump();
+            var headerTexts = headers.Select(h => h.Header?.ToString() ?? "").ToArray();
+            Check(headers.Length == groups.Length && headerTexts.SequenceEqual(["Прод · 2", "Тест · 1", "Без группы · 1"]) && Descendants<TextBlock>(headers[0]).Any(t => t.Text == "Прод · 2" && t.IsVisible), $"group headers show the name and the number of servers ({headers.Length}/{groups.Length}: {string.Join(" | ", headerTexts)})");
+            var test = headers.Single(h => (h.Header as string)?.StartsWith("Тест", StringComparison.Ordinal) == true); test.IsExpanded = false; Pump();
             Invoke(main, "RefreshHome"); Layout(main);
-            var testAgain = Descendants<GroupItem>(servers).Select(g => Descendants<Expander>(g).First()).Single(h => Descendants<TextBlock>(h).Any(t => t.Text.StartsWith("Тест", StringComparison.Ordinal)));
+            var testAgain = Descendants<GroupItem>(servers).Select(g => Descendants<Expander>(g).First()).Single(h => (h.Header as string)?.StartsWith("Тест", StringComparison.Ordinal) == true);
             Check(!testAgain.IsExpanded && Descendants<DataGridRow>(testAgain).All(r => !r.IsVisible), "a collapsed group stays collapsed after a refresh");
             evidence.Capture((FrameworkElement)main.Content, "home-groups", new { theme = "Light", fixtureOnly = true });
             testAgain.IsExpanded = true; foreach (var p in store.Profiles) p.Group = ""; store.Profiles.RemoveAll(p => p.Name == "file3");

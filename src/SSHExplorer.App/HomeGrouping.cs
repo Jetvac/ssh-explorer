@@ -40,15 +40,14 @@ public static class HomeGrouping
         expander.SetBinding(Expander.IsExpandedProperty, new Binding(nameof(CollectionViewGroup.Name)) { Converter = new ExpandedConverter(), Mode = BindingMode.OneTime });
         expander.AddHandler(Expander.CollapsedEvent, new RoutedEventHandler((s, _) => { if (((FrameworkElement)s).DataContext is CollectionViewGroup g) Collapsed.Add(g.Name?.ToString() ?? ""); }));
         expander.AddHandler(Expander.ExpandedEvent, new RoutedEventHandler((s, _) => { if (((FrameworkElement)s).DataContext is CollectionViewGroup g) Collapsed.Remove(g.Name?.ToString() ?? ""); }));
+        // Header is the ready text "Прод · 2"; the template only styles it.
+        expander.SetBinding(HeaderedContentControl.HeaderProperty, new MultiBinding { Converter = new HeaderConverter(), Bindings = { new Binding(nameof(CollectionViewGroup.Name)), new Binding(nameof(CollectionViewGroup.ItemCount)) } });
         var header = new FrameworkElementFactory(typeof(TextBlock));
+        header.SetBinding(TextBlock.TextProperty, new Binding());
         header.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
         header.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 6, 0, 6));
-        header.SetBinding(TextBlock.TextProperty, new MultiBinding { Converter = new HeaderConverter(), Bindings = { new Binding(nameof(CollectionViewGroup.Name)), new Binding(nameof(CollectionViewGroup.ItemCount)) } });
-        header.SetValue(AutomationProperties.NameProperty, "Группа серверов");
-        var headerTemplate = new DataTemplate { VisualTree = header };
-        expander.SetValue(HeaderedContentControl.HeaderTemplateProperty, headerTemplate);
-        // The header template's DataContext is the Expander's Header; bind Header to the group itself.
-        expander.SetBinding(HeaderedContentControl.HeaderProperty, new Binding());
+        expander.SetValue(HeaderedContentControl.HeaderTemplateProperty, new DataTemplate { VisualTree = header });
+        expander.SetBinding(AutomationProperties.NameProperty, new MultiBinding { Converter = new HeaderConverter(), Bindings = { new Binding(nameof(CollectionViewGroup.Name)), new Binding(nameof(CollectionViewGroup.ItemCount)) } });
         expander.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
         var template = new ControlTemplate(typeof(GroupItem)) { VisualTree = expander };
         var style = new Style(typeof(GroupItem)); style.Setters.Add(new Setter(Control.TemplateProperty, template));
