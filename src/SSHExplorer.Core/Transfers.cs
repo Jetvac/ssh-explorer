@@ -24,6 +24,7 @@ public sealed class TransferJob : INotifyPropertyChanged
     internal Task Completion = Task.CompletedTask;
     internal Func<CancellationToken, Task>? Operation;
     internal ServerSession[] Sessions = [];
+    internal RateLimiter? Limiter;
     public Guid Id { get; } = Guid.NewGuid();
     public Guid SessionId { get; internal set; }
     public string Name { get; internal set; } = "";
@@ -39,7 +40,17 @@ public sealed class TransferJob : INotifyPropertyChanged
     public int CompletedItems { get; internal set; }
     public int SkippedItems { get; internal set; }
     public int Attempt { get; private set; } = 1;
-    public string Summary => $"Выполнено объектов: {CompletedItems}; пропущено: {SkippedItems}";
+    /// <summary>Bytes taken over from a verified partial file of an earlier attempt.</summary>
+    public long ResumedBytes { get; private set; }
+    /// <summary>Partial files kept for a retry, by part path. They survive Reset; deleted when consumed, when the job
+    /// completes, or when it is removed from the queue.</summary>
+    internal readonly Dictionary<string, PartRecord> Parts = new(StringComparer.Ordinal);
+    internal PartRecord? Part(string key) { lock (Parts) return Parts.GetValueOrDefault(key); }
+    internal void KeepPart(string key, PartRecord record) { lock (Parts) Parts[key] = record; }
+    internal void ForgetPart(string key) { lock (Parts) Parts.Remove(key); }
+    internal Func<Task>[] TakeParts() { lock (Parts) { var all = Parts.Values.Select(p => p.Delete).ToArray(); Parts.Clear(); return all; } }
+    public string Summary => $"Выполнено объектов: {CompletedItems}; пропущено: {SkippedItems}" + (ResumedBytes > 0 ? $"; продолжено с уже переданных {TransferResume.Size(ResumedBytes)}" : "");
+    internal void AddResumed(long bytes) { Interlocked.Add(ref _bytes, bytes); ResumedBytes += bytes; Notify(); }
     public TransferKind Kind { get; internal set; }
     /// <summary>Profile names of the servers taking part (source first).</summary>
     public string SourceServer => Kind == TransferKind.Upload ? "Windows" : Sessions.Length > 0 ? Sessions[0].Profile.Name : "";
@@ -55,7 +66,7 @@ public sealed class TransferJob : INotifyPropertyChanged
     internal void Reset()
     {
         lock (_sync) { _cancel.Dispose(); _cancel = new(); }
-        Interlocked.Exchange(ref _bytes, 0); TotalBytes = null; Error = null; CompletedItems = 0; SkippedItems = 0; Attempt++; _notifiedAt = 0; _watch.Restart(); State = TransferState.Queued; Notify();
+        Interlocked.Exchange(ref _bytes, 0); TotalBytes = null; Error = null; CompletedItems = 0; SkippedItems = 0; ResumedBytes = 0; Attempt++; _notifiedAt = 0; _watch.Restart(); State = TransferState.Queued; Notify();
     }
     internal void Start() { _watch.Restart(); State = TransferState.Running; Notify(); }
     internal void AddBytes(int bytes)
@@ -72,7 +83,11 @@ public sealed class TransferJob : INotifyPropertyChanged
 public sealed partial class TransferQueue
 {
     private readonly List<TransferJob> _jobs = [];
-    private readonly SemaphoreSlim _parallelism = new(2, 2);
+    private readonly ParallelGate _parallelism = new(2);
+    /// <summary>Shared limit for all running transfers; set from settings.</summary>
+    public RateLimiter Limiter { get; } = new();
+    /// <summary>How many transfers run at once (1–8); raising it starts waiting jobs immediately.</summary>
+    public int Parallelism { get => _parallelism.Capacity; set => _parallelism.Capacity = value; }
     private readonly AsyncLocal<TransferJob?> _currentJob = new();
     public IReadOnlyList<TransferJob> Jobs { get { lock (_jobs) return _jobs.ToArray(); } }
     public event EventHandler? Changed;
@@ -80,11 +95,14 @@ public sealed partial class TransferQueue
     /// <summary>Removes finished (completed or cancelled) jobs from the visible queue. Failed jobs stay for retry.</summary>
     public int RemoveFinished()
     {
-        int removed;
-        lock (_jobs) removed = _jobs.RemoveAll(job => job.State is TransferState.Completed or TransferState.Cancelled);
+        int removed; TransferJob[] gone;
+        lock (_jobs) { gone = _jobs.Where(job => job.State is TransferState.Completed or TransferState.Cancelled).ToArray(); removed = _jobs.RemoveAll(job => gone.Contains(job)); }
+        // A cancelled job kept its verified partial files for a retry; removing the job removes them.
+        foreach (var job in gone) DeleteParts(job);
         if (removed > 0) Changed?.Invoke(this, EventArgs.Empty);
         return removed;
     }
+    static void DeleteParts(TransferJob job) { foreach (var delete in job.TakeParts()) _ = Task.Run(async () => { try { await delete().ConfigureAwait(false); } catch { } }); }
     public bool HasActive(Guid sessionId) => Jobs.Any(x => x.Sessions.Any(s => s.Id == sessionId) && x.State is TransferState.Queued or TransferState.Running);
     public void CancelSession(Guid sessionId) { foreach (var job in Jobs.Where(x => x.Sessions.Any(s => s.Id == sessionId))) if (job.State is TransferState.Queued or TransferState.Running) job.Cancel(); }
     public Task WaitAsync(TransferJob job, CancellationToken ct = default) => job.Completion.WaitAsync(ct);
@@ -104,6 +122,7 @@ public sealed partial class TransferQueue
             if (_jobs.Count >= 200) _jobs.RemoveAll(x => x.State is not TransferState.Queued and not TransferState.Running);
             _jobs.Add(job);
         }
+        job.Limiter = Limiter;
         job.PropertyChanged += (_, _) => Changed?.Invoke(this, EventArgs.Empty);
         job.Completion = Task.Run(() => RunJobAsync(job)); Changed?.Invoke(this, EventArgs.Empty); return job;
     }
@@ -116,6 +135,7 @@ public sealed partial class TransferQueue
             await _parallelism.WaitAsync(linked.Token).ConfigureAwait(false); acquired = true; _currentJob.Value = job; job.Start();
             await job.Operation!(linked.Token).ConfigureAwait(false);
             linked.Token.ThrowIfCancellationRequested(); job.State = TransferState.Completed;
+            DeleteParts(job); // parts of items skipped in this attempt are no longer needed
         }
         catch (OperationCanceledException) { job.State = TransferState.Cancelled; job.Error = "Передача отменена. " + job.Summary; }
         catch (Exception ex) { job.State = TransferState.Failed; job.Error = ErrorMessages.Describe(ex) + " " + job.Summary; }
@@ -232,20 +252,31 @@ public sealed partial class TransferQueue
         }
         long expected=info.Length; DateTime modified=info.LastWriteTimeUtc;
         var prior=SnapshotOrNull(client,dest);
-        string temporary=PosixPath.Combine(PosixPath.Parent(dest),".sshexplorer-"+Guid.NewGuid().ToString("N")+".part");
+        string temporary=PosixPath.Combine(PosixPath.Parent(dest),TransferResume.PartName("upload",source,dest));
+        long offset=0;
         try
         {
             using(var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read,128*1024,FileOptions.SequentialScan))
-            using(var output=client.Open(temporary,FileMode.CreateNew,FileAccess.Write)) await StreamAsync(job,input,output,expected,ct).ConfigureAwait(false);
+            {
+                offset=TransferResume.ResumableRemote(client,temporary,job.Part("remote:"+temporary),expected,modified,input);
+                using var output=offset>0?client.Open(temporary,FileMode.Open,FileAccess.Write):client.Open(temporary,FileMode.CreateNew,FileAccess.Write);
+                if(offset>0){output.Seek(offset,SeekOrigin.Begin);input.Seek(offset,SeekOrigin.Begin);job.AddResumed(offset);}
+                await StreamAsync(job,input,output,expected-offset,ct).ConfigureAwait(false);
+            }
             info.Refresh(); if(info.Length!=expected||info.LastWriteTimeUtc!=modified)throw new IOException("Источник изменён во время загрузки: "+source);
             if(RemoteFileService.Find(client,temporary).Length!=expected)throw new IOException("Размер загруженного файла не совпадает: "+temporary);
             client.SetLastWriteTimeUtc(temporary,modified);
-            CommitRemote(client,temporary,dest,prior,ct); job.CompletedItems++;
+            CommitRemote(client,temporary,dest,prior,ct); job.ForgetPart("remote:"+temporary); job.CompletedItems++;
         }
         catch(Exception ex)
         {
             var diagnosed=DiagnoseWriteFailure(client,dest,ex,ct);
-            TryDeleteOwned(client,temporary);
+            // Keep a substantial partial file of an unchanged source for "Повторить"; otherwise remove it.
+            // Works after a dropped connection too: the part stays on the server and the job remembers the source identity.
+            var target=job.Sessions[^1];
+            if(TransferResume.ShouldRetain(ex))
+                job.KeepPart("remote:"+temporary,new PartRecord(expected,modified,async()=>{using var lease=await target.LeaseSftpAsync(CancellationToken.None).ConfigureAwait(false);TryDeleteOwned(lease.Client,temporary);}));
+            else { job.ForgetPart("remote:"+temporary); TryDeleteOwned(client,temporary); }
             if(!ReferenceEquals(diagnosed,ex))throw diagnosed;
             throw;
         }
@@ -281,19 +312,29 @@ public sealed partial class TransferQueue
         }
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         var prior=LocalSnapshot(destination);
-        string temporary=Path.Combine(Path.GetDirectoryName(destination)!,".sshexplorer-"+Guid.NewGuid().ToString("N")+".part");
+        string temporary=Path.Combine(Path.GetDirectoryName(destination)!,TransferResume.PartName("download",source,destination));
         try
         {
             using(var input=client.OpenRead(source))
-            using(var output=new FileStream(temporary,FileMode.CreateNew,FileAccess.Write,FileShare.None,128*1024,FileOptions.SequentialScan))
-            { await StreamAsync(job,input,output,file.Length,ct).ConfigureAwait(false);output.Flush(true); }
+            {
+                long offset=TransferResume.ResumableLocal(temporary,job.Part("local:"+temporary),file.Length,file.LastWriteTimeUtc,input);
+                using var output=new FileStream(temporary,offset>0?FileMode.Open:FileMode.CreateNew,FileAccess.Write,FileShare.None,128*1024,FileOptions.SequentialScan);
+                if(offset>0){output.Seek(offset,SeekOrigin.Begin);input.Seek(offset,SeekOrigin.Begin);job.AddResumed(offset);}
+                await StreamAsync(job,input,output,file.Length-offset,ct).ConfigureAwait(false);output.Flush(true);
+            }
             var after=RemoteFileService.Find(client,source);if(!Same(file,after))throw new IOException("Источник изменён во время скачивания: "+source);
             if(LocalSnapshot(destination)!=prior)throw new IOException("Локальное назначение изменено во время передачи: "+destination);
             ct.ThrowIfCancellationRequested();
             if(File.Exists(destination))File.Replace(temporary,destination,null);else File.Move(temporary,destination);
-            File.SetLastWriteTimeUtc(destination,file.LastWriteTimeUtc);job.CompletedItems++;
+            File.SetLastWriteTimeUtc(destination,file.LastWriteTimeUtc);job.ForgetPart("local:"+temporary);job.CompletedItems++;
         }
-        catch{try{if(File.Exists(temporary))File.Delete(temporary);}catch{}throw;}
+        catch(Exception ex)
+        {
+            if(TransferResume.ShouldRetain(ex)&&File.Exists(temporary))
+                job.KeepPart("local:"+temporary,new PartRecord(file.Length,file.LastWriteTimeUtc,()=>{try{if(File.Exists(temporary))File.Delete(temporary);}catch{}return Task.CompletedTask;}));
+            else { job.ForgetPart("local:"+temporary); try{if(File.Exists(temporary))File.Delete(temporary);}catch{} }
+            throw;
+        }
     }
     private async Task CopyItemAsync(TransferJob job,ServerSession sourceSession,SftpClient input,SftpClient output,string source,string destination,bool move,CancellationToken ct,int depth=0)
     {
@@ -342,7 +383,7 @@ public sealed partial class TransferQueue
     private static async Task StreamAsync(TransferJob job,Stream source,Stream destination,long expected,CancellationToken ct)
     {
         byte[] buffer=new byte[128*1024];long copied=0;
-        while(true){ct.ThrowIfCancellationRequested();int read=await source.ReadAsync(buffer,ct).ConfigureAwait(false);if(read==0)break;if(copied+read>expected)throw new IOException("Источник вырос во время передачи.");await destination.WriteAsync(buffer.AsMemory(0,read),ct).ConfigureAwait(false);copied+=read;job.AddBytes(read);}
+        while(true){ct.ThrowIfCancellationRequested();int read=await source.ReadAsync(buffer,ct).ConfigureAwait(false);if(read==0)break;if(copied+read>expected)throw new IOException("Источник вырос во время передачи.");if(job.Limiter is {} limiter)await limiter.WaitAsync(read,ct).ConfigureAwait(false);await destination.WriteAsync(buffer.AsMemory(0,read),ct).ConfigureAwait(false);copied+=read;job.AddBytes(read);}
         if(copied!=expected)throw new IOException("Источник изменён: получен неполный файл.");await destination.FlushAsync(ct).ConfigureAwait(false);
     }
     private static string? SnapshotOrNull(SftpClient c,string path)=>RemoteFileService.Exists(c,path)?Stamp(RemoteFileService.Find(c,path)):null;
