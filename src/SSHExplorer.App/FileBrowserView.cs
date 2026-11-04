@@ -56,7 +56,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     internal FileBrowserView(ServerSession session, MainWindow main, IFileBrowserOperations operations)
     {
         this.session = session; this.main = main; this.operations = operations; mode = App.Store.Settings.ViewMode; imageSlots = new SemaphoreSlim(Math.Clamp(App.Store.Settings.PreviewParallelism, 1, 4));
-        DataContext = viewModel;
+        DataContext = viewModel; viewModel.SortKey = string.IsNullOrEmpty(App.Store.Settings.FileSortKey) ? "Name" : App.Store.Settings.FileSortKey; viewModel.Descending = App.Store.Settings.FileSortDescending;
         viewModel.Available = operations.Available;
         status.SetBinding(TextBlock.TextProperty, new Binding(nameof(FileBrowserViewModel.StatusText)));
         message.SetBinding(TextBlock.TextProperty, new Binding(nameof(FileBrowserViewModel.Message)));
@@ -326,12 +326,25 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     {
         if (context is not BrowserContext saved || !viewModel.Restore(saved)) return; SetMode(saved.Mode, false); RestoreSelection(saved.Selection); _ = Dispatcher.BeginInvoke(() => FindVisualChild<ScrollViewer>(mode == "Details" ? table : tiles)?.ScrollToVerticalOffset(saved.Offset));
     }
+    /// <summary>Header arrows, the "Сортировка" menu and the saved preference describe one order.</summary>
+    void SyncSortState()
+    {
+        foreach (var column in table.Columns) column.SortDirection = column.SortMemberPath == sortKey ? descending ? ListSortDirection.Descending : ListSortDirection.Ascending : null;
+        var settings = App.Store.Settings;
+        if (settings.FileSortKey != sortKey || settings.FileSortDescending != descending) { settings.FileSortKey = sortKey; settings.FileSortDescending = descending; _ = SaveSortAsync(); }
+    }
+    static async Task SaveSortAsync()
+    {
+        try { await App.Store.SaveAsync(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { await LocalDiagnostics.RecordAsync("files.sort.save.failed", error); }
+    }
     void ApplyItems()
     {
         EndLasso();
         if (disposed) return; var selection = viewModel.SelectedPaths.ToList(); restoringSelection = true;
         try { viewModel.ApplyFilter(App.Store.Settings.ShowHidden, App.Store.Settings.ShowExtensions); RestoreSelection(selection); }
         finally { restoringSelection = false; }
+        SyncSortState();
         if (nameEdit is { IsActive: true, IsBusy: false } edit && !viewModel.VisibleEntries.Contains(edit.Item)) CancelNameEdit();
         UpdateStatus(); _ = Ui.Guard(UpdatePreview);
     }

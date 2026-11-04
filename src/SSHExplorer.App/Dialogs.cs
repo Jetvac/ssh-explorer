@@ -96,44 +96,9 @@ public static class Dialogs
         { var b = Ui.Button(label, () => { result = decision; w.DialogResult = true; }); b.HorizontalContentAlignment = HorizontalAlignment.Left; p.Children.Add(b); }
         var cancel=Ui.Button("Отменить передачу",()=>w.DialogResult=false);cancel.IsCancel=true;w.Content = Ui.DialogSurface(p,cancel); w.ShowDialog(); if (applyAll.IsChecked == true && result != ConflictDecision.Cancel && c.JobId is not null) { if (conflictPolicies.Count > 128) conflictPolicies.Clear(); conflictPolicies[key] = result; } return result;
     }
-    public static void Settings()
-    {
-        var w = Window("Параметры SSH Explorer", 570); var p = new StackPanel { Margin = new Thickness(24) }; var s = App.Store.Settings;
-        p.Children.Add(Ui.DialogHeading("Параметры")); p.Children.Add(Ui.Text("Тема приложения"));
-        var version=Ui.Text($"SSH Explorer {BuildInfo.DisplayVersion}\nСборка: {BuildInfo.Commit}",12);version.TextWrapping=TextWrapping.Wrap;p.Children.Add(version);
-        p.Children.Add(Ui.AsyncButton("Скопировать путь к диагностике",()=>{Clipboard.SetText(System.IO.Path.Combine(App.Store.DirectoryPath,"Logs"));return Task.CompletedTask;}));
-        var themes = new ComboBox { ItemsSource = new[] { "Как в Windows", "Светлая", "Тёмная" }, SelectedIndex = s.Theme == "Light" ? 1 : s.Theme == "Dark" ? 2 : 0, Margin = new Thickness(0, 10, 0, 10) };System.Windows.Automation.AutomationProperties.SetName(themes,"Тема приложения"); p.Children.Add(themes);
-        var poll = Field(p, "Обновление диспетчера задач, секунд (1–60)", s.PollIntervalSeconds.ToString());
-        var font = Field(p, "Размер шрифта терминала (8–36)", s.TerminalFontSize.ToString());
-        var maxBytes = Field(p, "Лимит изображения для предпросмотра, МБ (1–200)", (s.PreviewMaxBytes / 1024 / 1024).ToString());
-        var pixels = Field(p, "Лимит изображения, мегапикселей (1–100)", (s.PreviewMaxPixels / 1_000_000).ToString());
-        var parallel = Field(p, "Одновременных запросов миниатюр (1–4, для новых вкладок)", s.PreviewParallelism.ToString());
-        var cache = Field(p, "Кэш изображений на вкладку, МБ (16–1024)", (s.PreviewCacheBytes / 1024 / 1024).ToString());
-        var editor = Field(p, "Текстовый редактор (полный путь EXE; пусто — Блокнот Windows)", s.ExternalEditorPath);
-        p.Children.Add(Ui.Button("Выбрать установленный редактор…", () => { var pick = new Microsoft.Win32.OpenFileDialog { Filter = "Редактор Windows|*.exe", CheckFileExists = true }; if (pick.ShowDialog(w) == true) editor.Text = pick.FileName; }));
-        p.Children.Add(Ui.Button("Доверенные ключи серверов…", TrustManagement));
-        p.Children.Add(Ui.AsyncButton("Очистить локальные копии для Windows…", ClearTransferCache));
-        p.Children.Add(Ui.AsyncButton("Очистить завершённые документы редактора…", () => ((MainWindow)Application.Current.MainWindow).ClearCompletedDocumentsAsync()));
-        var path = Ui.Text("Настройки и защищённые секреты: " + App.Store.DirectoryPath, 12); path.TextWrapping = TextWrapping.Wrap; path.Margin = new Thickness(0, 14, 0, 14); path.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(path);
-        p.Children.Add(Ui.Text("F5 в файловом менеджере очищает кэш миниатюр текущей вкладки.", 12));
-        var save=Ui.AsyncButton("Сохранить",async()=>
-        {
-            var ranges=new[]{(poll,1L,60L),(font,8L,36L),(maxBytes,1L,200L),(pixels,1L,100L),(parallel,1L,4L),(cache,16L,1024L)};
-            var values=new List<long>();TextBox? firstError=null;
-            foreach(var (field,min,max) in ranges)
-            {
-                if(!long.TryParse(field.Text,NumberStyles.Integer,CultureInfo.CurrentCulture,out var value)||value<min||value>max)
-                {Ui.SetValidationMessage(field,$"Введите целое число от {min} до {max}.");firstError??=field;}
-                else {Ui.SetValidationMessage(field,"");values.Add(value);}
-            }
-            if(firstError is not null){firstError.Focus();firstError.SelectAll();firstError.BringIntoView();return;}
-            if (!string.IsNullOrWhiteSpace(editor.Text) && (!System.IO.Path.IsPathFullyQualified(editor.Text) || editor.Text.StartsWith(@"\\") || !editor.Text.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !System.IO.File.Exists(editor.Text))) { Ui.SetValidationMessage(editor, "Выберите существующий локальный EXE редактора."); editor.Focus(); return; }
-            s.ExternalEditorPath = editor.Text;
-            s.PollIntervalSeconds=(int)values[0];s.TerminalFontSize=(int)values[1];s.PreviewMaxBytes=values[2]*1024*1024;s.PreviewMaxPixels=values[3]*1_000_000;s.PreviewParallelism=(int)values[4];s.PreviewCacheBytes=values[5]*1024*1024;
-            s.Theme=themes.SelectedIndex==1?"Light":themes.SelectedIndex==2?"Dark":"System";Theme.Apply(s.Theme);await App.Store.SaveAsync();w.DialogResult=true;
-        });
-        save.IsDefault=true;save.SetResourceReference(FrameworkElement.StyleProperty,"PrimaryButtonStyle");var cancel=Ui.Button("Отмена",()=>w.DialogResult=false);cancel.IsCancel=true;w.Content=Ui.DialogSurface(p,cancel,save);w.ShowDialog();
-    }
+    /// <summary>Opens "Параметры" (see <see cref="SettingsWindow"/>).</summary>
+    public static void Settings() => Settings("general");
+    public static void Settings(string section) { var window = new SettingsWindow(section); window.ShowDialog(); }
     static void TrustManagement()
     {
         var w = Window("Доверенные ключи", 760); w.Height = 450; w.SizeToContent = SizeToContent.Manual; w.ResizeMode = ResizeMode.CanResize;
@@ -143,6 +108,7 @@ public static class Dialogs
         var remove = Ui.AsyncButton("Удалить выбранный ключ…", async () => { if (list.SelectedItem is TrustRow r && Ui.Confirm($"Удалить сохранённое доверие к {r.Host}:{r.Port} ({r.Algorithm})?\n\nВыполняйте это только после проверки нового отпечатка у администратора.")) { await App.Store.Trust.ForgetAsync(r.Host, r.Port, r.Algorithm); Refresh(); } }); DockPanel.SetDock(remove, Dock.Bottom); p.Children.Add(remove); p.Children.Add(list); Refresh(); w.Content = p; w.ShowDialog();
     }
     sealed record TrustRow(string Host, int Port, string Algorithm, string Fingerprint) { public string DisplayName => $"{Host}:{Port} · {Algorithm}\n{Fingerprint}"; }
+    internal static Task ClearTransferCacheAsync() => ClearTransferCache();
     static async Task ClearTransferCache()
     {
         if (App.Transfers.Jobs.Any(j => j.State is TransferState.Queued or TransferState.Running)) throw new InvalidOperationException("Дождитесь завершения передач перед очисткой локальных копий.");

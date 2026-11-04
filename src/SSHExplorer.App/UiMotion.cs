@@ -17,6 +17,11 @@ public static class UiMotion
     static readonly object TargetsGate = new();
     static bool? testPolicy;
     static bool enabled = SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast;
+    static bool userReduced;
+    /// <summary>Windows "Animation effects" and High Contrast; the app setting can only reduce further.</summary>
+    public static bool SystemAnimationsEnabled => SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast;
+    /// <summary>"Уменьшить анимацию" in Параметры.</summary>
+    public static bool UserReduced { get => userReduced; set { userReduced = value; RefreshSystemPreferences(); } }
     public static bool Enabled => testPolicy ?? enabled;
     public static void SetFeedbackLayer(DependencyObject value, bool enabled) => value.SetValue(FeedbackLayerProperty, enabled);
     public static bool GetFeedbackLayer(DependencyObject value) => (bool)value.GetValue(FeedbackLayerProperty);
@@ -33,7 +38,7 @@ public static class UiMotion
     }
     public static void RefreshSystemPreferences()
     {
-        enabled = SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast;
+        enabled = SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast && !userReduced;
         // Theme/preferences may change during a transition. Finish current decoration immediately.
         FrameworkElement[] targets;
         lock (TargetsGate)

@@ -55,6 +55,18 @@ public sealed class AppSettings
     public long PreviewCacheBytes { get; set; } = 128 * 1024 * 1024;
     public List<ColumnSetting> Columns { get; set; } = [];
     public MonitorPreferences Monitor { get; set; } = new();
+    /// <summary>File table order (header and "Сортировка" menu share it).</summary>
+    public string FileSortKey { get; set; } = "Name";
+    public bool FileSortDescending { get; set; }
+    /// <summary>Header-click order of the other tables, one entry per table.</summary>
+    public List<TableSortSetting> TableSorts { get; set; } = [];
+    public bool ReduceMotion { get; set; }
+}
+public sealed class TableSortSetting
+{
+    public string Table { get; set; } = "";
+    public string Column { get; set; } = "";
+    public bool Descending { get; set; }
 }
 public sealed record InteractivePrompt(string Instruction, string Prompt, bool Echo);
 public sealed record SessionCredentials(string Secret, Func<InteractivePrompt, Task<string?>>? Prompt = null,

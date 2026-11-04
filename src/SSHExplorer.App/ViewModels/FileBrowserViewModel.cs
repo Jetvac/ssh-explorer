@@ -100,6 +100,7 @@ public sealed class FileItemComparer(string key, bool descending) : IComparer<Fi
     {
         if (x is null || y is null) return 0; if (x.Entry.IsDirectory != y.Entry.IsDirectory) return x.Entry.IsDirectory ? -1 : 1;
         var value = key switch { "Modified" => x.Entry.LastWriteTimeUtc.CompareTo(y.Entry.LastWriteTimeUtc), "Size" => x.Entry.Length.CompareTo(y.Entry.Length), "Type" => StringComparer.CurrentCultureIgnoreCase.Compare(x.Type, y.Type), "Permissions" => x.Entry.Permissions.CompareTo(y.Entry.Permissions), "Owner" => x.Entry.UserId.CompareTo(y.Entry.UserId), "Group" => x.Entry.GroupId.CompareTo(y.Entry.GroupId), _ => NaturalNameComparer.Instance.Compare(x.Name, y.Name) };
+        if (value == 0 && key != "Name") return NaturalNameComparer.Instance.Compare(x.Name, y.Name); // stable secondary key, always A→Z
         return descending ? -value : value;
     }
 }

@@ -90,6 +90,7 @@ public sealed partial class MainWindow : Window
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
         AddColumn(servers, "Название", "Name", 260); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240);
+        TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank)], "Name");
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
         var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
@@ -575,26 +576,4 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         finally { if (diagnostics is not null) Session.StageChanged -= diagnostics; }
     }
     internal void CancelDragFeedback() => files?.CancelDragFeedback();
-}
-
-public sealed class TransfersWindow : Window
-{
-    readonly DataGrid grid = new();
-    readonly TransferListViewModel transfers = new();
-    readonly System.Windows.Threading.DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(500) };
-    public TransfersWindow()
-    {
-        Style = (Style)FindResource(typeof(Window));
-        Title = "Передачи — SSH Explorer"; Width = 1050; Height = 440; MinWidth = 700; MinHeight = 300; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var p = new DockPanel(); p.SetResourceReference(Panel.BackgroundProperty, "Paper");
-        grid.SetResourceReference(StyleProperty, "TransferTableStyle");
-        var header = new Border { Child = Ui.Row(Ui.Text("Передачи", 18, true), Ui.Line(), Ui.CommandButton(Ui.CloseGlyph, "Отменить", () => (grid.SelectedItem as TransferRow)?.Job.Cancel()), Ui.AsyncCommandButton(Ui.RefreshGlyph, "Повторить", async () => { if (grid.SelectedItem is TransferRow row) await row.Job.RetryAsync(); })), Padding = new Thickness(12, 6, 12, 6) };
-        header.SetResourceReference(StyleProperty, "CommandBarStyle"); DockPanel.SetDock(header, Dock.Top); p.Children.Add(header);
-        var status = Ui.Text("", 12); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
-        var footer = new Border { Child = status }; footer.SetResourceReference(StyleProperty, "StatusBarStyle"); DockPanel.SetDock(footer, Dock.Bottom); p.Children.Add(footer);
-        MainWindow.AddColumn(grid, "Название", "Name", 220); MainWindow.AddColumn(grid, "Состояние", "State", 150); MainWindow.AddColumn(grid, "Передано", "Transferred", 120); MainWindow.AddColumn(grid, "Всего", "Total", 120); MainWindow.AddColumn(grid, "Прогресс", "Progress", 100); MainWindow.AddColumn(grid, "Скорость", "Speed", 120); MainWindow.AddColumn(grid, "Осталось", "Remaining", 120); MainWindow.AddColumn(grid, "Источник", "Source", 280); MainWindow.AddColumn(grid, "Назначение", "Destination", 280); MainWindow.AddColumn(grid, "Результат / ошибка", "Result", 380); p.Children.Add(grid); Content = p;
-        grid.ItemsSource = transfers.Rows;
-        void RefreshRows() { transfers.Refresh(App.Transfers.Jobs); status.Text = $"Передач: {transfers.Rows.Count} · Прогресс и результат обновляются автоматически"; }
-        timer.Tick += (_, _) => RefreshRows(); RefreshRows(); timer.Start(); Closed += (_, _) => timer.Stop();
-    }
 }

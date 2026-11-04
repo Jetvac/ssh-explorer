@@ -83,9 +83,9 @@ public sealed class MonitorViewModel : ObservableObject
     public void ApplySnapshot(MonitorSnapshot value, IEnumerable<HistoryPoint> history)
     {
         Snapshot = value; failure = ""; isStale = false;requiresFreshSnapshot=false;
-        Reconcile(Networks, value.Networks.Select(x => new NetworkRow(x.Name, Speed(x.ReceiveBytesPerSecond), Speed(x.SendBytesPerSecond), x.ReceiveStatus.Reason, x.SendStatus.Reason)).ToArray());
-        Reconcile(Disks, value.Disks.Select(x => new DiskRow(x.Name, Speed(x.ReadBytesPerSecond), Speed(x.WriteBytesPerSecond),x.ReadStatus.Reason,x.WriteStatus.Reason)).ToArray());
-        Reconcile(Storage, value.Storage.Select(x => new StorageRow(x.FileSystem, x.MountPoint, Size(x.TotalBytes), Size(x.AvailableBytes))).ToArray());
+        Reconcile(Networks, value.Networks.Select(x => new NetworkRow(x.Name, Speed(x.ReceiveBytesPerSecond), Speed(x.SendBytesPerSecond), x.ReceiveStatus.Reason, x.SendStatus.Reason, x.ReceiveBytesPerSecond, x.SendBytesPerSecond)).ToArray());
+        Reconcile(Disks, value.Disks.Select(x => new DiskRow(x.Name, Speed(x.ReadBytesPerSecond), Speed(x.WriteBytesPerSecond),x.ReadStatus.Reason,x.WriteStatus.Reason,x.ReadBytesPerSecond,x.WriteBytesPerSecond)).ToArray());
+        Reconcile(Storage, value.Storage.Select(x => new StorageRow(x.FileSystem, x.MountPoint, Size(x.TotalBytes), Size(x.AvailableBytes), x.TotalBytes, x.AvailableBytes)).ToArray());
         History = history.ToArray(); RaiseHistory();
         foreach (var name in new[] { nameof(Summary), nameof(CpuText), nameof(MemoryText), nameof(CpuHeader), nameof(MemoryHeader), nameof(Limitations), nameof(SystemInfo) }) Raise(name);
         RebuildProcesses(); RaiseStatus();
@@ -156,9 +156,10 @@ public sealed class MonitorViewModel : ObservableObject
     static string Size(long? value) => MetricFormatter.Size(value);
 }
 
-public sealed record NetworkRow(string Name, string Receive, string Send, string ReceiveReason = "", string SendReason = "");
-public sealed record DiskRow(string Name, string Read, string Write, string ReadReason = "", string WriteReason = "");
-public sealed record StorageRow(string FileSystem, string MountPoint, string Total, string Available);
+// Display strings are for cells; the typed values are the sort keys (bytes/s, bytes; null = unknown).
+public sealed record NetworkRow(string Name, string Receive, string Send, string ReceiveReason = "", string SendReason = "", double? ReceiveRate = null, double? SendRate = null);
+public sealed record DiskRow(string Name, string Read, string Write, string ReadReason = "", string WriteReason = "", double? ReadRate = null, double? WriteRate = null);
+public sealed record StorageRow(string FileSystem, string MountPoint, string Total, string Available, long? TotalBytes = null, long? AvailableBytes = null);
 public sealed class ProcessItemViewModel(ProcessMetric metric, long? totalMemory) : ObservableObject
 {
     ProcessMetric current = metric;

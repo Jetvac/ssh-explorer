@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using SSHExplorer.Core;
 
 namespace SSHExplorer.App.ViewModels;
@@ -6,6 +7,7 @@ namespace SSHExplorer.App.ViewModels;
 public sealed class TransferListViewModel
 {
     public ObservableCollection<TransferRow> Rows { get; } = [];
+    /// <summary>Updates rows in place: selection, sort and scroll position stay with the same objects.</summary>
     public void Refresh(IReadOnlyList<TransferJob> jobs)
     {
         var current = jobs.Select(j => j.Id).ToHashSet();
@@ -17,6 +19,8 @@ public sealed class TransferListViewModel
             row.Refresh();
         }
     }
+    public int Active => Rows.Count(r => r.Job.State is TransferState.Queued or TransferState.Running);
+    public int Failed => Rows.Count(r => r.Job.State == TransferState.Failed);
 }
 
 public sealed class TransferRow(TransferJob job) : ObservableObject
@@ -26,6 +30,14 @@ public sealed class TransferRow(TransferJob job) : ObservableObject
     public string Name => job.Name;
     public string Source => job.Source;
     public string Destination => job.Destination;
+    public string Direction => job.Kind switch
+    {
+        TransferKind.Upload => "Windows → " + job.DestinationServer,
+        TransferKind.Download => job.SourceServer + " → Windows",
+        TransferKind.ServerMove => job.SourceServer == job.DestinationServer ? "Перемещение · " + job.SourceServer : job.SourceServer + " → " + job.DestinationServer + " (перемещение)",
+        _ => job.SourceServer == job.DestinationServer ? "Копирование · " + job.SourceServer : job.SourceServer + " → " + job.DestinationServer,
+    };
+    public string DirectionGlyph => job.Kind switch { TransferKind.Upload => Ui.UploadGlyph, TransferKind.Download => Ui.DownloadGlyph, _ => IconCatalog.Transfers };
     public string State => Value(nameof(State));
     public string Transferred => Value(nameof(Transferred));
     public string Total => Value(nameof(Total));
@@ -33,16 +45,29 @@ public sealed class TransferRow(TransferJob job) : ObservableObject
     public string Speed => Value(nameof(Speed));
     public string Remaining => Value(nameof(Remaining));
     public string Result => Value(nameof(Result));
+    public double ProgressValue => job.Progress ?? 0;
+    public bool ProgressKnown => job.Progress is not null || job.State is not (TransferState.Running);
+    public bool IsRunning => job.State == TransferState.Running;
+    /// <summary>Typed sort keys: unknown stays null so it sorts after known values.</summary>
+    public int StateRank => job.State switch { TransferState.Running => 0, TransferState.Queued => 1, TransferState.Failed => 2, TransferState.Cancelled => 3, _ => 4 };
+    public double? ProgressKey => job.Progress;
+    public double? SpeedKey => job.State == TransferState.Running && job.BytesPerSecond > 0 ? job.BytesPerSecond : null;
+    public TimeSpan? RemainingKey => job.State == TransferState.Running ? job.Remaining : null;
+    public long TransferredKey => job.BytesTransferred;
+    public string StateKind => job.State.ToString();
     string Value(string name) => values.GetValueOrDefault(name, "—");
     void Update(string name, string value) { if (Value(name) != value) { values[name] = value; Raise(name); } }
     public void Refresh()
     {
-        Update(nameof(State), job.State switch { TransferState.Queued => "В очереди", TransferState.Running => "Передача", TransferState.Completed => "Завершено", TransferState.Cancelled => "Отменено", _ => "Ошибка" });
+        Update(nameof(State), job.State switch { TransferState.Queued => "В очереди", TransferState.Running => "Выполняется", TransferState.Completed => "Завершено", TransferState.Cancelled => "Отменено", _ => "Ошибка" });
         Update(nameof(Transferred), Ui.Size(job.BytesTransferred));
-        Update(nameof(Total), job.TotalBytes is { } total ? Ui.Size(total) : "Подсчёт…");
-        Update(nameof(Progress), job.Progress is { } progress ? $"{progress:0.0}%" : "Неизвестно");
-        Update(nameof(Speed), job.BytesPerSecond > 0 ? Ui.Size((long)job.BytesPerSecond) + "/с" : "—");
-        Update(nameof(Remaining), job.Remaining is { } remaining ? remaining.ToString(@"hh\:mm\:ss") : "—");
-        Update(nameof(Result), job.Error ?? job.Summary);
+        Update(nameof(Total), job.TotalBytes is { } total ? Ui.Size(total) : job.State == TransferState.Running ? "Подсчёт…" : "—");
+        Update(nameof(Progress), job.Progress is { } progress ? progress.ToString("0.0", CultureInfo.CurrentCulture) + " %" : job.State == TransferState.Running ? "Неизвестно" : "—");
+        Update(nameof(Speed), SpeedKey is { } speed ? Ui.Size((long)speed) + "/с" : "—");
+        // Unknown time is "—", never 0: completed jobs show their result instead.
+        Update(nameof(Remaining), RemainingKey is { } remaining ? FormatDuration(remaining) : "—");
+        Update(nameof(Result), job.Error ?? (job.State == TransferState.Completed ? job.Summary + " · " + FormatDuration(job.Elapsed) : job.State == TransferState.Cancelled ? "Отменено пользователем. " + job.Summary : job.Summary));
+        Raise(nameof(ProgressValue)); Raise(nameof(ProgressKnown)); Raise(nameof(IsRunning)); Raise(nameof(StateKind));
     }
+    public static string FormatDuration(TimeSpan value) => value.TotalHours >= 24 ? $"{(int)value.TotalDays} д {value.Hours} ч" : value.TotalHours >= 1 ? $"{(int)value.TotalHours} ч {value.Minutes:00} мин" : value.TotalMinutes >= 1 ? $"{value.Minutes} мин {value.Seconds:00} с" : $"{Math.Max(0, value.Seconds)} с";
 }

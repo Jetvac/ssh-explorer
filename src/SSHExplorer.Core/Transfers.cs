@@ -10,6 +10,8 @@ namespace SSHExplorer.Core;
 public enum ConflictDecision { Replace, Skip, KeepBoth, Cancel }
 public sealed record TransferConflict(string Source, string Destination, bool SourceIsDirectory, bool DestinationIsDirectory, long? SourceLength, long? DestinationLength, string? Reason = null, Guid? JobId = null, int Attempt = 1);
 public enum TransferState { Queued, Running, Completed, Cancelled, Failed }
+/// <summary>Where data moves: Windows → server, server → Windows, or between server paths.</summary>
+public enum TransferKind { Upload, Download, ServerCopy, ServerMove }
 
 public sealed class TransferJob : INotifyPropertyChanged
 {
@@ -38,6 +40,14 @@ public sealed class TransferJob : INotifyPropertyChanged
     public int SkippedItems { get; internal set; }
     public int Attempt { get; private set; } = 1;
     public string Summary => $"Выполнено объектов: {CompletedItems}; пропущено: {SkippedItems}";
+    public TransferKind Kind { get; internal set; }
+    /// <summary>Profile names of the servers taking part (source first).</summary>
+    public string SourceServer => Kind == TransferKind.Upload ? "Windows" : Sessions.Length > 0 ? Sessions[0].Profile.Name : "";
+    public string DestinationServer => Kind == TransferKind.Download ? "Windows" : Sessions.Length > 0 ? Sessions[^1].Profile.Name : "";
+    public bool CanCancel => State is TransferState.Queued or TransferState.Running;
+    public bool CanRetry => RetryAction is not null && State is TransferState.Failed or TransferState.Cancelled;
+    /// <summary>Wall time of the current attempt (stopped when it finishes).</summary>
+    public TimeSpan Elapsed => _watch.Elapsed;
     public event PropertyChangedEventHandler? PropertyChanged;
     internal CancellationToken Cancellation => _cancel.Token;
     public void Cancel() { lock (_sync) _cancel.Cancel(); }
@@ -67,6 +77,14 @@ public sealed partial class TransferQueue
     public IReadOnlyList<TransferJob> Jobs { get { lock (_jobs) return _jobs.ToArray(); } }
     public event EventHandler? Changed;
     public Func<TransferConflict, Task<ConflictDecision>>? ResolveConflict { get; set; }
+    /// <summary>Removes finished (completed or cancelled) jobs from the visible queue. Failed jobs stay for retry.</summary>
+    public int RemoveFinished()
+    {
+        int removed;
+        lock (_jobs) removed = _jobs.RemoveAll(job => job.State is TransferState.Completed or TransferState.Cancelled);
+        if (removed > 0) Changed?.Invoke(this, EventArgs.Empty);
+        return removed;
+    }
     public bool HasActive(Guid sessionId) => Jobs.Any(x => x.Sessions.Any(s => s.Id == sessionId) && x.State is TransferState.Queued or TransferState.Running);
     public void CancelSession(Guid sessionId) { foreach (var job in Jobs.Where(x => x.Sessions.Any(s => s.Id == sessionId))) if (job.State is TransferState.Queued or TransferState.Running) job.Cancel(); }
     public Task WaitAsync(TransferJob job, CancellationToken ct = default) => job.Completion.WaitAsync(ct);
@@ -107,7 +125,7 @@ public sealed partial class TransferQueue
     {
         var paths = localPaths.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (paths.Length == 0) throw new ArgumentException("Не выбраны файлы для загрузки.");
-        var job = new TransferJob { SessionId=target.Id, Sessions=[target], Name=paths.Length == 1 ? Path.GetFileName(paths[0]) : $"Загрузка {paths.Length} объектов",Source=string.Join("; ",paths),Destination=remoteDirectory };
+        var job = new TransferJob { Kind=TransferKind.Upload, SessionId=target.Id, Sessions=[target], Name=paths.Length == 1 ? Path.GetFileName(paths[0]) : $"Загрузка {paths.Length} объектов",Source=string.Join("; ",paths),Destination=remoteDirectory };
         job.Operation = async ct =>
         {
             var destination = await target.Files.ResolvePathAsync(remoteDirectory, ct).ConfigureAwait(false);
@@ -126,7 +144,7 @@ public sealed partial class TransferQueue
         var paths = remotePaths.Select(x => PosixPath.Normalize(x, source.Files.HomeDirectory)).Distinct(StringComparer.Ordinal).ToArray();
         if (paths.Length == 0) throw new ArgumentException("Не выбраны файлы для скачивания.");
         string destination = Path.GetFullPath(localDirectory);
-        var job = new TransferJob { SessionId=source.Id,Sessions=[source],Name=paths.Length == 1 ? PosixPath.Name(paths[0]) : $"Скачивание {paths.Length} объектов",Source=string.Join("; ",paths),Destination=destination };
+        var job = new TransferJob { Kind=TransferKind.Download, SessionId=source.Id,Sessions=[source],Name=paths.Length == 1 ? PosixPath.Name(paths[0]) : $"Скачивание {paths.Length} объектов",Source=string.Join("; ",paths),Destination=destination };
         job.Operation = async ct =>
         {
             WindowsNames.EnsureNoReparseAncestors(destination);
@@ -152,7 +170,7 @@ public sealed partial class TransferQueue
         var paths = remotePaths.Select(x => PosixPath.Normalize(x, source.Files.HomeDirectory)).Distinct(StringComparer.Ordinal).ToArray();
         if (paths.Length == 0) throw new ArgumentException("Не выбраны файлы.");
         bool sameEndpoint = HostTrustStore.NormalizeHost(source.Profile.Host) == HostTrustStore.NormalizeHost(target.Profile.Host) && source.Profile.Port == target.Profile.Port && source.Profile.Username == target.Profile.Username;
-        var job = new TransferJob { SessionId=target.Id,Sessions=ReferenceEquals(source,target) ? [source] : [source,target],Name=(move ? "Перемещение: " : "Копирование: ")+(paths.Length==1?PosixPath.Name(paths[0]):$"{paths.Length} объектов"),Source=string.Join("; ",paths),Destination=remoteDirectory };
+        var job = new TransferJob { Kind=move?TransferKind.ServerMove:TransferKind.ServerCopy, SessionId=target.Id,Sessions=ReferenceEquals(source,target) ? [source] : [source,target],Name=(move ? "Перемещение: " : "Копирование: ")+(paths.Length==1?PosixPath.Name(paths[0]):$"{paths.Length} объектов"),Source=string.Join("; ",paths),Destination=remoteDirectory };
         job.Operation = async ct =>
         {
             string destination = await target.Files.ResolvePathAsync(remoteDirectory, ct).ConfigureAwait(false);

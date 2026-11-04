@@ -185,8 +185,11 @@ public sealed class MonitorView : UserControl, IDisposable
         resources.Children.Add(ResourcePanel("Память", nameof(MonitorViewModel.MemoryText), nameof(MonitorViewModel.MemoryReason), memoryGraph));
         var body = new StackPanel { Margin = new Thickness(20, 16, 20, 16) }; body.Children.Add(resources);
         AddPerformanceTable(body, "Сеть", networks, nameof(MonitorViewModel.Networks), [("Интерфейс", "Name", 150), ("Получение", "Receive", 170), ("Отправка", "Send", 170)]);
+        TableSorting.Attach(networks, "monitor.network", [new("Name", r => ((NetworkRow)r).Name, true), new("Receive", r => ((NetworkRow)r).ReceiveRate), new("Send", r => ((NetworkRow)r).SendRate)], "Name");
         AddPerformanceTable(body, "Дисковый ввод-вывод", disks, nameof(MonitorViewModel.Disks), [("Устройство", "Name", 150), ("Чтение", "Read", 170), ("Запись", "Write", 170)]);
+        TableSorting.Attach(disks, "monitor.disks", [new("Name", r => ((DiskRow)r).Name, true), new("Read", r => ((DiskRow)r).ReadRate), new("Write", r => ((DiskRow)r).WriteRate)], "Name");
         AddPerformanceTable(body, "Хранилища", storage, nameof(MonitorViewModel.Storage), [("Файловая система", "FileSystem", 170), ("Точка монтирования", "MountPoint", 180), ("Всего", "Total", 130), ("Доступно", "Available", 130)]);
+        TableSorting.Attach(storage, "monitor.storage", [new("MountPoint", r => ((StorageRow)r).MountPoint, true), new("FileSystem", r => ((StorageRow)r).FileSystem, true), new("Total", r => ((StorageRow)r).TotalBytes), new("Available", r => ((StorageRow)r).AvailableBytes)], "MountPoint");
         performance.Content = body;
     }
     FrameworkElement ResourcePanel(string caption, string valueProperty, string reasonProperty, MetricGraph graph)

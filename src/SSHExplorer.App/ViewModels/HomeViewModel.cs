@@ -43,4 +43,6 @@ public sealed class ServerProfileViewModel(ServerProfile profile, SessionState[]
     public string Username => profile.Username;
     public string Status => states.Length == 0 ? "Не подключён" : states.Any(s => s == SessionState.Connected) ? $"Подключён · сессий: {states.Length}"
         : states.Any(s => s is SessionState.Connecting or SessionState.AwaitingTrust) ? "Подключение…" : "Связь потеряна";
+    /// <summary>Sort key for the status column: active sessions first, then connecting, lost, idle.</summary>
+    public int StatusRank => states.Length == 0 ? 3 : states.Any(s => s == SessionState.Connected) ? 0 : states.Any(s => s is SessionState.Connecting or SessionState.AwaitingTrust) ? 1 : 2;
 }
