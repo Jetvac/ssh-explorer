@@ -79,7 +79,7 @@ public static class Ui
         menu.SetValue(FlyoutOwnerProperty, owner);
         menu.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape && !menu.Items.OfType<MenuItem>().Any(i => i.IsSubmenuOpen)) { e.Handled = true; menu.IsOpen = false; } };
         RoutedEventHandler unloaded = (_, _) => menu.IsOpen = false;
-        menu.Opened += (_, _) => { owner.Unloaded += unloaded; UiMotion.OpenFlyout(menu); };
+        menu.Opened += (_, _) => { owner.Unloaded += unloaded; AlignSubmenuHeaders(menu); UiMotion.OpenFlyout(menu); };
         menu.Closed += (_, _) => owner.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
             owner.Unloaded -= unloaded;
@@ -88,6 +88,43 @@ public static class Ui
             if (!owner.IsLoaded || !owner.IsEnabled || window?.IsActive != true) return;
             if (Keyboard.FocusedElement is null or MenuItem or ContextMenu) owner.Focus();
         });
+    }
+    static readonly DependencyProperty SubmenuShiftProperty = DependencyProperty.RegisterAttached("SubmenuShift", typeof(double), typeof(Ui), new PropertyMetadata(0d));
+    /// <summary>
+    /// The Fluent submenu-header template has no check column. In a menu with checkable items the
+    /// ordinary items reserve that column, so a submenu header's icon and text sat one column left.
+    /// Measures the real text offset of an ordinary item and shifts each submenu header's icon and text by it.
+    /// </summary>
+    internal static void AlignSubmenuHeaders(ContextMenu menu)
+    {
+        var items = menu.Items.OfType<MenuItem>().Where(i => i.IsVisible).ToArray();
+        var reference = items.FirstOrDefault(i => !i.HasItems && i.Header is string); if (reference is null || !items.Any(i => i.HasItems)) return;
+        menu.UpdateLayout();
+        double? TextX(MenuItem item)
+        {
+            var text = FindVisual<TextBlock>(item, t => item.Header is string header && t.Text == header);
+            return text is null || !text.IsVisible ? null : text.TransformToAncestor(item).Transform(new Point()).X - (double)item.GetValue(SubmenuShiftProperty);
+        }
+        if (TextX(reference) is not { } target) return;
+        foreach (var item in items.Where(i => i.HasItems))
+        {
+            if (TextX(item) is not { } current) continue;
+            double shift = Math.Round(target - current), applied = (double)item.GetValue(SubmenuShiftProperty);
+            if (Math.Abs(shift - applied) < 1) continue;
+            var padding = item.Padding; item.Padding = new Thickness(padding.Left - applied + shift, padding.Top, padding.Right, padding.Bottom);
+            if (item.Icon is FrameworkElement icon) { var margin = icon.Margin; icon.Margin = new Thickness(margin.Left - applied + shift, margin.Top, margin.Right, margin.Bottom); }
+            item.SetValue(SubmenuShiftProperty, shift);
+        }
+    }
+    static T? FindVisual<T>(DependencyObject root, Func<T, bool> match) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T found && match(found)) return found;
+            if (FindVisual(child, match) is { } nested) return nested;
+        }
+        return null;
     }
     public static void AttachContextMenu(FrameworkElement owner, ContextMenu menu)
     {

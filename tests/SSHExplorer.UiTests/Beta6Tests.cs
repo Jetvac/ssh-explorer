@@ -185,14 +185,11 @@ internal static class Beta6Tests
             Check(homeColumns >= servers.ActualWidth - 24, $"Home: columns fill the table ({homeColumns:0} of {servers.ActualWidth:0} DIP), no empty filler header");
             // Submenu headers (no own command) must align with ordinary items: the Fluent template collapses the icon column without an Icon.
             Invoke(main, "AddMenu"); Pump(); Layout(main);
-            var add = PresentationSource.CurrentSources.Cast<PresentationSource>().Select(src => src.RootVisual).Where(v => v is not null).SelectMany(v => Descendants<ContextMenu>(v!)).Single(m => m.IsOpen);
-            var ordinary = add.Items.OfType<MenuItem>().Single(i => !i.HasItems); var submenu = add.Items.OfType<MenuItem>().First(i => i.HasItems);
-            double X(FrameworkElement e) => e.TransformToAncestor(add).Transform(new Point()).X;
-            TextBlock HeaderText(MenuItem item) => Descendants<TextBlock>(item).First(t => t.Text == item.Header?.ToString());
-            double iconOrdinary = X((FrameworkElement)ordinary.Icon), iconSubmenu = X((FrameworkElement)submenu.Icon), textOrdinary = X(HeaderText(ordinary)), textSubmenu = X(HeaderText(submenu));
-            Check(Math.Abs(iconOrdinary - iconSubmenu) <= 2 && Math.Abs(textOrdinary - textSubmenu) <= 2, $"submenu header icon and text align with ordinary items (icon {iconSubmenu:0}/{iconOrdinary:0}, text {textSubmenu:0}/{textOrdinary:0} DIP)");
-            evidence.Capture(add, "menu-submenu-alignment", new { theme = "Light", fixtureOnly = true });
-            add.IsOpen = false; Pump();
+            var add = OpenMenu(); CheckSubmenuAlignment(add, "«+» (no checkable items)"); evidence.Capture(add, "menu-add-alignment", new { theme = "Light", fixtureOnly = true }); add.IsOpen = false; Pump();
+            var (viewTab, _) = AddTab(main, store, "Меню вида"); Pump(); Layout(main);
+            var viewButton = Descendants<Button>((FrameworkElement)viewTab.Content).First(b => b.IsVisible && Descendants<TextBlock>(b).Any(t => t.Text == "Просмотреть"));
+            viewButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
+            var view = OpenMenu(); CheckSubmenuAlignment(view, "«Просмотреть» (checkable items)"); evidence.Capture(view, "menu-view-alignment", new { theme = "Light", fixtureOnly = true }); view.IsOpen = false; Pump();
             evidence.Capture((FrameworkElement)main.Content, "sort-home", new { theme = "Light", fixtureOnly = true });
 
             var model = new MonitorViewModel(); var monitor = new MonitorView(model);
@@ -408,6 +405,16 @@ internal static class Beta6Tests
     }
     static void CloseMain(MainWindow main) { bool closed = false; main.Closed += (_, _) => closed = true; main.Close(); WaitFor(() => closed); }
     static object Field(object target, string name) => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(target)!;
+    static ContextMenu OpenMenu() => PresentationSource.CurrentSources.Cast<PresentationSource>().Select(src => src.RootVisual).Where(v => v is not null).SelectMany(v => Descendants<ContextMenu>(v!)).Single(m => m.IsOpen);
+    static void CheckSubmenuAlignment(ContextMenu menu, string name)
+    {
+        double X(FrameworkElement e) => e.TransformToAncestor(menu).Transform(new Point()).X;
+        TextBlock HeaderText(MenuItem item) => Descendants<TextBlock>(item).First(t => t.Text == item.Header?.ToString());
+        var items = menu.Items.OfType<MenuItem>().Where(i => i.IsVisible && i.Header is string).ToArray();
+        var ordinary = items.First(i => !i.HasItems && i.Icon is not null); var submenus = items.Where(i => i.HasItems).ToArray(); var plain = items.First(i => !i.HasItems);
+        var bad = submenus.Where(s => Math.Abs(X(HeaderText(s)) - X(HeaderText(plain))) > 2 || s.Icon is FrameworkElement icon && Math.Abs(X(icon) - X((FrameworkElement)ordinary.Icon)) > 2).Select(s => $"{s.Header}: icon {X((FrameworkElement)s.Icon!):0} vs {X((FrameworkElement)ordinary.Icon):0}, text {X(HeaderText(s)):0} vs {X(HeaderText(plain)):0}").ToArray();
+        Check(submenus.Length > 0 && bad.Length == 0, $"{name}: submenu header icons and text align with ordinary items ({submenus.Length} submenus{(bad.Length > 0 ? "; " + string.Join("; ", bad) : "")})");
+    }
     static void Invoke(object target, string name) => target.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic, Type.EmptyTypes)!.Invoke(target, null);
     static void Complete(Task task) { WaitFor(() => task.IsCompleted); task.GetAwaiter().GetResult(); }
     static void WaitFor(Func<bool> done) { var watch = System.Diagnostics.Stopwatch.StartNew(); while (!done()) { if (watch.Elapsed > TimeSpan.FromSeconds(15)) throw new TimeoutException("beta.6 UI state did not settle."); Pump(); } }
