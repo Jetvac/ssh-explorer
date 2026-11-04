@@ -51,7 +51,7 @@ public sealed partial class MainWindow : Window
         var root = new Grid();
         openServerButton = Ui.IconButton(Ui.AddGlyph, AddMenu, "Открыть сервер");
         allTabsButton = Ui.FlyoutButton(IconCatalog.TabList, "", CreateTabListMenu, "Все вкладки (Ctrl+Shift+A)"); allTabsButton.Name = "AllTabsButton";
-        var actions = Ui.Row(allTabsButton, Ui.IconButton(IconCatalog.Documents, ShowDocuments, "Редактируемые документы"), Ui.IconButton(IconCatalog.Transfers, ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
+        var actions = Ui.Row(allTabsButton, Ui.IconButton(IconCatalog.Documents, ShowDocuments, "Редактируемые документы"), Ui.IconButton(IconCatalog.Transfers, ShowTransfers, "Очередь передач"), Ui.IconButton(IconCatalog.Settings, Dialogs.Settings, "Параметры"));
         actions.Name = "CaptionActions"; actions.VerticalAlignment = VerticalAlignment.Top; actions.Margin = new Thickness(8, 4, 8, 0); WindowChrome.SetIsHitTestVisibleInChrome(actions, true);
         caption = new WindowCaption(this);
         var trailing = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top }; trailing.Children.Add(actions); trailing.Children.Add(caption);
@@ -527,7 +527,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         if (disposed) return;
         if (section == key && key != "monitor" && screen.Content is not null &&
-            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal))) return;
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel))) return;
         var previousContent = screen.Content; var previousPage = monitor?.Page;
         section = key;
         UpdateConnectionStatusVisibility();

@@ -6,7 +6,10 @@ public sealed class SessionViewModel : ObservableObject
 {
     string currentSection = "files", statusText = "Подключение…";
     bool isActive, canReconnect;
-    public string CurrentSection { get => currentSection; set { if (value is not ("files" or "terminal" or "monitor")) throw new ArgumentException("Неизвестный раздел сессии."); Set(ref currentSection, value); } }
+    public string CurrentSection { get => currentSection; set { if (!IsSection(value)) throw new ArgumentException("Неизвестный раздел сессии."); Set(ref currentSection, value); } }
+    /// <summary>Every section reachable from the session navigation (Сервер, Терминал, Диспетчер задач, Файлы).</summary>
+    public static readonly string[] Sections = ["server", "terminal", "monitor", "files"];
+    public static bool IsSection(string? value) => value is not null && Array.IndexOf(Sections, value) >= 0;
     public bool IsActive { get => isActive; set => Set(ref isActive, value); }
     public bool CanReconnect { get => canReconnect; private set => Set(ref canReconnect, value); }
     public string StatusText { get => statusText; set => Set(ref statusText, value); }

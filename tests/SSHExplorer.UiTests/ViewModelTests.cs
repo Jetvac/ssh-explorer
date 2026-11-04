@@ -12,6 +12,10 @@ internal static class ViewModelTests
         int count = 0;
         void Check(bool value, string name) { assert(value, name); count++; }
         static RemoteEntry File(string name, string parent = "/first") => new() { Name = name, FullPath = parent + "/" + name, IsRegularFile = true, Length = 100, LastWriteTimeUtc = DateTime.UnixEpoch };
+        var sessionModel = new SessionViewModel(); bool sectionsAccepted = true;
+        foreach (var key in new[] { "server", "terminal", "monitor", "files" }) { try { sessionModel.CurrentSection = key; sectionsAccepted &= sessionModel.CurrentSection == key; } catch (ArgumentException) { sectionsAccepted = false; } }
+        bool unknownRejected; try { sessionModel.CurrentSection = "unknown"; unknownRejected = false; } catch (ArgumentException) { unknownRejected = sessionModel.CurrentSection == "files"; }
+        Check(sectionsAccepted && unknownRejected, "MVVM session accepts every navigation section, including Server, and rejects unknown ones without changing state");
         var files = new FileBrowserViewModel();
         var first = files.BeginNavigation(); files.CommitNavigation(first, "/first", [File("A"), File("a"), File("item10"), File("item2"), File(".hidden")], true, [], 0);
         files.ApplyFilter(false, true); files.SetSelection(["/first/A"]);
