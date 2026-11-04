@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
+  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
+  <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
+  <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
+</svg>

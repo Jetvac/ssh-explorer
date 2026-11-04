@@ -99,7 +99,7 @@ public sealed class MonitorViewModel : ObservableObject
         RaiseStatus();
     }
     void AppendGap(DateTimeOffset timestamp,string reason)
-    { History=History.Append(new HistoryPoint(timestamp,null,null,null,null){IsGap=true,Reason=reason}).TakeLast(120).ToArray(); RaiseHistory(); }
+    { History=History.Append(new HistoryPoint(timestamp,null,null,null,null){IsGap=true,Reason=reason}).Where(p => p.Timestamp >= timestamp - TimeSpan.FromMinutes(5)).TakeLast(3600).ToArray(); RaiseHistory(); }
     void RaiseHistory() { Raise(nameof(History)); Raise(nameof(CpuHistory)); Raise(nameof(MemoryHistory)); }
     void RaiseStatus()
     { foreach(var name in new[]{nameof(StatusText),nameof(Freshness),nameof(StatusDetails),nameof(DataDetails),nameof(HasError),nameof(IsStale),nameof(CpuReason),nameof(MemoryReason),nameof(CanSignalSelected),nameof(SignalDisabledReason),nameof(IsCommandRunning)}) Raise(name); }

@@ -12,6 +12,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using SSHExplorer.Core;
 using SSHExplorer.App.ViewModels;
@@ -135,8 +136,12 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         var forward = Ui.AsyncIconButton(Ui.ForwardGlyph, Forward, "Вперёд · Alt+→"); forward.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.CanGoForward)));
         var up = Ui.AsyncIconButton(Ui.UpGlyph, Up, "Вверх · Alt+↑"); up.SetBinding(IsEnabledProperty, new Binding(nameof(FileBrowserViewModel.CanGoUp)));
         var buttons = Ui.Row(back, forward, up, Ui.AsyncIconButton(Ui.RefreshGlyph, RefreshAsync, "Обновить · F5")); bar.Children.Add(buttons);
-        var pathHost = new Grid { Margin = new Thickness(8, 0, 12, 0), MinHeight = 38 }; var pathBorder = new Border { CornerRadius = new CornerRadius(5), Padding = new Thickness(8, 0, 8, 0), Child = new ScrollViewer { Content = breadcrumbs, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled } }; pathBorder.SetResourceReference(Border.BackgroundProperty, "Surface");
-        pathBorder.MouseDown += (_, e) => { if (FindAncestor<Button>(e.OriginalSource as DependencyObject) is null) EditAddress(); }; pathHost.Children.Add(pathBorder);
+        var pathHost = new Grid { Margin = new Thickness(8, 0, 12, 0), MinHeight = 38 }; var breadcrumbScroll = new ScrollViewer { Content = breadcrumbs, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false }; var pathBorder = new Border { Name = "AddressCrumbs", CornerRadius = new CornerRadius(5), Padding = new Thickness(8, 0, 8, 0), Child = breadcrumbScroll, Cursor = Cursors.IBeam }; pathBorder.SetResourceReference(Border.BackgroundProperty, "Surface");
+        // beta.5 listened to the bubbling MouseDown of the Border. The inner ScrollViewer marks
+        // MouseLeftButtonDown handled when it takes focus, so the free area never started editing.
+        // Preview runs before the ScrollViewer; breadcrumb buttons keep their own navigation.
+        pathBorder.PreviewMouseLeftButtonDown += (_, e) => { if (FindAncestor<ButtonBase>(e.OriginalSource as DependencyObject) is null) { e.Handled = true; EditAddress(); } };
+        breadcrumbs.Cursor = Cursors.Arrow; pathHost.Children.Add(pathBorder);
         address.Visibility = Visibility.Collapsed;
         address.PreviewKeyDown += async (_, e) =>
         {
@@ -151,7 +156,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         search.TextChanged += (_, _) => { viewModel.SearchQuery = search.Text; ApplyItems(); }; System.Windows.Automation.AutomationProperties.SetName(search, "Поиск в текущей папке");
         var searchMenu = new ContextMenu(); searchMenu.Items.Add(Ui.AsyncMenu("Искать во вложенных папках…", RecursiveSearch, glyph: Ui.SearchGlyph)); searchMenu.Items.Add(Ui.Menu("Отменить рекурсивный поиск", () => recursiveSearchCts?.Cancel(), glyph: Ui.CloseGlyph)); searchMenu.Items.Add(Ui.AsyncMenu("Вернуться к содержимому папки", RefreshAsync, glyph: Ui.RefreshGlyph)); Ui.AttachContextMenu(search, searchMenu);
         var searchHost = new Grid(); searchHost.Children.Add(search); var hint = Ui.Text("Поиск в этой папке", 13); hint.Margin = new Thickness(9, 0, 6, 0); hint.IsHitTestVisible = false; hint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(hint); search.TextChanged += (_, _) => hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        Grid.SetColumn(searchHost, 2); bar.Children.Add(searchHost); addressBar = bar;
+        Grid.SetColumn(searchHost, 2); bar.Children.Add(searchHost); addressBar = bar; bar.PreviewKeyDown += HandleBarShortcut;
     }
     void BuildCommands()
     {
@@ -179,7 +184,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         var viewButton = Ui.FlyoutButton(CommandGlyphs.View(mode), "Просмотреть", BuildViewMenu);
         viewModeGlyph = ((Panel)viewButton.Content).Children.OfType<TextBlock>().First();
         commands.Add("View", viewButton, () => Submenu("Просмотреть", CommandGlyphs.View(mode), BuildViewMenu), 50);
-        var border = new Border { Child = commands, DataContext = viewModel }; border.SetResourceReference(StyleProperty, "CommandBarStyle"); commandBar = border;
+        var border = new Border { Child = commands, DataContext = viewModel }; border.SetResourceReference(StyleProperty, "CommandBarStyle"); commandBar = border; border.PreviewKeyDown += HandleBarShortcut;
         var bottom = new Grid { DataContext = viewModel, Margin = new Thickness(14, 5, 14, 5), Height = 20 }; bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); bottom.ColumnDefinitions.Add(new ColumnDefinition()); status.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); bottom.Children.Add(status); statusBar = bottom;
         message.Margin = new Thickness(16, 0, 0, 0); message.TextWrapping = TextWrapping.NoWrap; message.TextTrimming = TextTrimming.CharacterEllipsis; message.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); message.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); message.SetBinding(ToolTipProperty, new Binding(nameof(FileBrowserViewModel.Message))); Grid.SetColumn(message, 1); bottom.Children.Add(message);
     }
@@ -226,7 +231,23 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         foreach (var part in CurrentPath.Split('/', StringSplitOptions.RemoveEmptyEntries)) { path += "/" + part; var target = path; var separator = Ui.Icon("\uE76C", 10, false); separator.Margin = new Thickness(2, 0, 2, 0); breadcrumbs.Children.Add(separator); var b = Ui.AsyncButton(part, () => NavigateAsync(target)); b.SetResourceReference(StyleProperty, "CommandButtonStyle"); b.Padding = new Thickness(7, 3, 7, 3); breadcrumbs.Children.Add(b); }
         if (address.Visibility != Visibility.Visible) address.Text = CurrentPath;
     }
-    void EditAddress() { if (address.Visibility != Visibility.Visible) address.Text = CurrentPath; address.Visibility = Visibility.Visible; address.Focus(); address.SelectAll(); }
+    internal bool IsEditingAddress => address.Visibility == Visibility.Visible;
+    internal void EditAddress()
+    {
+        if (address.Visibility != Visibility.Visible) { address.Text = CurrentPath; address.Visibility = Visibility.Visible; }
+        // The TextBox becomes focusable only after it is visible in layout; focus now and once more
+        // at input priority so a click on the crumbs never leaves the caret elsewhere.
+        void Activate() { if (address.Visibility != Visibility.Visible) return; address.Focus(); Keyboard.Focus(address); address.SelectAll(); }
+        UpdateLayout(); Activate();
+        if (!address.IsKeyboardFocused) Dispatcher.BeginInvoke(DispatcherPriority.Input, Activate);
+    }
+    /// <summary>Ctrl+L / Alt+D / Ctrl+F from the address and command bars, which live outside this view's tree.</summary>
+    internal void HandleBarShortcut(object sender, KeyEventArgs e)
+    {
+        var mods = Keyboard.Modifiers; var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (mods == ModifierKeys.Control && key == Key.L || mods == ModifierKeys.Alt && key == Key.D) { e.Handled = true; EditAddress(); }
+        else if (mods == ModifierKeys.Control && key == Key.F && !ReferenceEquals(e.OriginalSource, search)) { e.Handled = true; search.Focus(); search.SelectAll(); }
+    }
     internal async Task SubmitAddressAsync()
     {
         if (addressPending) return;
@@ -374,7 +395,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     ContextMenu BuildViewMenu()
     {
-        var m = new ContextMenu(); foreach (var (key, label, glyph) in new[] { ("Huge", "Огромные значки", "\uE8B9"), ("Large", "Крупные значки", "\uE8B8"), ("Medium", "Обычные значки", "\uE80A"), ("Small", "Мелкие значки", "\uE80B"), ("List", "Список", "\uE8A1"), ("Details", "Таблица", "\uE9D5"), ("Tile", "Плитка", "\uE8FD"), ("Content", "Содержимое", "\uE8A5") }) { var item = Ui.Menu(label, () => SetMode(key), glyph: glyph); item.IsCheckable = true; item.IsChecked = mode == key; m.Items.Add(item); }
+        var m = new ContextMenu(); foreach (var (key, label, glyph) in new[] { ("Huge", "Огромные значки", IconCatalog.ViewHuge), ("Large", "Крупные значки", IconCatalog.ViewLarge), ("Medium", "Обычные значки", IconCatalog.ViewMedium), ("Small", "Мелкие значки", IconCatalog.ViewSmall), ("List", "Список", IconCatalog.ViewList), ("Details", "Таблица", IconCatalog.ViewDetails), ("Tile", "Плитка", IconCatalog.ViewTiles), ("Content", "Содержимое", IconCatalog.ViewContent) }) { var item = Ui.Menu(label, () => SetMode(key), glyph: glyph); item.IsCheckable = true; item.IsChecked = mode == key; m.Items.Add(item); }
         m.Items.Add(new Separator()); void Toggle(string label, bool initial, Action<bool> action) { var i = new MenuItem { Header = label, IsCheckable = true, IsChecked = initial }; i.Click += (_, _) => { action(i.IsChecked); _ = App.Store.SaveAsync(); }; m.Items.Add(i); }
         Toggle("Скрытые элементы", App.Store.Settings.ShowHidden, x => { App.Store.Settings.ShowHidden = x; ApplyItems(); }); Toggle("Расширения имён файлов", App.Store.Settings.ShowExtensions, x => { App.Store.Settings.ShowExtensions = x; ApplyItems(); }); Toggle("Область сведений", App.Store.Settings.DetailsPane, x => { App.Store.Settings.DetailsPane = x; UpdatePreviewVisibility(); _ = Ui.Guard(UpdatePreview); }); Toggle("Область просмотра", App.Store.Settings.PreviewPane, x => { App.Store.Settings.PreviewPane = x; UpdatePreviewVisibility(); _ = Ui.Guard(UpdatePreview); });
         var columns = new MenuItem { Header = "Колонки таблицы" }; foreach (var c in table.Columns) { var i = new MenuItem { Header = c.Header, IsCheckable = true, IsChecked = c.Visibility == Visibility.Visible, IsEnabled = c != table.Columns[0] }; i.Click += (_, _) => { c.Visibility = i.IsChecked ? Visibility.Visible : Visibility.Collapsed; SaveColumns(); }; columns.Items.Add(i); } m.Items.Add(columns); return m;

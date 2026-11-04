@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A8DBFF"/>
+      <stop offset="1" stop-color="#73BDF5"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#3B9BF2"/>
+      <stop offset="1" stop-color="#1765D6"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="url(#back)"/>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="none" stroke="#2B7CD3" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M38.6 104.4A16 16 0 0 1 54.2 92H232a12 12 0 0 1 11.7 14.6l-19.6 98.9A18 18 0 0 1 206.5 220H30a12 12 0 0 1-11.7-14.6Z" fill="url(#front)"/>
+  <path d="M54.2 93H232a11 11 0 0 1 10.8 8.5" fill="none" stroke="url(#edge)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
+</svg>

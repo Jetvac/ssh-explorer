@@ -21,7 +21,8 @@ public static partial class ProcParser
         if (text.Length > MaxProtocolCharacters)
             throw new MonitoringUnavailableException("Ответ мониторинга превысил 16 МиБ. Уменьшите лимит процессов.");
         using var reader = new StringReader(text);
-        if (reader.ReadLine()?.TrimEnd('\r') != "SSHXMON1")
+        var header = reader.ReadLine()?.TrimEnd('\r');
+        if (header is not ("SSHXMON1" or "SSHXMON2"))
             throw new MonitoringUnavailableException("Сервер не вернул протокол мониторинга /proc.");
         var result = new Dictionary<string, string?>(StringComparer.Ordinal);
         string? line;
@@ -34,12 +35,51 @@ public static partial class ProcParser
             if (tab is < 1 or > 100 || !KeyPattern().IsMatch(line[..tab]))
                 throw new MonitoringUnavailableException("Повреждена граница записи мониторинга.");
             var key = line[..tab];
-            if (!result.TryAdd(key, line[(tab + 1)..] == "!" ? null :
-                Encoding.UTF8.GetString(Convert.FromBase64String(line[(tab + 1)..]))))
+            var value = line[(tab + 1)..] == "!" ? null : Encoding.UTF8.GetString(Convert.FromBase64String(line[(tab + 1)..]));
+            if (key == "procs") { ExpandProcessStream(value ?? "", result); continue; }
+            if (!result.TryAdd(key, value))
                 throw new MonitoringUnavailableException("Повторная запись в протоколе мониторинга.");
         }
         if (!ended) throw new MonitoringUnavailableException("Мониторинг прерван: неполный ответ сервера.");
         return result;
+    }
+
+    /// <summary>
+    /// Protocol 2 process stream: five-line records (P pid / stat / uid / "read write" / stat again),
+    /// "X pid" for a process that vanished before its stat was read and a final "C count limited".
+    /// Expanded into the protocol 1 per-process keys so the calculator has a single input model.
+    /// </summary>
+    static void ExpandProcessStream(string text, Dictionary<string, string?> result)
+    {
+        var lines = text.Split('\n');
+        bool counted = false;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (line.Length == 0) continue;
+            if (line.StartsWith("X ", StringComparison.Ordinal) && int.TryParse(line.AsSpan(2), NumberStyles.None, Invariant, out var gone))
+            { result.TryAdd($"p/{gone}/stat", null); continue; }
+            if (line.StartsWith("C ", StringComparison.Ordinal))
+            {
+                var words = Words(line[2..]);
+                if (words.Length != 2 || !int.TryParse(words[0], NumberStyles.None, Invariant, out _)) throw new MonitoringUnavailableException("Повреждён итог списка процессов.");
+                result["meta/count"] = words[0]; result["meta/limited"] = words[1] == "1" ? "1" : "0"; counted = true; continue;
+            }
+            if (!line.StartsWith("P ", StringComparison.Ordinal) || !int.TryParse(line.AsSpan(2), NumberStyles.None, Invariant, out var pid) || pid <= 0 || i + 4 >= lines.Length)
+                throw new MonitoringUnavailableException("Повреждена запись процесса в протоколе мониторинга.");
+            string stat = lines[i + 1], uid = lines[i + 2], io = lines[i + 3], end = lines[i + 4];
+            i += 4;
+            var prefix = $"p/{pid}/";
+            if (!result.TryAdd(prefix + "stat", stat.Length == 0 ? null : stat + "\n"))
+                throw new MonitoringUnavailableException("Повторная запись процесса в протоколе мониторинга.");
+            result[prefix + "stat_end"] = end.Length == 0 ? null : end + "\n";
+            var owner = uid.Split(' ');
+            result[prefix + "status"] = owner[0].Length == 0 ? null : "Uid:\t" + owner[0] + "\n" + (owner.Length > 1 && owner[1].Length > 0 ? "VmRSS:\t" + owner[1] + " kB\n" : "");
+            var counters = io.Split(' ');
+            result[prefix + "io"] = counters.Length == 2 && counters[0].Length > 0 && counters[1].Length > 0
+                ? "read_bytes: " + counters[0] + "\nwrite_bytes: " + counters[1] + "\n" : null;
+        }
+        if (!counted) throw new MonitoringUnavailableException("Мониторинг прерван: список процессов неполон.");
     }
 
     public static CpuCounters? ParseCpu(string? text)

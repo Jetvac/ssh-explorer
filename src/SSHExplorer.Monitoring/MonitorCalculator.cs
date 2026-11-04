@@ -7,6 +7,15 @@ public sealed class MonitorCalculator
 {
     private RawSample? _previous;
     private string? _resetReason;
+    private Dictionary<uint, string> _users = [];
+    private DateTimeOffset _usersRead = DateTimeOffset.MinValue;
+    private readonly Dictionary<(int Pid, ulong Start), (string? Display, bool Truncated)> _commandLines = [];
+
+    /// <summary>PIDs whose command line has not been read yet; the next process sample frames them.</summary>
+    public IReadOnlyList<int> PendingCommandLines { get; private set; } = [];
+    /// <summary>True when /etc/passwd should be read with the next sample (first time, unknown UID or stale).</summary>
+    public bool UsersRefreshNeeded { get; private set; } = true;
+    public static readonly TimeSpan UsersMaxAge = TimeSpan.FromMinutes(10);
 
     public void Reset(string reason = "База измерений сброшена; нужен следующий замер.")
     { if(_previous is not null) _resetReason = reason; _previous = null; }
@@ -15,6 +24,8 @@ public sealed class MonitorCalculator
     {
         var frames = ProcParser.DecodeFrames(protocol);
         var current = RawSample.Parse(frames);
+        if (current.Frame("sys/passwd") is not null) { _users = new Dictionary<uint, string>(current.Users); _usersRead = timestamp; }
+        ApplyCommandLineCache(current);
         var previous = _previous;
         string? reset = _resetReason; _resetReason = null;
         if (previous is not null && ((!string.IsNullOrEmpty(current.BootId) && !string.IsNullOrEmpty(previous.BootId) && current.BootId != previous.BootId) ||
@@ -57,12 +68,12 @@ public sealed class MonitorCalculator
                 ? Math.Clamp(100d * (p.Stat.CpuTicks - old.Stat.CpuTicks) / totalDelta.Value, 0, 100) : null;
             if (cpuStatus.State != MetricState.Available) percent = null;
             var processCpu = current.Cpu is null ? cpuStatus : reset is not null ? new MetricStatus(MetricState.Reset, reset)
-                : previous is null ? Waiting("Первый замер: CPU процесса рассчитывается по следующей точке.")
+                : previous is null || !previous.HasProcesses ? Waiting("Первый замер: CPU процесса рассчитывается по следующей точке.")
                 : old is null ? new MetricStatus(MetricState.NewProcess, "Новый процесс или повторно использованный PID: ещё нет предыдущей точки.")
                 : cpuStatus.State != MetricState.Available ? cpuStatus
                 : percent.HasValue ? MetricStatus.Measured : new MetricStatus(MetricState.Reset,"Счётчик CPU процесса уменьшился; нужна новая база.");
             return new ProcessMetric(p.Identity, p.Stat.Name,
-                p.Identity.UserId == uint.MaxValue ? "Недоступно" : current.Users.GetValueOrDefault(p.Identity.UserId,
+                p.Identity.UserId == uint.MaxValue ? "Недоступно" : _users.GetValueOrDefault(p.Identity.UserId,
                     p.Identity.UserId.ToString(CultureInfo.InvariantCulture)), p.Stat.State, percent, p.MemoryBytes,
                 Rate(p.ReadBytes, old?.ReadBytes, seconds), Rate(p.WriteBytes, old?.WriteBytes, seconds), p.CommandLine)
             {
@@ -112,7 +123,8 @@ public sealed class MonitorCalculator
             limitations.Add("Некоторые командные строки ограничены первыми 4096 байтами.");
         if (current.Processes.Values.Any(p => p.Identity.UserId == uint.MaxValue))
             limitations.Add("У части процессов недоступен владелец; отправка сигналов для них отключена.");
-        if (current.Frame("sys/passwd") is null) limitations.Add("Имена пользователей недоступны; показаны числовые UID.");
+        if (current.HasProcesses && _users.Count == 0) limitations.Add("Имена пользователей недоступны; показаны числовые UID.");
+        UsersRefreshNeeded = _users.Count == 0 || timestamp - _usersRead > UsersMaxAge || current.Processes.Values.Any(p => p.Identity.UserId != uint.MaxValue && !_users.ContainsKey(p.Identity.UserId));
         foreach (var (key, bound) in new (string, int)[] { ("sys/stat", 65536), ("sys/net", 65536), ("sys/disks", 131072), ("sys/passwd", 131072), ("sys/df", 131072) })
             if (current.Frame(key) is { } value && System.Text.Encoding.UTF8.GetByteCount(value) >= bound)
                 limitations.Add($"{key}: достигнут лимит чтения {bound} байт; список может быть неполным.");
@@ -139,7 +151,25 @@ public sealed class MonitorCalculator
 
     private sealed record CounterPair(ulong Read, ulong Write);
     private sealed record RawProcess(ProcessIdentity Identity, ProcessStat Stat, long? MemoryBytes,
-        ulong? ReadBytes, ulong? WriteBytes, string? CommandLine, bool CommandLineTruncated);
+        ulong? ReadBytes, ulong? WriteBytes, string? CommandLine, bool CommandLineTruncated, bool CommandLineRead);
+
+    // Command lines are read once per (PID, start time); later samples reuse them. A process that
+    // rewrites its argv after start keeps the first observed value (shown as such in details).
+    private void ApplyCommandLineCache(RawSample current)
+    {
+        if (!current.HasProcesses) { PendingCommandLines = []; return; }
+        var live = new HashSet<(int, ulong)>();
+        var pending = new List<int>();
+        foreach (var (pid, process) in current.Processes.ToArray())
+        {
+            var key = (pid, process.Identity.StartTimeTicks); live.Add(key);
+            if (process.CommandLineRead) { _commandLines[key] = (process.CommandLine, process.CommandLineTruncated); continue; }
+            if (_commandLines.TryGetValue(key, out var cached)) current.Processes[pid] = process with { CommandLine = cached.Display, CommandLineTruncated = cached.Truncated };
+            else if (pending.Count < CollectorRequest.MaxCommandLinesPerSample) pending.Add(pid);
+        }
+        foreach (var stale in _commandLines.Keys.Where(key => !live.Contains(key)).ToArray()) _commandLines.Remove(stale);
+        PendingCommandLines = pending;
+    }
 
     private sealed class RawSample
     {
@@ -152,6 +182,7 @@ public sealed class MonitorCalculator
         public Dictionary<string, CounterPair> Disks { get; } = new(StringComparer.Ordinal);
         public Dictionary<uint, string> Users { get; } = [];
         public int UnreadableProcesses { get; private set; }
+        public bool HasProcesses { get; private init; }
         public string? Frame(string key) => _frames.GetValueOrDefault(key);
 
         public static RawSample Parse(IReadOnlyDictionary<string, string?> frames)
@@ -161,7 +192,8 @@ public sealed class MonitorCalculator
             {
                 _frames = frames, Cpu = ProcParser.ParseCpu(frames.GetValueOrDefault("sys/stat")),
                 UptimeSeconds = upText.Length > 0 ? ProcParser.PositiveDouble(upText[0]) : null,
-                BootId = frames.GetValueOrDefault("sys/boot_id")?.Trim()
+                BootId = frames.GetValueOrDefault("sys/boot_id")?.Trim(),
+                HasProcesses = frames.ContainsKey("meta/count")
             };
             foreach (var row in (sample.Frame("sys/passwd") ?? "").Split('\n'))
             {
@@ -183,12 +215,13 @@ public sealed class MonitorCalculator
                 if (rss is null && pageSize is not null && stat.ResidentPages >= 0 && stat.ResidentPages <= long.MaxValue / pageSize)
                     rss = stat.ResidentPages * pageSize;
                 var io = ProcParser.ParseColonFields(sample.Frame(prefix + "io"));
+                var cmdlineRead = frames.ContainsKey(prefix + "cmdline");
                 var cmdline = sample.Frame(prefix + "cmdline");
                 var truncated = cmdline is not null && System.Text.Encoding.UTF8.GetByteCount(cmdline) >= 4096;
                 var display = cmdline is null ? null : string.Join(' ', cmdline.Split('\0', StringSplitOptions.RemoveEmptyEntries).Select(DisplayArgument));
                 sample.Processes[stat.Pid] = new RawProcess(new ProcessIdentity(stat.Pid, stat.StartTimeTicks, uid),
                     stat, rss, ProcParser.Unsigned(io.GetValueOrDefault("read_bytes")),
-                    ProcParser.Unsigned(io.GetValueOrDefault("write_bytes")), display, truncated);
+                    ProcParser.Unsigned(io.GetValueOrDefault("write_bytes")), display, truncated, cmdlineRead);
             }
             foreach (var row in (sample.Frame("sys/net") ?? "").Split('\n'))
             {

@@ -8,6 +8,7 @@
     <AssemblyName>SSHExplorer</AssemblyName>
     <RootNamespace>SSHExplorer.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
@@ -19,6 +20,7 @@
     <ProjectReference Include="..\SSHExplorer.Core\SSHExplorer.Core.csproj" />
     <ProjectReference Include="..\SSHExplorer.Monitoring\SSHExplorer.Monitoring.csproj" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <Resource Include="Assets\AppIcon.ico" />
     <Content Include="Assets\Terminal\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -21,7 +21,7 @@ public partial class App : Application
         if (!startDesktop) return;
         DesktopStartupCount++;
         base.OnStartup(e);
-        EventManager.RegisterClassHandler(typeof(Window), Window.LoadedEvent, new RoutedEventHandler((sender, _) => Theme.ApplyWindowFrame((Window)sender)));
+        EventManager.RegisterClassHandler(typeof(Window), Window.LoadedEvent, new RoutedEventHandler((sender, _) => { AppIcon.Apply((Window)sender); Theme.ApplyWindowFrame((Window)sender); }));
         DispatcherUnhandledException += (_, args) =>
         {
             UiTestDiagnostics.Record(args.Exception);

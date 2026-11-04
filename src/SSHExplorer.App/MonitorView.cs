@@ -88,7 +88,9 @@ public sealed class MonitorView : UserControl, IDisposable
         Content = root;
         viewModel.PropertyChanged += ModelChanged; viewModel.ProcessesUpdated += ApplyProcesses; viewModel.Processes.CollectionChanged += ProcessesChanged;
         Theme.Changed += PaletteChanged;
-        timer.Tick += async (_, _) => await Poll();
+        // One-shot scheduling: the next request starts one interval after the previous START, or
+        // right after completion when collection is slower than the interval. Requests never overlap.
+        timer.Tick += async (_, _) => { timer.Stop(); await Poll(); };
         preferenceSaveTimer.Tick += async (_,_) => { preferenceSaveTimer.Stop();await SavePreferencesAsync(); };
         SizeChanged += (_, _) => UpdateResponsive();
         PreviewKeyDown += OnKey;
@@ -191,8 +193,8 @@ public sealed class MonitorView : UserControl, IDisposable
     {
         var panel = new StackPanel { Margin = new Thickness(0, 0, 16, 16) };
         var row = new DockPanel(); var value = Ui.Text("", 24, true); value.HorizontalAlignment = HorizontalAlignment.Right; value.SetBinding(TextBlock.TextProperty, new Binding(valueProperty)); value.SetBinding(ToolTipProperty, new Binding(reasonProperty)); value.SetBinding(AutomationProperties.HelpTextProperty, new Binding(reasonProperty)); DockPanel.SetDock(value, Dock.Right); row.Children.Add(value); row.Children.Add(Ui.Text(caption, 18, true)); panel.Children.Add(row);
-        var scale = Ui.Text("100%", 12); scale.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); scale.Margin = new Thickness(0, 10, 0, 4); panel.Children.Add(scale); panel.Children.Add(graph);
-        var axis = new DockPanel { Margin = new Thickness(0, 4, 0, 0) }; var zero = Ui.Text("0%", 12); zero.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); axis.Children.Add(zero); var interval = Ui.Text(graph.IntervalLabel, 12); interval.TextAlignment = TextAlignment.Right; interval.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); axis.Children.Add(interval); graph.IntervalChanged += () => interval.Text = graph.IntervalLabel; panel.Children.Add(axis);
+        var unit = Ui.Text("% использования · наведите указатель, чтобы увидеть значение", 12); unit.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); unit.Margin = new Thickness(0, 10, 0, 4); unit.TextTrimming = TextTrimming.CharacterEllipsis; panel.Children.Add(unit); panel.Children.Add(graph);
+        var axis = new DockPanel { Margin = new Thickness(0, 4, 40, 0) }; var span = Ui.Text(graph.WindowLabel, 12); span.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); axis.Children.Add(span); var interval = Ui.Text(graph.IntervalLabel, 12); interval.TextAlignment = TextAlignment.Right; interval.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); axis.Children.Add(interval); graph.IntervalChanged += () => { interval.Text = graph.IntervalLabel; span.Text = graph.WindowLabel; }; panel.Children.Add(axis);
         return panel;
     }
     void AddPerformanceTable(Panel parent, string caption, DataGrid table, string source, (string Caption, string Property, double Width)[] fields)
@@ -208,7 +210,7 @@ public sealed class MonitorView : UserControl, IDisposable
     {
         if (disposed || page == value) return;
         if (page == MonitorPage.Processes) processOffset = FindScroll(processes)?.VerticalOffset ?? processOffset; else performanceOffset = performance.VerticalOffset;
-        page = value; ApplyPage();
+        page = value; ApplyPage(); if (monitor is not null) monitor.Scope = page == MonitorPage.Processes ? MonitorScope.Processes : MonitorScope.System;
         var version = ++pageEpoch;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (disposed || version != pageEpoch) return; if (page == MonitorPage.Processes) FindScroll(processes)?.ScrollToVerticalOffset(processOffset); else performance.ScrollToVerticalOffset(performanceOffset); });
     }
@@ -323,7 +325,7 @@ public sealed class MonitorView : UserControl, IDisposable
         {
             if (compactCommands) menu.Items.Add(SignalItem("Завершить задачу (SIGTERM)…", 15));
             menu.Items.Add(SignalItem("Принудительно завершить (SIGKILL)…", 9)); menu.Items.Add(new Separator());
-            var choose = new MenuItem { Header = "Выбрать столбцы", Icon = Ui.Icon(Ui.ViewGlyph, 16, false) };
+            var choose = new MenuItem { Header = "Выбрать столбцы", Icon = Ui.Icon(IconCatalog.ViewDetails, 16, false) };
             foreach (var (key, column) in columns)
             {
                 bool autoHidden=preferences[key].Visible&&column.Visibility!=Visibility.Visible;
@@ -352,16 +354,19 @@ public sealed class MonitorView : UserControl, IDisposable
     void ApplyPolling()
     {
         var effective = active && !pausedByUser;
-        if (viewModel.IsActive == effective && (timer.IsEnabled || !effective || monitor is null)) return;
+        if (viewModel.IsActive == effective && (timer.IsEnabled || pollCancellation is not null || !effective || monitor is null)) return;
         ++pollEpoch; viewModel.IsActive = effective; timer.Stop(); UpdateGraphTime();
         if (!effective) { pollCancellation?.Cancel(); monitor?.MarkGap(DateTimeOffset.UtcNow, pausedByUser ? "Обновление приостановлено пользователем" : "Раздел мониторинга скрыт"); return; }
         if (monitor is null) return;
-        var interval = session is null ? monitor.ExpectedInterval : TimeSpan.FromSeconds(Math.Clamp(App.Store.Settings.PollIntervalSeconds, 1, 60)); monitor.ExpectedInterval = interval; timer.Interval = interval; cpuGraph.GapThreshold = memoryGraph.GapThreshold = TimeSpan.FromSeconds(Math.Max(3, interval.TotalSeconds * 2.5)); timer.Start(); _ = Poll();
+        var interval = session is null ? monitor.ExpectedInterval : TimeSpan.FromSeconds(Math.Clamp(App.Store.Settings.PollIntervalSeconds, 1, 60)); monitor.ExpectedInterval = interval;
+        monitor.Scope = page == MonitorPage.Processes ? MonitorScope.Processes : MonitorScope.System;
+        monitor.HistoryWindow = cpuGraph.Window + TimeSpan.FromMinutes(1);
+        cpuGraph.GapThreshold = memoryGraph.GapThreshold = monitor.ContinuityLimit; _ = Poll();
     }
     async Task Poll()
     {
         if (disposed || monitor is null || !viewModel.IsActive || pollCancellation is not null || viewModel.IsBusy || viewModel.IsCommandRunning) return;
-        var epoch = pollEpoch; var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); pollCancellation = request; viewModel.IsBusy = true;
+        var epoch = pollEpoch; var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); pollCancellation = request; viewModel.IsBusy = true; var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         try
         {
             var sample = await monitor.SampleAsync(request.Token);
@@ -376,6 +381,14 @@ public sealed class MonitorView : UserControl, IDisposable
             // Hide/Dispose only cancels. The request owns disposal after its awaited
             // callback has unwound, so rapid resume never reuses a disposed CTS.
             request.Dispose(); viewModel.IsBusy = false;
+            if (!disposed && viewModel.IsActive && epoch == pollEpoch && monitor is not null)
+            {
+                var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(startedAt);
+                var rest = TimeSpan.FromMilliseconds(Math.Min(250, monitor.ExpectedInterval.TotalMilliseconds / 4));
+                var delay = monitor.ExpectedInterval - elapsed; if (delay < rest) delay = rest;
+                cpuGraph.GapThreshold = memoryGraph.GapThreshold = monitor.ContinuityLimit;
+                timer.Interval = delay; timer.Start();
+            }
             if (!disposed && viewModel.IsActive && epoch != pollEpoch)
                 _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, () => { if (!disposed && viewModel.IsActive) _ = Poll(); });
         }
@@ -431,7 +444,7 @@ public sealed class MonitorView : UserControl, IDisposable
         empty.Visibility = viewModel.Processes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         empty.Text = viewModel.Snapshot is null ? viewModel.HasError ? "Не удалось получить процессы" : !viewModel.IsActive ? "Обновление приостановлено" : "Собираем данные…" : search.Text.Length > 0 ? "Нет совпадений" : "Нет доступных процессов";
     }
-    void UpdateGraphTime() { cpuGraph.Now = memoryGraph.Now = DateTimeOffset.UtcNow; }
+    void UpdateGraphTime() { cpuGraph.Now = memoryGraph.Now = session is null && monitor is null ? DateTimeOffset.UtcNow : SteadyClock.Now; }
 
     async Task Signal(int signal)
     {

@@ -13,6 +13,10 @@ public static class SessionTabInfo
     public static readonly DependencyProperty DescriptionProperty = DependencyProperty.RegisterAttached("Description", typeof(string), typeof(SessionTabInfo), new PropertyMetadata(""));
     public static void SetDescription(DependencyObject target, string value) => target.SetValue(DescriptionProperty, value);
     public static string GetDescription(DependencyObject target) => (string)target.GetValue(DescriptionProperty);
+    /// <summary>Content placed after the tab strip in the caption row (window actions and caption buttons).</summary>
+    public static readonly DependencyProperty TrailingContentProperty = DependencyProperty.RegisterAttached("TrailingContent", typeof(object), typeof(SessionTabInfo), new PropertyMetadata(null));
+    public static void SetTrailingContent(DependencyObject target, object? value) => target.SetValue(TrailingContentProperty, value);
+    public static object? GetTrailingContent(DependencyObject target) => target.GetValue(TrailingContentProperty);
 }
 
 public sealed class TabScrollAvailabilityConverter : IMultiValueConverter

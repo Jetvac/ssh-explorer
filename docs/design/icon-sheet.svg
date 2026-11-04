@@ -1,0 +1,494 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1808" viewBox="0 0 760 1808" font-family="Segoe UI, DejaVu Sans, sans-serif">
+<rect width="760" height="1808" fill="#ffffff"/>
+<text x="20" y="32" font-size="18" font-weight="600" fill="#1a1a1a">SSH Explorer — командные иконки (вектор, сетка 16 DIP, штрих 1 DIP)</text>
+<text x="20" y="54" font-size="12" fill="#626262">Слева светлая поверхность, справа тёмная; размеры 16 / 20 / 24 / 32 DIP при 100 %.</text>
+<rect x="20" y="70" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,85.0) scale(1.0)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,83.0) scale(1.25)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,81.0) scale(1.5)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,77.0) scale(2.0)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="90" font-size="12" fill="#1a1a1a">view-huge</text>
+<text x="174" y="106" font-size="10" fill="#626262">Огромные значки: один крупный эскиз</text>
+<rect x="380" y="70" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,85.0) scale(1.0)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,83.0) scale(1.25)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,81.0) scale(1.5)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,77.0) scale(2.0)"><path d="M3.5 2.5H12.5A1 1 0 0 1 13.5 3.5V12.5A1 1 0 0 1 12.5 13.5H3.5A1 1 0 0 1 2.5 12.5V3.5A1 1 0 0 1 3.5 2.5Z M4.5 11.5L7 8.5L9 10.5L10.5 9L12 11.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="90" font-size="12" fill="#f4f4f4">view-huge</text>
+<text x="534" y="106" font-size="10" fill="#b7b7b7">Огромные значки: один крупный эскиз</text>
+<rect x="20" y="122" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,137.0) scale(1.0)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,135.0) scale(1.25)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,133.0) scale(1.5)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,129.0) scale(2.0)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="142" font-size="12" fill="#1a1a1a">view-large</text>
+<text x="174" y="158" font-size="10" fill="#626262">Крупные значки: сетка 2×2</text>
+<rect x="380" y="122" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,137.0) scale(1.0)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,135.0) scale(1.25)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,133.0) scale(1.5)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,129.0) scale(2.0)"><path d="M3.5 2.5H6A1 1 0 0 1 7 3.5V6A1 1 0 0 1 6 7H3.5A1 1 0 0 1 2.5 6V3.5A1 1 0 0 1 3.5 2.5Z M10 2.5H12.5A1 1 0 0 1 13.5 3.5V6A1 1 0 0 1 12.5 7H10A1 1 0 0 1 9 6V3.5A1 1 0 0 1 10 2.5Z M3.5 9H6A1 1 0 0 1 7 10V12.5A1 1 0 0 1 6 13.5H3.5A1 1 0 0 1 2.5 12.5V10A1 1 0 0 1 3.5 9Z M10 9H12.5A1 1 0 0 1 13.5 10V12.5A1 1 0 0 1 12.5 13.5H10A1 1 0 0 1 9 12.5V10A1 1 0 0 1 10 9Z" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="142" font-size="12" fill="#f4f4f4">view-large</text>
+<text x="534" y="158" font-size="10" fill="#b7b7b7">Крупные значки: сетка 2×2</text>
+<rect x="20" y="174" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,189.0) scale(1.0)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,187.0) scale(1.25)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,185.0) scale(1.5)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,181.0) scale(2.0)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="194" font-size="12" fill="#1a1a1a">view-medium</text>
+<text x="174" y="210" font-size="10" fill="#626262">Обычные значки: сетка 3×3</text>
+<rect x="380" y="174" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,189.0) scale(1.0)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,187.0) scale(1.25)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,185.0) scale(1.5)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,181.0) scale(2.0)"><path d="M2.5 2.5H4.5V4.5H2.5Z M7 2.5H9V4.5H7Z M11.5 2.5H13.5V4.5H11.5Z M2.5 7H4.5V9H2.5Z M7 7H9V9H7Z M11.5 7H13.5V9H11.5Z M2.5 11.5H4.5V13.5H2.5Z M7 11.5H9V13.5H7Z M11.5 11.5H13.5V13.5H11.5Z" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="194" font-size="12" fill="#f4f4f4">view-medium</text>
+<text x="534" y="210" font-size="10" fill="#b7b7b7">Обычные значки: сетка 3×3</text>
+<rect x="20" y="226" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,241.0) scale(1.0)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,239.0) scale(1.25)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,237.0) scale(1.5)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,233.0) scale(2.0)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="246" font-size="12" fill="#1a1a1a">view-small</text>
+<text x="174" y="262" font-size="10" fill="#626262">Мелкие значки: строки значок+имя в две к</text>
+<rect x="380" y="226" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,241.0) scale(1.0)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,239.0) scale(1.25)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,237.0) scale(1.5)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,233.0) scale(2.0)"><path d="M1.5 3H3V4.5H1.5Z M5 3.75H7 M1.5 7.25H3V8.75H1.5Z M5 8H7 M1.5 11.5H3V13H1.5Z M5 12.25H7 M9 3H10.5V4.5H9Z M12.5 3.75H14.5 M9 7.25H10.5V8.75H9Z M12.5 8H14.5 M9 11.5H10.5V13H9Z M12.5 12.25H14.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="246" font-size="12" fill="#f4f4f4">view-small</text>
+<text x="534" y="262" font-size="10" fill="#b7b7b7">Мелкие значки: строки значок+имя в две к</text>
+<rect x="20" y="278" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,293.0) scale(1.0)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,291.0) scale(1.25)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,289.0) scale(1.5)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,285.0) scale(2.0)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="298" font-size="12" fill="#1a1a1a">view-list</text>
+<text x="174" y="314" font-size="10" fill="#626262">Список: одна колонка коротких строк</text>
+<rect x="380" y="278" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,293.0) scale(1.0)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,291.0) scale(1.25)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,289.0) scale(1.5)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,285.0) scale(2.0)"><path d="M2.5 3.5H3.5 M6 3.5H13.5 M2.5 8H3.5 M6 8H13.5 M2.5 12.5H3.5 M6 12.5H13.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="298" font-size="12" fill="#f4f4f4">view-list</text>
+<text x="534" y="314" font-size="10" fill="#b7b7b7">Список: одна колонка коротких строк</text>
+<rect x="20" y="330" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,345.0) scale(1.0)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,343.0) scale(1.25)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,341.0) scale(1.5)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,337.0) scale(2.0)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="350" font-size="12" fill="#1a1a1a">view-details</text>
+<text x="174" y="366" font-size="10" fill="#626262">Таблица: строки с колонками и заголовком</text>
+<rect x="380" y="330" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,345.0) scale(1.0)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,343.0) scale(1.25)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,341.0) scale(1.5)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,337.0) scale(2.0)"><path d="M1.5 3H14.5 M1.5 6.5H8.5 M10.5 6.5H14.5 M1.5 9.5H8.5 M10.5 9.5H14.5 M1.5 12.5H8.5 M10.5 12.5H14.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="350" font-size="12" fill="#f4f4f4">view-details</text>
+<text x="534" y="366" font-size="10" fill="#b7b7b7">Таблица: строки с колонками и заголовком</text>
+<rect x="20" y="382" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,397.0) scale(1.0)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,395.0) scale(1.25)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,393.0) scale(1.5)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,389.0) scale(2.0)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="402" font-size="12" fill="#1a1a1a">view-tiles</text>
+<text x="174" y="418" font-size="10" fill="#626262">Плитка: значок слева и две строки сведен</text>
+<rect x="380" y="382" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,397.0) scale(1.0)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,395.0) scale(1.25)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,393.0) scale(1.5)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,389.0) scale(2.0)"><path d="M2.5 2H5.5A1 1 0 0 1 6.5 3V6A1 1 0 0 1 5.5 7H2.5A1 1 0 0 1 1.5 6V3A1 1 0 0 1 2.5 2Z M8.5 3.5H14.5 M8.5 5.5H12.5 M2.5 9H5.5A1 1 0 0 1 6.5 10V13A1 1 0 0 1 5.5 14H2.5A1 1 0 0 1 1.5 13V10A1 1 0 0 1 2.5 9Z M8.5 10.5H14.5 M8.5 12.5H12.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="402" font-size="12" fill="#f4f4f4">view-tiles</text>
+<text x="534" y="418" font-size="10" fill="#b7b7b7">Плитка: значок слева и две строки сведен</text>
+<rect x="20" y="434" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,449.0) scale(1.0)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,447.0) scale(1.25)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,445.0) scale(1.5)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,441.0) scale(2.0)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="454" font-size="12" fill="#1a1a1a">view-content</text>
+<text x="174" y="470" font-size="10" fill="#626262">Содержимое: строки с разделителями</text>
+<rect x="380" y="434" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,449.0) scale(1.0)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,447.0) scale(1.25)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,445.0) scale(1.5)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,441.0) scale(2.0)"><path d="M2.5 2H4.5A1 1 0 0 1 5.5 3V5A1 1 0 0 1 4.5 6H2.5A1 1 0 0 1 1.5 5V3A1 1 0 0 1 2.5 2Z M7.5 3H14.5 M7.5 5H11 M1.5 8H14.5 M2.5 10H4.5A1 1 0 0 1 5.5 11V13A1 1 0 0 1 4.5 14H2.5A1 1 0 0 1 1.5 13V11A1 1 0 0 1 2.5 10Z M7.5 11H14.5 M7.5 13H11" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="454" font-size="12" fill="#f4f4f4">view-content</text>
+<text x="534" y="470" font-size="10" fill="#b7b7b7">Содержимое: строки с разделителями</text>
+<rect x="20" y="486" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,501.0) scale(1.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,499.0) scale(1.25)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,497.0) scale(1.5)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,493.0) scale(2.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="506" font-size="12" fill="#1a1a1a">tab-list</text>
+<text x="174" y="522" font-size="10" fill="#626262">Все вкладки</text>
+<rect x="380" y="486" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,501.0) scale(1.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,499.0) scale(1.25)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,497.0) scale(1.5)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,493.0) scale(2.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M1.5 6.5H14.5 M5.5 3.5V6.5 M9.5 3.5V6.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="506" font-size="12" fill="#f4f4f4">tab-list</text>
+<text x="534" y="522" font-size="10" fill="#b7b7b7">Все вкладки</text>
+<rect x="20" y="538" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,553.0) scale(1.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,551.0) scale(1.25)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,549.0) scale(1.5)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,545.0) scale(2.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="558" font-size="12" fill="#1a1a1a">new-tab</text>
+<text x="174" y="574" font-size="10" fill="#626262">Новая вкладка</text>
+<rect x="380" y="538" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,553.0) scale(1.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,551.0) scale(1.25)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,549.0) scale(1.5)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,545.0) scale(2.0)"><path d="M3 3.5H13A1.5 1.5 0 0 1 14.5 5V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V5A1.5 1.5 0 0 1 3 3.5Z M8 6.5V11 M5.75 8.75H10.25" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="558" font-size="12" fill="#f4f4f4">new-tab</text>
+<text x="534" y="574" font-size="10" fill="#b7b7b7">Новая вкладка</text>
+<rect x="20" y="590" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,605.0) scale(1.0)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,603.0) scale(1.25)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,601.0) scale(1.5)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,597.0) scale(2.0)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="610" font-size="12" fill="#1a1a1a">documents</text>
+<text x="174" y="626" font-size="10" fill="#626262">Редактируемые документы</text>
+<rect x="380" y="590" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,605.0) scale(1.0)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,603.0) scale(1.25)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,601.0) scale(1.5)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,597.0) scale(2.0)"><path d="M10 14.5H4A1.5 1.5 0 0 1 2.5 13V3A1.5 1.5 0 0 1 4 1.5H8.5L11.5 4.5V7 M8.5 1.5V4.5H11.5 M8.5 13.5L13 9L14.5 10.5L10 15H8.5Z" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="610" font-size="12" fill="#f4f4f4">documents</text>
+<text x="534" y="626" font-size="10" fill="#b7b7b7">Редактируемые документы</text>
+<rect x="20" y="642" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,657.0) scale(1.0)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,655.0) scale(1.25)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,653.0) scale(1.5)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,649.0) scale(2.0)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="662" font-size="12" fill="#1a1a1a">transfers</text>
+<text x="174" y="678" font-size="10" fill="#626262">Передачи</text>
+<rect x="380" y="642" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,657.0) scale(1.0)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,655.0) scale(1.25)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,653.0) scale(1.5)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,649.0) scale(2.0)"><path d="M5 13.5V2.5 M2 5.5L5 2.5L8 5.5 M11 2.5V13.5 M8 10.5L11 13.5L14 10.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="662" font-size="12" fill="#f4f4f4">transfers</text>
+<text x="534" y="678" font-size="10" fill="#b7b7b7">Передачи</text>
+<rect x="20" y="694" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,709.0) scale(1.0)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,707.0) scale(1.25)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,705.0) scale(1.5)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,701.0) scale(2.0)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="714" font-size="12" fill="#1a1a1a">server</text>
+<text x="174" y="730" font-size="10" fill="#626262">Сервер</text>
+<rect x="380" y="694" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,709.0) scale(1.0)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,707.0) scale(1.25)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,705.0) scale(1.5)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,701.0) scale(2.0)"><path d="M3.5 2H12.5A1 1 0 0 1 13.5 3V6A1 1 0 0 1 12.5 7H3.5A1 1 0 0 1 2.5 6V3A1 1 0 0 1 3.5 2Z M3.5 9H12.5A1 1 0 0 1 13.5 10V13A1 1 0 0 1 12.5 14H3.5A1 1 0 0 1 2.5 13V10A1 1 0 0 1 3.5 9Z M5 4.5H5.5 M5 11.5H5.5 M8 4.5H11 M8 11.5H11" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="714" font-size="12" fill="#f4f4f4">server</text>
+<text x="534" y="730" font-size="10" fill="#b7b7b7">Сервер</text>
+<rect x="20" y="746" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,761.0) scale(1.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,759.0) scale(1.25)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,757.0) scale(1.5)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,753.0) scale(2.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="766" font-size="12" fill="#1a1a1a">processes</text>
+<text x="174" y="782" font-size="10" fill="#626262">Процессы</text>
+<rect x="380" y="746" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,761.0) scale(1.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,759.0) scale(1.25)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,757.0) scale(1.5)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,753.0) scale(2.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4 6H5 M7 6H12 M4 8.5H5 M7 8.5H12 M4 11H5 M7 11H10" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="766" font-size="12" fill="#f4f4f4">processes</text>
+<text x="534" y="782" font-size="10" fill="#b7b7b7">Процессы</text>
+<rect x="20" y="798" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,813.0) scale(1.0)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,811.0) scale(1.25)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,809.0) scale(1.5)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,805.0) scale(2.0)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="818" font-size="12" fill="#1a1a1a">performance</text>
+<text x="174" y="834" font-size="10" fill="#626262">Производительность</text>
+<rect x="380" y="798" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,813.0) scale(1.0)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,811.0) scale(1.25)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,809.0) scale(1.5)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,805.0) scale(2.0)"><path d="M1.5 13.5H14.5 M2.5 11L5.5 7L8 9.5L11.5 4L13.5 6.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="818" font-size="12" fill="#f4f4f4">performance</text>
+<text x="534" y="834" font-size="10" fill="#b7b7b7">Производительность</text>
+<rect x="20" y="850" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,865.0) scale(1.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,863.0) scale(1.25)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,861.0) scale(1.5)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,857.0) scale(2.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="870" font-size="12" fill="#1a1a1a">terminal</text>
+<text x="174" y="886" font-size="10" fill="#626262">Терминал</text>
+<rect x="380" y="850" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,865.0) scale(1.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,863.0) scale(1.25)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,861.0) scale(1.5)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,857.0) scale(2.0)"><path d="M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M4.5 6L6.75 8.25L4.5 10.5 M8.5 10.5H11.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="870" font-size="12" fill="#f4f4f4">terminal</text>
+<text x="534" y="886" font-size="10" fill="#b7b7b7">Терминал</text>
+<rect x="20" y="902" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,917.0) scale(1.0)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,915.0) scale(1.25)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,913.0) scale(1.5)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,909.0) scale(2.0)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="922" font-size="12" fill="#1a1a1a">power</text>
+<text x="174" y="938" font-size="10" fill="#626262">Выключить</text>
+<rect x="380" y="902" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,917.0) scale(1.0)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,915.0) scale(1.25)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,913.0) scale(1.5)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,909.0) scale(2.0)"><path d="M8 1.5V7.5 M4.6 3.9A5.5 5.5 0 1 0 11.4 3.9" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="922" font-size="12" fill="#f4f4f4">power</text>
+<text x="534" y="938" font-size="10" fill="#b7b7b7">Выключить</text>
+<rect x="20" y="954" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,969.0) scale(1.0)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,967.0) scale(1.25)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,965.0) scale(1.5)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,961.0) scale(2.0)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="974" font-size="12" fill="#1a1a1a">restart</text>
+<text x="174" y="990" font-size="10" fill="#626262">Перезагрузить</text>
+<rect x="380" y="954" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,969.0) scale(1.0)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,967.0) scale(1.25)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,965.0) scale(1.5)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,961.0) scale(2.0)"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="974" font-size="12" fill="#f4f4f4">restart</text>
+<text x="534" y="990" font-size="10" fill="#b7b7b7">Перезагрузить</text>
+<rect x="20" y="1006" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,1021.0) scale(1.0)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,1019.0) scale(1.25)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,1017.0) scale(1.5)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,1013.0) scale(2.0)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="1026" font-size="12" fill="#1a1a1a">reconnect</text>
+<text x="174" y="1042" font-size="10" fill="#626262">Переподключиться</text>
+<rect x="380" y="1006" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,1021.0) scale(1.0)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,1019.0) scale(1.25)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,1017.0) scale(1.5)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,1013.0) scale(2.0)"><path d="M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="1026" font-size="12" fill="#f4f4f4">reconnect</text>
+<text x="534" y="1042" font-size="10" fill="#b7b7b7">Переподключиться</text>
+<rect x="20" y="1058" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,1073.0) scale(1.0)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,1071.0) scale(1.25)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,1069.0) scale(1.5)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,1065.0) scale(2.0)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="1078" font-size="12" fill="#1a1a1a">network</text>
+<text x="174" y="1094" font-size="10" fill="#626262">Сеть</text>
+<rect x="380" y="1058" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,1073.0) scale(1.0)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,1071.0) scale(1.25)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,1069.0) scale(1.5)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,1065.0) scale(2.0)"><path d="M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="1078" font-size="12" fill="#f4f4f4">network</text>
+<text x="534" y="1094" font-size="10" fill="#b7b7b7">Сеть</text>
+<rect x="20" y="1110" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,1125.0) scale(1.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,1123.0) scale(1.25)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,1121.0) scale(1.5)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,1117.0) scale(2.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="1130" font-size="12" fill="#1a1a1a">storage</text>
+<text x="174" y="1146" font-size="10" fill="#626262">Хранилища</text>
+<rect x="380" y="1110" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,1125.0) scale(1.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,1123.0) scale(1.25)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,1121.0) scale(1.5)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,1117.0) scale(2.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="1130" font-size="12" fill="#f4f4f4">storage</text>
+<text x="534" y="1146" font-size="10" fill="#b7b7b7">Хранилища</text>
+<text x="20" y="1192" font-size="14" font-weight="600" fill="#1a1a1a">Системные глифы Segoe Fluent Icons (отрисовываются Windows; проверка — CI-галерея)</text>
+<text x="20" y="1214" font-size="11" fill="#1a1a1a">add — U+E710 Add</text>
+<text x="380" y="1214" font-size="11" fill="#1a1a1a">back — U+E72B Back</text>
+<text x="20" y="1232" font-size="11" fill="#1a1a1a">forward — U+E72A Forward</text>
+<text x="380" y="1232" font-size="11" fill="#1a1a1a">up — U+E74A Up</text>
+<text x="20" y="1250" font-size="11" fill="#1a1a1a">refresh — U+E72C Refresh</text>
+<text x="380" y="1250" font-size="11" fill="#1a1a1a">home — U+E80F Home</text>
+<text x="20" y="1268" font-size="11" fill="#1a1a1a">folder — U+E8B7 Folder</text>
+<text x="380" y="1268" font-size="11" fill="#1a1a1a">cut — U+E8C6 Cut</text>
+<text x="20" y="1286" font-size="11" fill="#1a1a1a">copy — U+E8C8 Copy</text>
+<text x="380" y="1286" font-size="11" fill="#1a1a1a">paste — U+E77F Paste</text>
+<text x="20" y="1304" font-size="11" fill="#1a1a1a">rename — U+E8AC Rename</text>
+<text x="380" y="1304" font-size="11" fill="#1a1a1a">delete — U+E74D Delete</text>
+<text x="20" y="1322" font-size="11" fill="#1a1a1a">upload — U+E898 Upload</text>
+<text x="380" y="1322" font-size="11" fill="#1a1a1a">download — U+E896 Download</text>
+<text x="20" y="1340" font-size="11" fill="#1a1a1a">sort — U+E8CB Sort</text>
+<text x="380" y="1340" font-size="11" fill="#1a1a1a">more — U+E712 More</text>
+<text x="20" y="1358" font-size="11" fill="#1a1a1a">settings — U+E713 Setting</text>
+<text x="380" y="1358" font-size="11" fill="#1a1a1a">close — U+E711 Cancel</text>
+<text x="20" y="1376" font-size="11" fill="#1a1a1a">search — U+E721 Search</text>
+<text x="380" y="1376" font-size="11" fill="#1a1a1a">document — U+E8A5 Document</text>
+<text x="20" y="1394" font-size="11" fill="#1a1a1a">pin — U+E718 Pin</text>
+<text x="380" y="1394" font-size="11" fill="#1a1a1a">info — U+E946 Info</text>
+<text x="20" y="1412" font-size="11" fill="#1a1a1a">undo — U+E7A7 Undo</text>
+<text x="380" y="1412" font-size="11" fill="#1a1a1a">edit — U+E70F Edit</text>
+<text x="20" y="1430" font-size="11" fill="#1a1a1a">play — U+E768 Play</text>
+<text x="380" y="1430" font-size="11" fill="#1a1a1a">pause — U+E769 Pause</text>
+<text x="20" y="1448" font-size="11" fill="#1a1a1a">remove — U+E738 Remove</text>
+<text x="380" y="1448" font-size="11" fill="#1a1a1a">check — U+E73E CheckMark</text>
+<text x="20" y="1466" font-size="11" fill="#1a1a1a">chevron-down — U+E70D ChevronDown</text>
+<text x="380" y="1466" font-size="11" fill="#1a1a1a">chevron-right — U+E76C ChevronRight</text>
+<text x="20" y="1484" font-size="11" fill="#1a1a1a">down — U+E74B Down</text>
+<text x="380" y="1484" font-size="11" fill="#1a1a1a">view — U+E890 View</text>
+<text x="20" y="1502" font-size="11" fill="#1a1a1a">command-prompt — U+E756 CommandPrompt</text>
+<text x="20" y="1528" font-size="14" font-weight="600" fill="#1a1a1a">Знак приложения: варианты 16–24 / 32–48 / 64–256</text>
+<rect x="14" y="1536" width="28" height="28" rx="6" fill="#f3f3f3"/>
+<svg x="20" y="1542" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
+  <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
+  <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
+  <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
+</svg>
+<rect x="14" y="1660" width="28" height="28" rx="6" fill="#202020"/>
+<svg x="20" y="1666" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
+  <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
+  <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
+  <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
+</svg>
+<rect x="54" y="1536" width="36" height="36" rx="6" fill="#f3f3f3"/>
+<svg x="60" y="1542" width="24" height="24" viewBox="0 0 16 16">
+  <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
+  <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
+  <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
+  <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
+</svg>
+<rect x="54" y="1660" width="36" height="36" rx="6" fill="#202020"/>
+<svg x="60" y="1666" width="24" height="24" viewBox="0 0 16 16">
+  <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
+  <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
+  <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
+  <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
+</svg>
+<rect x="102" y="1536" width="44" height="44" rx="6" fill="#f3f3f3"/>
+<svg x="108" y="1542" width="32" height="32" viewBox="0 0 32 32">
+  <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
+  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
+  <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
+  <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
+</svg>
+<rect x="102" y="1660" width="44" height="44" rx="6" fill="#202020"/>
+<svg x="108" y="1666" width="32" height="32" viewBox="0 0 32 32">
+  <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
+  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
+  <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
+  <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
+</svg>
+<rect x="158" y="1536" width="60" height="60" rx="6" fill="#f3f3f3"/>
+<svg x="164" y="1542" width="48" height="48" viewBox="0 0 32 32">
+  <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
+  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
+  <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
+  <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
+</svg>
+<rect x="158" y="1660" width="60" height="60" rx="6" fill="#202020"/>
+<svg x="164" y="1666" width="48" height="48" viewBox="0 0 32 32">
+  <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
+  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
+  <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
+  <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
+</svg>
+<rect x="230" y="1536" width="76" height="76" rx="6" fill="#f3f3f3"/>
+<svg x="236" y="1542" width="64" height="64" viewBox="0 0 256 256">
+  <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A8DBFF"/>
+      <stop offset="1" stop-color="#73BDF5"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#3B9BF2"/>
+      <stop offset="1" stop-color="#1765D6"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="url(#back)"/>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="none" stroke="#2B7CD3" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M38.6 104.4A16 16 0 0 1 54.2 92H232a12 12 0 0 1 11.7 14.6l-19.6 98.9A18 18 0 0 1 206.5 220H30a12 12 0 0 1-11.7-14.6Z" fill="url(#front)"/>
+  <path d="M54.2 93H232a11 11 0 0 1 10.8 8.5" fill="none" stroke="url(#edge)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
+</svg>
+<rect x="230" y="1660" width="76" height="76" rx="6" fill="#202020"/>
+<svg x="236" y="1666" width="64" height="64" viewBox="0 0 256 256">
+  <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A8DBFF"/>
+      <stop offset="1" stop-color="#73BDF5"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#3B9BF2"/>
+      <stop offset="1" stop-color="#1765D6"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="url(#back)"/>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="none" stroke="#2B7CD3" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M38.6 104.4A16 16 0 0 1 54.2 92H232a12 12 0 0 1 11.7 14.6l-19.6 98.9A18 18 0 0 1 206.5 220H30a12 12 0 0 1-11.7-14.6Z" fill="url(#front)"/>
+  <path d="M54.2 93H232a11 11 0 0 1 10.8 8.5" fill="none" stroke="url(#edge)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
+</svg>
+<rect x="318" y="1536" width="108" height="108" rx="6" fill="#f3f3f3"/>
+<svg x="324" y="1542" width="96" height="96" viewBox="0 0 256 256">
+  <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A8DBFF"/>
+      <stop offset="1" stop-color="#73BDF5"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#3B9BF2"/>
+      <stop offset="1" stop-color="#1765D6"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="url(#back)"/>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="none" stroke="#2B7CD3" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M38.6 104.4A16 16 0 0 1 54.2 92H232a12 12 0 0 1 11.7 14.6l-19.6 98.9A18 18 0 0 1 206.5 220H30a12 12 0 0 1-11.7-14.6Z" fill="url(#front)"/>
+  <path d="M54.2 93H232a11 11 0 0 1 10.8 8.5" fill="none" stroke="url(#edge)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
+</svg>
+<rect x="318" y="1660" width="108" height="108" rx="6" fill="#202020"/>
+<svg x="324" y="1666" width="96" height="96" viewBox="0 0 256 256">
+  <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A8DBFF"/>
+      <stop offset="1" stop-color="#73BDF5"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#3B9BF2"/>
+      <stop offset="1" stop-color="#1765D6"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="url(#back)"/>
+  <path d="M30 60a18 18 0 0 1 18-18h52a18 18 0 0 1 12.7 5.3L126 60h82a18 18 0 0 1 18 18v124a18 18 0 0 1-18 18H48a18 18 0 0 1-18-18Z" fill="none" stroke="#2B7CD3" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M38.6 104.4A16 16 0 0 1 54.2 92H232a12 12 0 0 1 11.7 14.6l-19.6 98.9A18 18 0 0 1 206.5 220H30a12 12 0 0 1-11.7-14.6Z" fill="url(#front)"/>
+  <path d="M54.2 93H232a11 11 0 0 1 10.8 8.5" fill="none" stroke="url(#edge)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
+</svg>
+</svg>

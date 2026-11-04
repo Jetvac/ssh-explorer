@@ -16,7 +16,9 @@ namespace SSHExplorer.App;
 
 public sealed partial class MainWindow : Window
 {
-    readonly TabControl tabs = new() { Padding = new Thickness(0, 0, 318, 0), Tag = "WindowTabs" };
+    readonly TabControl tabs = new() { Padding = new Thickness(8, 0, 0, 0), Tag = "WindowTabs" };
+    WindowCaption caption = null!;
+    internal WindowCaption Caption => caption;
     readonly TabItem home = new();
     readonly DataGrid servers = new();
     readonly TextBox search = new() { MinWidth = 300, ToolTip = "Поиск сохранённых серверов" };
@@ -38,19 +40,23 @@ public sealed partial class MainWindow : Window
     {
         connectionAttempts = new(windowLifetime.Token);
         Style = (Style)FindResource(typeof(Window));
-        // The glass strip belongs to DWM. An opaque WPF background over it
-        // hides the real caption buttons even when native hit testing is enabled.
-        Background = Brushes.Transparent;
+        // The caption row (tabs, actions, caption buttons) is one WPF surface; see WindowCaption.
+        SetResourceReference(BackgroundProperty, "CaptionSurface");
         DataContext = viewModel;
         tabs.SetResourceReference(StyleProperty, "SessionTabControlStyle");
         home.SetResourceReference(StyleProperty, "SessionTabItemStyle");
         Title = "SSH Explorer " + BuildInfo.DisplayVersion; Width = 1320; Height = 850; MinWidth = 720; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 44, GlassFrameThickness = new Thickness(0, 44, 0, 0), ResizeBorderThickness = SystemParameters.WindowResizeBorderThickness, CornerRadius = new CornerRadius(8), UseAeroCaptionButtons = true });
+        AppIcon.Apply(this);
+        WindowCaption.ApplyChrome(this);
         var root = new Grid();
         openServerButton = Ui.IconButton(Ui.AddGlyph, AddMenu, "Открыть сервер");
-        allTabsButton = Ui.FlyoutButton("\uE70D", "", CreateTabListMenu, "Все вкладки (Ctrl+Shift+A)"); allTabsButton.Name = "AllTabsButton";
-        var actions = Ui.Row(allTabsButton, Ui.IconButton("\uE70F", ShowDocuments, "Редактируемые документы"), Ui.IconButton("\uE8AB", ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
-        actions.VerticalAlignment = VerticalAlignment.Top; actions.HorizontalAlignment = HorizontalAlignment.Right; actions.Margin = new Thickness(0, 4, 146, 0); WindowChrome.SetIsHitTestVisibleInChrome(actions, true); root.Children.Add(tabs); root.Children.Add(actions); Content = root;
+        allTabsButton = Ui.FlyoutButton(IconCatalog.TabList, "", CreateTabListMenu, "Все вкладки (Ctrl+Shift+A)"); allTabsButton.Name = "AllTabsButton";
+        var actions = Ui.Row(allTabsButton, Ui.IconButton(IconCatalog.Documents, ShowDocuments, "Редактируемые документы"), Ui.IconButton(IconCatalog.Transfers, ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
+        actions.Name = "CaptionActions"; actions.VerticalAlignment = VerticalAlignment.Top; actions.Margin = new Thickness(8, 4, 8, 0); WindowChrome.SetIsHitTestVisibleInChrome(actions, true);
+        caption = new WindowCaption(this);
+        var trailing = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top }; trailing.Children.Add(actions); trailing.Children.Add(caption);
+        SessionTabInfo.SetTrailingContent(tabs, trailing);
+        root.Children.Add(tabs); Content = root;
         home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); SessionTabInfo.SetTitle(home, "Главная"); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
         tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); RevealSelectedTab(); RefreshHome(); };
         tabs.SizeChanged+=(_,_)=>RevealSelectedTab();
@@ -238,7 +244,7 @@ public sealed partial class MainWindow : Window
         var close = Ui.Button("", async () => await CloseTab(tab), "Закрыть «"+title+"» (Ctrl+F4)"); close.Name="SessionTabCloseButton"; close.Content = Ui.Icon(Ui.CloseGlyph, 11, false); close.SetResourceReference(StyleProperty, "TabCloseButtonStyle"); WindowChrome.SetIsHitTestVisibleInChrome(close, true);
         var label = Ui.Text(title); label.TextTrimming = TextTrimming.CharacterEllipsis; label.MinWidth=0;
         var header = new Grid { ToolTip=title+"\n"+SessionTabInfo.GetDescription(tab) }; header.ColumnDefinitions.Add(new(){Width=GridLength.Auto}); header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
-        header.Children.Add(Ui.Icon("\uE968",16)); Grid.SetColumn(label,1); header.Children.Add(label); Grid.SetColumn(close,2); header.Children.Add(close); tab.Header=header; WindowChrome.SetIsHitTestVisibleInChrome(header,true);
+        header.Children.Add(Ui.Icon(IconCatalog.Server,16)); Grid.SetColumn(label,1); header.Children.Add(label); Grid.SetColumn(close,2); header.Children.Add(close); tab.Header=header; WindowChrome.SetIsHitTestVisibleInChrome(header,true);
         Point? start = null;
         header.PreviewMouseLeftButtonDown += (_, e) => start = e.GetPosition(header);
         header.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && start is Point a && (e.GetPosition(header) - a).Length > 12 && !close.IsMouseOver) { start = null; try { DragDrop.DoDragDrop(header, TabDragData(tab), DragDropEffects.Move); } finally { CancelDragFeedback(); } } };
@@ -395,9 +401,9 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var statusRow = new DockPanel { LastChildFill = true, MinHeight = 30 }; DockPanel.SetDock(state, Dock.Right); statusRow.Children.Add(state); statusRow.Children.Add(fileStatusHost); connectionStatus.Child = statusRow; connectionStatus.Padding = new Thickness(0); connectionStatus.SetResourceReference(StyleProperty, "StatusBarStyle"); Grid.SetRow(connectionStatus, 3); host.Children.Add(connectionStatus);
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Clamp(App.Store.Settings.TreeWidth, 190, 420)), MinWidth = 190, MaxWidth = 420 }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 340 });
         side.Margin = new Thickness(5, 8, 5, 8); side.SetResourceReference(Panel.BackgroundProperty, "NavigationSurface");
-        side.Children.Add(Nav(Ui.TerminalGlyph, "Терминал", "terminal")); side.Children.Add(Nav("\uE9D9", "Диспетчер задач", "monitor"));
-        monitorNavigation.Children.Add(Nav("\uE9D9", "Процессы", "processes"));
-        monitorNavigation.Children.Add(Nav("\uE9D2", "Производительность", "performance"));
+        side.Children.Add(Nav(Ui.TerminalGlyph, "Терминал", "terminal")); side.Children.Add(Nav(IconCatalog.Performance, "Диспетчер задач", "monitor"));
+        monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
+        monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
         monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
         var line = new Border { Height = 1, Margin = new Thickness(8, 10, 8, 10) }; line.SetResourceReference(Border.BackgroundProperty, "Edge"); side.Children.Add(line);
         side.Children.Add(Nav("\uE8B7", "Файлы", "files"));

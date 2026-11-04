@@ -248,7 +248,7 @@ internal static class MonitorTests
             TestSuite.Throws<ArgumentOutOfRangeException>(() => CollectorCommand.Create(0));
             TestSuite.Throws<ArgumentOutOfRangeException>(() => CollectorCommand.Create(4097));
             var command = CollectorCommand.Create(123);
-            TestSuite.True(command.Contains("-gt 123", StringComparison.Ordinal));
+            TestSuite.True(command.Contains("-ge 123", StringComparison.Ordinal));
             foreach (var prohibited in new[] { "apt ", "yum ", "pip ", "systemctl ", "sudo ", "curl ", "wget " })
                 TestSuite.True(!command.Contains(prohibited, StringComparison.Ordinal));
             TestSuite.True(!command.Contains("/proc/$p/net/dev", StringComparison.Ordinal));

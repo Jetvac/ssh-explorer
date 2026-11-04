@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
+  <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
+  <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
+  <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
+</svg>

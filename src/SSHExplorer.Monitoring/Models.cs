@@ -102,6 +102,12 @@ public sealed record HistoryPoint(DateTimeOffset Timestamp, double? CpuPercent,
 {
     public bool IsGap { get; init; }
     public string? Reason { get; init; }
+    /// <summary>
+    /// Set by <see cref="LinuxMonitor"/>: true when this point is joined to the previous successful
+    /// point. Null for points from other sources; renderers then apply their own time threshold.
+    /// </summary>
+    public bool? ContinuesSeries { get; init; }
+    public TimeSpan CollectionDuration { get; init; }
 }
 
 public sealed record MonitorCapabilities(bool HasHtop, bool HasTop);

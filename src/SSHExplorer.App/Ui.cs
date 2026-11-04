@@ -22,7 +22,7 @@ public static class Ui
     }));
     public static void SetValidationMessage(DependencyObject target,string value)=>target.SetValue(ValidationMessageProperty,value);
     public static string GetValidationMessage(DependencyObject target)=>(string)target.GetValue(ValidationMessageProperty);
-    public const string AddGlyph = "\uE710", BackGlyph = "\uE72B", ForwardGlyph = "\uE72A", UpGlyph = "\uE74A", RefreshGlyph = "\uE72C", HomeGlyph = "\uE80F", FolderGlyph = "\uE8B7", CutGlyph = "\uE8C6", CopyGlyph = "\uE8C8", PasteGlyph = "\uE77F", RenameGlyph = "\uE8AC", DeleteGlyph = "\uE74D", UploadGlyph = "\uE898", DownloadGlyph = "\uE896", SortGlyph = "\uE8CB", ViewGlyph = "\uE8A9", MoreGlyph = "\uE712", SettingsGlyph = "\uE713", CloseGlyph = "\uE711", SearchGlyph = "\uE721", FileGlyph = "\uE8A5", TerminalGlyph = "\uE756", PinGlyph = "\uE718", PropertiesGlyph = "\uE946", UndoGlyph = "\uE7A7", NewTabGlyph = "\uE8A7";
+    public const string AddGlyph = "\uE710", BackGlyph = "\uE72B", ForwardGlyph = "\uE72A", UpGlyph = "\uE74A", RefreshGlyph = "\uE72C", HomeGlyph = "\uE80F", FolderGlyph = "\uE8B7", CutGlyph = "\uE8C6", CopyGlyph = "\uE8C8", PasteGlyph = "\uE77F", RenameGlyph = "\uE8AC", DeleteGlyph = "\uE74D", UploadGlyph = "\uE898", DownloadGlyph = "\uE896", SortGlyph = "\uE8CB", ViewGlyph = "\uE8A9", MoreGlyph = "\uE712", SettingsGlyph = "\uE713", CloseGlyph = "\uE711", SearchGlyph = "\uE721", FileGlyph = "\uE8A5", TerminalGlyph = "\uE756", PinGlyph = "\uE718", PropertiesGlyph = "\uE946", UndoGlyph = "\uE7A7", NewTabGlyph = IconCatalog.NewTab;
     public static readonly DependencyProperty IsCurrentFolderProperty = DependencyProperty.RegisterAttached("IsCurrentFolder", typeof(bool), typeof(Ui), new FrameworkPropertyMetadata(false));
     public static void SetIsCurrentFolder(DependencyObject target, bool value) => target.SetValue(IsCurrentFolderProperty, value);
     public static bool GetIsCurrentFolder(DependencyObject target) => (bool)target.GetValue(IsCurrentFolderProperty);
@@ -134,9 +134,17 @@ public static class Ui
         if (size is 14 or 12 or 18) block.SetResourceReference(TextBlock.FontSizeProperty, size == 12 ? "UICaptionSize" : size == 18 ? "UIHeadingSize" : "UIFontSize");
         return block;
     }
-    public static TextBlock Icon(string glyph, double size = 18, bool trailingSpace = true)
+    /// <summary>Command/navigation icon: a Segoe Fluent system glyph or an <see cref="IconCatalog"/> vector key.</summary>
+    public static FrameworkElement Icon(string glyph, double size = 18, bool trailingSpace = true)
     {
-        var block = new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"), FontSize = size, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = trailingSpace ? new Thickness(0, 0, 9, 0) : new Thickness(0) };
+        var margin = trailingSpace ? new Thickness(0, 0, 9, 0) : new Thickness(0);
+        if (IconCatalog.IsVector(glyph))
+        {
+            var icon = new VectorIcon(glyph, size == 18 ? 18 : size) { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = margin };
+            if (size == 18) icon.SetResourceReference(VectorIcon.IconSizeProperty, "IconSize");
+            return icon;
+        }
+        var block = new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"), FontSize = size, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = margin };
         if (size == 18) block.SetResourceReference(TextBlock.FontSizeProperty, "IconSize"); return block;
     }
     public static StackPanel Row(params UIElement[] items) { var p = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var x in items) p.Children.Add(x); return p; }
