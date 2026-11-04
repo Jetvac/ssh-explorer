@@ -19,12 +19,21 @@ public static class HomeGrouping
     public static void Attach(DataGrid grid, Func<bool> enabled)
     {
         grid.GroupStyle.Add(new GroupStyle { ContainerStyle = ContainerStyle(), HidesIfEmpty = true });
+        // Changing grouping with recycled row containers and virtualized columns crashed WPF's DataGridCellsPanel
+        // (ArgumentOutOfRange in ArrangeOverride, seen in CI). Home has four columns and few rows: realize them plainly.
+        grid.EnableColumnVirtualization = false;
+        VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Standard);
+        VirtualizingPanel.SetIsVirtualizingWhenGrouping(grid, false);
         void Apply()
         {
             if (grid.ItemsSource is null || CollectionViewSource.GetDefaultView(grid.ItemsSource) is not ListCollectionView view) return;
             bool on = enabled();
-            if (on && view.GroupDescriptions.Count == 0) view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ServerProfileViewModel.GroupName), null, StringComparison.CurrentCultureIgnoreCase));
-            else if (!on && view.GroupDescriptions.Count > 0) view.GroupDescriptions.Clear();
+            if (on == view.GroupDescriptions.Count > 0) return;
+            using (view.DeferRefresh())
+            {
+                if (on) view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ServerProfileViewModel.GroupName), null, StringComparison.CurrentCultureIgnoreCase));
+                else view.GroupDescriptions.Clear();
+            }
         }
         DependencyPropertyDescriptor.FromProperty(ItemsControl.ItemsSourceProperty, typeof(DataGrid))?.AddValueChanged(grid, (_, _) => Apply());
         grid.Loaded += (_, _) => Apply();
