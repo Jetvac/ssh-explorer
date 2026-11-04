@@ -3,7 +3,8 @@ using System.Globalization;
 
 namespace SSHExplorer.Core;
 
-public enum AuthenticationKind { Password, PrivateKey, KeyboardInteractive }
+/// <summary>Stored by name; Agent is appended so existing numeric indexes keep their meaning.</summary>
+public enum AuthenticationKind { Password, PrivateKey, KeyboardInteractive, Agent }
 public sealed class ServerProfile
 {
     public Guid Id { get; set; } = Guid.NewGuid();

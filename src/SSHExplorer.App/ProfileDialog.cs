@@ -55,7 +55,7 @@ public sealed class ProfileDialog:Window,ICancellableModal
         var port=Field("Порт",nameof(_model.Port),nameof(_model.PortError));Grid.SetColumn(port,1);endpoint.Children.Add(port);panel.Children.Add(endpoint);
         panel.Children.Add(Field("Пользователь Linux",nameof(_model.Username),nameof(_model.UserError)));
         panel.Children.Add(Label("Способ входа"));
-        var authentication=new ComboBox{ItemsSource=new[]{"Пароль","Приватный ключ","Keyboard-interactive"},MinHeight=34,Margin=new(0,0,0,10)};
+        var authentication=new ComboBox{ItemsSource=new[]{"Пароль","Приватный ключ","Keyboard-interactive","SSH-агент (OpenSSH, Pageant-совместимый)"},MinHeight=34,Margin=new(0,0,0,10)};
         authentication.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedIndexProperty,new Binding(nameof(_model.AuthenticationIndex)){Mode=BindingMode.TwoWay});AutomationProperties.SetName(authentication,"Способ входа");_fields["Authentication"]=authentication;panel.Children.Add(authentication);
         var keyPanel=new StackPanel();keyPanel.SetBinding(VisibilityProperty,new Binding(nameof(_model.IsKeyAuthentication)){Converter=new BooleanToVisibilityConverter()});
         var keyField=Field("Приватный ключ",nameof(_model.PrivateKeyPath),nameof(_model.KeyError));keyPanel.Children.Add(keyField);
@@ -69,6 +69,12 @@ public sealed class ProfileDialog:Window,ICancellableModal
         UpdateSecretSummary();_model.PropertyChanged+=(_,e)=>{if(e.PropertyName==nameof(_model.SaveSecret))UpdateSecretSummary();};panel.Children.Add(secretInfo);
         var explanation=Ui.Text("",12);explanation.TextWrapping=TextWrapping.Wrap;explanation.SetResourceReference(TextBlock.ForegroundProperty,"Muted");explanation.SetBinding(TextBlock.TextProperty,new Binding(nameof(_model.SecretExplanation)));
         var secretDetails=new Expander{Header="Подробнее о сохранении секрета",Content=explanation,Margin=new(0,2,0,6)};panel.Children.Add(secretDetails);
+        // With an SSH agent there is no secret: hide every secret control and say where the keys come from.
+        var usesSecret=new Binding(nameof(_model.UsesSecret)){Converter=new BooleanToVisibilityConverter()};
+        foreach(var element in new FrameworkElement[]{secretLabel,_secret,remember,secretInfo,secretDetails})element.SetBinding(VisibilityProperty,usesSecret);
+        var agentNote=Ui.Text("Ключи и подписи предоставляет SSH-агент: агент OpenSSH для Windows или сокет из SSH_AUTH_SOCK. Приватный ключ и парольная фраза не попадают в приложение; агент может запросить подтверждение.",12);
+        agentNote.Name="AgentNote";agentNote.TextWrapping=TextWrapping.Wrap;agentNote.SetResourceReference(TextBlock.ForegroundProperty,"Muted");agentNote.Margin=new(0,0,0,8);
+        agentNote.SetBinding(VisibilityProperty,new Binding(nameof(_model.UsesSecret)){Converter=new InverseBooleanToVisibilityConverter()});panel.Children.Insert(panel.Children.IndexOf(secretLabel),agentNote);
         _advanced.Header="Дополнительные параметры";_advanced.Margin=new(0,4,0,0);var advanced=new StackPanel{Margin=new(0,8,0,0)};
         advanced.Children.Add(Field("Стартовая папка",nameof(_model.InitialPath),nameof(_model.InitialPathError)));
         var timeout=Field("Таймаут подключения, 3–120 секунд",nameof(_model.Timeout),nameof(_model.TimeoutError));timeout.HorizontalAlignment=HorizontalAlignment.Left;timeout.Width=245;advanced.Children.Add(timeout);_advanced.Content=advanced;panel.Children.Add(_advanced);

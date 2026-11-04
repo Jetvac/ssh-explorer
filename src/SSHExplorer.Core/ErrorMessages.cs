@@ -7,6 +7,8 @@ public static class ErrorMessages
     public static string Describe(Exception ex) => ex switch
     {
         HostKeyChangedException => ex.Message,
+        SshAgentException => ex.Message,
+        SshAuthenticationException when ex.InnerException is SshAgentException agent => agent.Message,
         OperationCanceledException => "Операция отменена.",
         SshAuthenticationException => "Сервер отклонил аутентификацию. Проверьте пользователя, пароль или ключ.",
         SshOperationTimeoutException or TimeoutException => "Истекло время ожидания ответа сервера.",

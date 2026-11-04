@@ -19,6 +19,11 @@ internal static class SessionAuthentication
         return result ?? throw new OperationCanceledException("Интерактивный вход отменён.", ct);
     }
 
+    /// <summary>Replaceable for tests and diagnostics; defaults to SSH_AUTH_SOCK or the Windows OpenSSH agent.</summary>
+    internal static Func<SshAgentClient> AgentFactory { get; set; } = () => SshAgentEndpoint.Default();
+    /// <summary>Optional restriction of agent identities (tests offer one key type at a time).</summary>
+    internal static Func<AgentIdentity, bool>? AgentFilter { get; set; }
+
     internal static AuthenticationMethod[] CreateMethods(ServerProfile profile, SessionCredentials credentials,
         Action<IDisposable> register, Func<InteractivePrompt, string> respond)
     {
@@ -28,6 +33,13 @@ internal static class SessionAuthentication
             var key = string.IsNullOrEmpty(credentials.Secret) ? new PrivateKeyFile(profile.PrivateKeyPath) : new PrivateKeyFile(profile.PrivateKeyPath, credentials.Secret);
             register(key);
             methods.Add(new PrivateKeyAuthenticationMethod(profile.Username, key));
+        }
+        else if (profile.Authentication == AuthenticationKind.Agent)
+        {
+            // Identities are listed now; each signature is requested from the agent during authentication.
+            var source = new AgentKeySource(AgentFactory(), AgentFilter);
+            if (source.HostKeyAlgorithms.Count == 0) throw new SshAgentException("В SSH-агенте нет подходящих ключей. Добавьте ключ (ssh-add) или выберите другой способ входа.");
+            methods.Add(new PrivateKeyAuthenticationMethod(profile.Username, source));
         }
         else if (profile.Authentication == AuthenticationKind.Password)
             methods.Add(new PasswordAuthenticationMethod(profile.Username, credentials.Secret));

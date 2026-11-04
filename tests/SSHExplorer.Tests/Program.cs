@@ -9,6 +9,12 @@ if (args.Length == 2 && args[0] == "--document-edit-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real SFTP document checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length is 4 or 5 && args[0] == "--agent-integration")
+{
+    await AgentIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3], args.Length == 5 ? args[4] : null);
+    Console.WriteLine($"RESULT: {suite.Passed} real agent checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 1 && args[0] == "--document-edit")
 {
     await DocumentEditTests.RunAsync(suite);
@@ -46,6 +52,7 @@ await ServerPanelTests.RunAsync(suite);
 #if CORE_TESTS
 await CoreTests.RunAsync(suite);
 await SshConfigTests.RunAsync(suite);
+await AgentTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

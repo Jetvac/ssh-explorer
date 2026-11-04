@@ -44,10 +44,12 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public int AuthenticationIndex
     {
         get=>_authenticationIndex;
-        set{if(_authenticationIndex!=value)_hasStoredSecret=false;Set(ref _authenticationIndex,value);Changed(nameof(IsKeyAuthentication));Changed(nameof(SecretLabel));Changed(nameof(SecretExplanation));ClearError(nameof(PrivateKeyPath));ClearError("Secret");}
+        set{if(_authenticationIndex!=value)_hasStoredSecret=false;Set(ref _authenticationIndex,value);Changed(nameof(IsKeyAuthentication));Changed(nameof(UsesSecret));Changed(nameof(SecretLabel));Changed(nameof(SecretExplanation));ClearError(nameof(PrivateKeyPath));ClearError("Secret");}
     }
     public bool SaveSecret{get=>_saveSecret;set{Set(ref _saveSecret,value);Changed(nameof(SecretExplanation));ClearError("Secret");}}
     public bool IsKeyAuthentication=>AuthenticationIndex==(int)AuthenticationKind.PrivateKey;
+    /// <summary>An SSH agent signs for the user: there is no password or passphrase to enter or store.</summary>
+    public bool UsesSecret=>AuthenticationIndex!=(int)AuthenticationKind.Agent;
     public string SecretLabel=>IsKeyAuthentication?"Парольная фраза ключа (если задана)":AuthenticationIndex==2?"Пароль для первоначального запроса":"Пароль";
     public string SecretExplanation=>(IsKeyAuthentication?"Для незашифрованного ключа парольная фраза не нужна. ":AuthenticationIndex==2?"Дополнительные запросы и одноразовые коды вводятся отдельно и не сохраняются. ":"Пустое поле можно заполнить при подключении. ")+
         (SaveSecret?"«Сохранить» записывает введённый секрет без проверки. «Сохранить и подключиться» обновит его только после успешного входа.":"«Сохранить» записывает только профиль; пароль потребуется при будущем входе. «Сохранить и подключиться» использует введённое значение в этой попытке.")+
@@ -81,12 +83,12 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         if(!int.TryParse(Port.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out int port)||port is <1 or >65535)_errors[nameof(Port)]="Порт: число от 1 до 65535.";
         if(string.IsNullOrWhiteSpace(Username))_errors[nameof(Username)]="Введите имя пользователя Linux.";
         else if(Username.Any(char.IsControl))_errors[nameof(Username)]="Имя пользователя содержит управляющие символы.";
-        if(AuthenticationIndex is <0 or >2)_errors["Authentication"]="Выберите способ входа.";
+        if(AuthenticationIndex is <0 or >3)_errors["Authentication"]="Выберите способ входа.";
         if(IsKeyAuthentication&&(string.IsNullOrWhiteSpace(PrivateKeyPath)||!File.Exists(PrivateKeyPath.Trim())))_errors[nameof(PrivateKeyPath)]="Выберите существующий локальный файл приватного ключа.";
         if(!int.TryParse(Timeout.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out int timeout)||timeout is <3 or >120)_errors[nameof(Timeout)]="Таймаут: число от 3 до 120 секунд.";
         try{_ = PosixPath.Normalize(string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim());}
         catch(ArgumentException){_errors[nameof(InitialPath)]="Используйте абсолютный POSIX-путь или ~ домашней папки.";}
-        if(SaveSecret&&!IsKeyAuthentication&&string.IsNullOrEmpty(secret)&&!_hasStoredSecret&&!deferSecretUntilAuthentication)_errors["Secret"]="Введите пароль для сохранения или отключите сохранение секрета.";
+        if(SaveSecret&&UsesSecret&&!IsKeyAuthentication&&string.IsNullOrEmpty(secret)&&!_hasStoredSecret&&!deferSecretUntilAuthentication)_errors["Secret"]="Введите пароль для сохранения или отключите сохранение секрета.";
         RaiseErrors();Status=_errors.Count==0?"":ValidationSummary;return _errors.Count==0;
     }
     public async Task<string?> LoadSecretAsync(CancellationToken ct=default)
@@ -111,7 +113,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         try
         {
             TryNormalizeHost(Host,out string host);
-            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim()};
+            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret&&UsesSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim()};
             var result=deferSecretUntilAuthentication
                 ?await _persistence.SaveForConnectionAsync(profile,ct)
                 :await _persistence.SaveAsync(profile,SaveSecret&&!(secret.Length==0&&_hasStoredSecret)?secret:null,ct);

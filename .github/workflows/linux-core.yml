@@ -29,6 +29,28 @@ jobs:
         run: |
           set -o pipefail
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build 2>&1 | tee artifacts-core.log
+      - name: Real OpenSSH server and ssh-agent (0.3 A2 agent authentication)
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends openssh-server > /dev/null
+          fixture="$RUNNER_TEMP/sshd-agent"; mkdir -p "$fixture"; chmod 700 "$fixture"
+          ssh-keygen -q -t ed25519 -N '' -f "$fixture/host_ed25519"
+          ssh-keygen -q -t ed25519 -N '' -C 'ed25519@ci' -f "$fixture/client_ed25519"
+          ssh-keygen -q -t rsa -b 3072 -N '' -C 'rsa@ci' -f "$fixture/client_rsa"
+          mkdir -p ~/.ssh; chmod 700 ~/.ssh
+          cat "$fixture/client_ed25519.pub" "$fixture/client_rsa.pub" >> ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
+          {
+            echo "Port 2222"; echo "ListenAddress 127.0.0.1"; echo "HostKey $fixture/host_ed25519"; echo "PidFile $fixture/sshd.pid"
+            echo "PasswordAuthentication no"; echo "KbdInteractiveAuthentication no"; echo "PubkeyAuthentication yes"; echo "UsePAM no"
+            echo "StrictModes no"; echo "AuthorizedKeysFile %h/.ssh/authorized_keys"
+          } > "$fixture/sshd_config"
+          sudo mkdir -p /run/sshd
+          sudo /usr/sbin/sshd -f "$fixture/sshd_config" -E "$fixture/sshd.log"
+          eval "$(ssh-agent -s)" > /dev/null
+          ssh-add -q "$fixture/client_ed25519" "$fixture/client_rsa"
+          empty_sock="$RUNNER_TEMP/empty-agent.sock"; ssh-agent -a "$empty_sock" > /dev/null
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --agent-integration 127.0.0.1 2222 "$USER" "$empty_sock" 2>&1 | tee artifacts-agent.log
+          sudo kill "$(cat "$fixture/sshd.pid")" || true
       - name: Collector benchmark beta.5 vs protocol 2 (same runner, +300 processes)
         run: |
           mkdir -p artifacts
@@ -41,5 +63,6 @@ jobs:
           name: Linux-core-${{ github.sha }}
           path: |
             artifacts-core.log
+            artifacts-agent.log
             artifacts/collector-benchmark.json
           retention-days: 14

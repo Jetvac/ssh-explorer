@@ -223,7 +223,9 @@ public sealed partial class MainWindow : Window
                 try { saved = profile.SaveSecret ? await App.Store.ReadSecretAsync(profile.Id, attempt.Token) : null; await attempt.RecordAsync("secret.read", "succeeded"); }
                 catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or IOException or UnauthorizedAccessException or FormatException)
                 { await attempt.RecordAsync("secret.read", "failed", ex); forceCredentials = true; secretUnavailable = true; }
-                if (saved is not null && !forceCredentials && !requireCredentials.Contains(profile.Id)) credentials = new SessionCredentials(saved);
+                // An SSH agent signs for the user: no password or passphrase dialog.
+                if (profile.Authentication == AuthenticationKind.Agent) credentials = new SessionCredentials("");
+                else if (saved is not null && !forceCredentials && !requireCredentials.Contains(profile.Id)) credentials = new SessionCredentials(saved);
                 else
                 {
                     await attempt.RecordAsync("credentials.dialog", "started");
