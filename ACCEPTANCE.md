@@ -1,6 +1,27 @@
-# SSH Explorer — приёмка 0.2.0-beta.4
+# SSH Explorer — приёмка 0.2.0-beta.5
 
-## Текущая итерация: beta.4
+## Текущая итерация: beta.5
+
+База — опубликованная beta.4 `1fb919fbf87ff0baa6ecf6fcca242a6b68e614fb`. Пользователь разрешил Computer Use 04.11.2026 и затем запретил дальнейшее использование. Уже выполненный живой тест учитывается только с его development DLL; после отзыва — код/headless/Windows CI. Причина прежнего парольного crash остаётся неизвестной. Визуальную приёмку выполняет пользователь.
+
+[Редактирование и его границы](docs/REMOTE_EDIT.md) · [сопоставление](docs/UI_PARITY.md) · [CI и provenance выпуска](docs/CI_BETA5.md).
+
+| Граница | Статус / доказательство |
+|---|---|
+| Byte-preserving remote-edit lifecycle | PASS:15 целевых component checks, сериализация/immutable snapshots/journal/recovery, strict text/format, empty/missing, conflict и10МиБ; входят в64 core checkpoint, не суммируются повторно |
+| Реальный SFTP и SFTP-only | PASS указанного объёма:6 normal-development и11 SFTP-only checks, общий набор пересекается; mode0755, hash-conflict при той жеmtime, explicit symlink/retarget, permission denied, root owner, FIFO, ENOSPC, cancel |
+| Настоящий установленный Блокнот | PASS development-сборки: открыл `.sh` без выполнения, инструмент ввёл текст и нажал Ctrl+S; независимый SFTP hash/mode/baseline совпали; после закрытия клиента редактор открыт. Notepad11.2607.14.0; не proof финального EXE/обычного auth/физического человека |
+| Native Shell icons | PASS:реальные16/32/48/256, shared cache,10 000 моделей без фонового шторма, DPI buckets/invalidation; рисунок ассоциации зависит от установленной Windows |
+| Реальные WPF виды/вкладки/документы | PASS checkpoint CI своего уровня; точные final screenshots/assertions/commit в release verification. Controlled transport/launcher в document gallery явно не выдаётся за Notepad |
+| Прежние файловые/auth/terminal/monitor/transfer механизмы | Сохранены;48 monitor/shell,38 Files,24 Forms/Tabs, profile/STA/auth/fresh child/native ABI и packaged startup проходят полный CI checkpoint. Финальная сборка проверяется отдельно |
+| Дальнейший host Computer Use/HWND | NOT RUN после отзыва; существующий внешний редактор не закрывали |
+| Полный physical auth/Explorer OLE/DWM/Snap/motion/DPI/HC/clean Windows | NOT RUN как полная матрица; шаги ниже. Native caption не восстанавливается из WPF client PNG |
+
+Ручная приёмка текста: открыть `.sh`/`.conf`/`.txt` без расширения/Unicode/10МиБ → Ctrl+S → увидеть подтверждённый серверный hash; быстрые сохранения/atomic replacement/пустой файл → один актуальный результат; второй клиент меняет содержимое с той же длиной/mtime → конфликт → отмена/получить серверную/сохранить рядом/явная замена → новое внешнее изменение требует нового решения; недоступная сеть/ENOSPC/права → локальная копия цела; close/cancel/restart → редактор не завершён, старый draft сам не отправлен. Отдельно проверить UTF-8/BOM/UTF-16 и формат, внешний Save As, symlink/retarget/special files, одинаковые имена двух серверов и изменение профиля.
+
+Ручная визуальная матрица: две/много одинаково названных вкладок, active close и «+», восемь файловых видов, текущий view glyph, длинное имя/inline rename/group/context menu; Light/Dark, настоящий OS text scale и DPI100/125/150/200/High Contrast; live Explorer dragWindows↔сервер/A↔B/внутри сервера, Copy/Move/None/tree/tab/Escape/close; native caption/Snap/multi-monitor; motion с быстрым прерыванием/системным отключением; чистая offline Windows с полным portable. Программный font22 — отдельная компонентная проверка, не OS DPI.
+
+## Историческая итерация: beta.4
 
 Baseline: опубликованная `v0.2.0-beta.3`, `e8ef6815dd3417dcbda632077ed8408c77576d04`. Успешный пользовательский запуск относится к beta.2; оценка beta.3 была по изображениям. Причина прежнего парольного вылета остаётся неизвестной. При повторении он вновь становится первым приоритетом. Визуальная приёмка остаётся за пользователем.
 

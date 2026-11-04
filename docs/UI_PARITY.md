@@ -1,6 +1,24 @@
 # Сопоставление интерфейса с Windows 11
 
-## Актуальная итерация beta.4
+## Актуальная итерация beta.5
+
+Сопоставление: Windows11 Explorer/Notepad → immutable beta.4 `1fb919fbf87ff0baa6ecf6fcca242a6b68e614fb` → beta.5. Во время разрешённого Computer Use осмотрен собственный fixture в Explorer build26200.9711/25H2, Light, стандартный Details. Инструмент сообщил1066×681 для bounded window; физический DPI/OS text scale не измерены. Поэтому сравнение структуры/оптики не объявляется pixel-perfect или точными native DIP. [Метаданные референса](test-results/beta5-windows-reference.json), [реализация](UI_ITERATION_BETA5.md), [доказательства](CI_BETA5.md).
+
+| Windows роль / наблюдение | Опубликованная beta.4 | Новая реализация | Проверяемое доказательство |
+|---|---|---|---|
+| Notepad: обычное редактирование содержимого | UTF-8 read-only TextBox,256КиБ; inline rename относится только к имени | Настоящий установленный редактор,32МиБ, byte-preserving bridge, Ctrl+S и подтверждённый server hash, список статусов | Actual installed Notepad development proof + SFTP-only roundtrip/failures; controlled CI launcher отдельно |
+| Согласованное безопасное сохранение | Transfer CommitRemote преимущественно metadata, нет модели документа | Отдельный content-checked service, exact host-key identity/target, immutable operation journal, conflict/UNKNOWN/recovery | Same length+mtime writer, repeated conflict, pre/post-commit boundary, root-owner refusal, ENOSPC, symlink; не atomic hash CAS |
+| Explorer: настоящие папки/типы | Упрощённые цветные DrawingImage | Shell type/attributes resources16/32/48/256, фоновый STA и bounded DPI/environment cache | 5 native resource checks + actual eight-view PNG; установленные ассоциации могут отличаться между ПК |
+| Explorer: две вкладки | Обе зоны стрелок занимают место всегда | Collapsed без overflow, одинаковые стабильные зоны при overflow, корректный disabled край | Measured HeaderScroller/arrow bounds; прежний many-tabs/close suite сохранён |
+| Explorer: «+» у конца | «+» смешан со служебными действиями справа | Собственный full hit target за реальным tab extent, служебные действия отдельно, native caption area сохранена | Actual two-tabs frame и measured plus/scroll geometry; полный live Snap/DWM отдельно |
+| Explorer: текущий режим | Главное «Просмотреть» всегда с сеткой | Glyph соответствует всем восьми активным режимам; размеры изображения и нажатия разделены | Actual eight modes, current glyph и distinct image-preview/edit availability |
+| Explorer: привычные пропорции | Общие роли уже есть, но объектные рисунки и свободные arrow areas нарушают впечатление | Роли command/tab16, file-small16, shared heights; полноценные строки длинных имён, tooltip, adaptive tiles для enlarged text | Native reference ограничен неизвестным DPI; CI фиксирует actual geometry/culture/font; font22 не называется OS DPI |
+| Windows формы/состояния | Общие templates beta.4 уже работают | Сохранены поля, popup, validation и общий footer; document surface имеет тематическую подложку и scrollable reason | Прежние Forms24 и новая document gallery, Light/Dark/узкое окно/enlarged text |
+| Привычное восстановление | Нет remote-edit lifecycle | Pending известен до закрытия; редактор независим; после старта draft paused без auto upload | Component recovery, real Notepad remained open after client close; окончательный release provenance отдельно |
+
+Рабочая копия, snapshot и профиль не публикуются. Live Notepad-тест относится к development DLL, а final CI document frames используют controlled executor/launcher и не выдаются за внешний редактор. После пользовательского отзыва Computer Use новых desktop capture/input нет; экспорт уже захваченных reference bytes не управляет окнами. Сохранены исторические доказательства и неизвестная причина прежнего password crash. Пользовательская визуальная приёмка остаётся открытой.
+
+## Проверенная итерация beta.4 (история)
 
 Тройка: исходные Explorer/Task Manager пользователя → immutable beta.3 `e8ef6815dd3417dcbda632077ed8408c77576d04` → beta.4. Физический DPI и active state Windows-референсов неизвестны: оценка структуры/контролов ограничена этой неопределённостью, pixel-perfect не заявляется. [Реализация](UI_ITERATION_BETA4.md), [доказательства и статусы](CI_BETA4.md), [приёмка](../ACCEPTANCE.md).
 

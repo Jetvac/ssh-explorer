@@ -1,0 +1,16 @@
+{
+  "source": "Own Explorer fixture captured before Computer Use revocation; exported existing bytes only, no later capture/input",
+  "windowsBuild": "26200.9711",
+  "windowsRelease": "25H2",
+  "theme": "Light",
+  "density": "Observed Details view",
+  "toolReportedWindowSize": {
+    "width": 1066,
+    "height": 681
+  },
+  "physicalDpi": "Not independently measured",
+  "systemTextScale": "Not independently measured",
+  "nativeCaptionIncluded": true,
+  "sha256": "c7c5a4d26ee267708aedbfecd1c4bd58807bb9c68b26459968f246bad41ffdf6",
+  "publishedToGitHub": false
+}

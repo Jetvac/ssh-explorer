@@ -36,6 +36,8 @@ Watcher — только сигнал: Changed/Created/Deleted/Renamed/Error о�
 
 ## Проверки
 
-Development checkpoint: 12 целевых component tests PASS, включая strict format detection, пустую версию, missing file, same-length/mtime conflict, повторный конфликт, immutable rapid saves, pre/post-commit loss/recovery, offline restore, changed identity, deduplication и 10 МиБ. Это тесты transport bridge с controlled executor; они не доказывают ввод в настоящем Блокноте. Итоговые SFTP/Notepad/CI/release доказательства фиксируются отдельно с точными версиями и границами.
+Development checkpoint: 15 целевых component tests PASS, включая strict format detection, пустую версию, missing file, same-length/mtime conflict, повторный конфликт, immutable rapid saves, pre/post-commit loss/recovery, offline restore, changed identity, deduplication и 10 МиБ. Это тесты transport bridge с controlled executor; они не доказывают ввод в настоящем Блокноте. Реальные SFTP/SFTP-only, установленный Notepad и текущий CI описаны в [CI_BETA5](CI_BETA5.md) с точными версиями и границами. Computer Use был повторно разрешён 04.11.2026, а затем отозван; после отзыва host UI не используется.
 
 Источники: [FileSystemWatcher](https://learn.microsoft.com/en-us/dotnet/api/system.io.filesystemwatcher?view=net-10.0), [вкладки/восстановление Блокнота](https://blogs.windows.com/windows-insider/2023/08/31/new-updates-for-snipping-tool-and-notepad-for-windows-insiders/), [OpenSSH SFTP extensions](https://github.com/openssh/openssh-portable/blob/master/PROTOCOL).
+
+Прогресс отправки относится к байтам зафиксированного snapshot; отмена доступна в дополнительных командах документа во время операции. Формат/поколение/подтверждённый hash относятся к соответствующим сохранённым версиям, а не к несохранённому буферу редактора.

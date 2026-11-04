@@ -36,3 +36,8 @@
 Clipboard sequence guard не даёт ожиданию загрузки перезаписать новый буфер пользователя. Внутренний remote-file payload — непрозрачный 32-байтный token в bounded registry со слабыми ссылками; CLR-объекты не сериализуются в OLE. Токены закрытой сессии удаляются.
 
 SftpProtocolAdapter закреплён на SSH.NET 2026.0.0, проверяет internal signatures и fail-closed предоставляет exact LSTAT/READLINK/SYMLINK/POSIX rename. Причина и реальные проверки — docs/CORE_LIMITATIONS.md.
+
+
+## Документы внешнего редактора (beta.5)
+
+`RemoteEditWorkspace/RemoteEditSession` в Core хранят exact server+host-key+path identity, working copy, immutable snapshot и atomic operation journal. Watcher лишь планирует стабильное чтение, per-document gate сериализует версии. `IRemoteDocumentTransport` изолирует проверяемое сохранение; SFTP adapter использует bounded auxiliary leases и exact paths, content hash до/после, metadata и POSIX rename. App слой запускает установленный editor EXE с отдельным path argument, показывает `RemoteDocumentsWindow`, обрабатывает lifecycle и выбор конфликтов; editor process никогда не принадлежит client lifetime. После закрытия main server session скрытого подключения нет. [Контракт и ограничения](docs/REMOTE_EDIT.md).

@@ -57,3 +57,8 @@ dotnet run --project tests/SSHExplorer.Core.Smoke -c Release -- .tools/vm/integr
 ```
 
 `tests/fixtures/provision-modes.py` является только инструментом разработки. Он подготавливает disposable VM через root serial; режим `--relay` создаёт временный локальный TCP-мост к двум дополнительным тестовым SSH-портам. В клиенте SSH Explorer ни этот скрипт, ни Python, ни relay не используются. После проверок дополнительные listeners и relay helpers остановлены; основная VM и SSH-порт 22222 оставлены для других испытаний.
+
+
+## Документное сохранение beta.5
+
+Новый `SftpDocumentTransport` отделён от обычного Transfer CommitRemote: дважды сверяет server content hash, пишет own exclusive sibling, проверяет mode/uid/gid и перечитывает destination после POSIX rename. Для unsupported rename нет скрытого delete/backup fallback. Это всё ещё не SFTP hash CAS: остаётся окно внешнего writer, Flush не доказывает fsync, ACL/xattr/hardlinks не сохраняются. Перед открытием показаны условия; при конфликте/неизвестном результате локальный snapshot остаётся. Обрыв может помешать cleanup собственного temporary; клиент не удаляет неизвестное назначение и не делает слепой rollback. [Полные границы и восстановление](REMOTE_EDIT.md).
