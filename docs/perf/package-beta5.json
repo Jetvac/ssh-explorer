@@ -1,0 +1,121 @@
+{
+  "directory": "SSHExplorer-0.2.0-beta.5-win-x64",
+  "unpackedBytes": 866053547,
+  "files": 863,
+  "exeBytes": 162816,
+  "zipBytes": 392175022,
+  "categories": [
+    {
+      "category": "WebView2 Fixed Runtime",
+      "files": 257,
+      "bytes": 706209931
+    },
+    {
+      "category": ".NET runtime (Microsoft.NETCore.App)",
+      "files": 185,
+      "bytes": 80337880
+    },
+    {
+      "category": ".NET WindowsDesktop (WPF) runtime",
+      "files": 53,
+      "bytes": 57096432
+    },
+    {
+      "category": "WPF/WinForms satellite resources",
+      "files": 156,
+      "bytes": 8688328
+    },
+    {
+      "category": "Third-party libraries",
+      "files": 13,
+      "bytes": 7908782
+    },
+    {
+      "category": "Documentation",
+      "files": 162,
+      "bytes": 3388936
+    },
+    {
+      "category": "SSH Explorer (own code)",
+      "files": 9,
+      "bytes": 1364900
+    },
+    {
+      "category": "Terminal assets (xterm.js)",
+      "files": 7,
+      "bytes": 580074
+    },
+    {
+      "category": "Licenses and notices",
+      "files": 19,
+      "bytes": 387333
+    },
+    {
+      "category": "Package metadata",
+      "files": 2,
+      "bytes": 90951
+    }
+  ],
+  "largest": [
+    {
+      "path": "WebView2Runtime/msedge.dll",
+      "bytes": 355200328
+    },
+    {
+      "path": "WebView2Runtime/resources.pak",
+      "bytes": 34472217
+    },
+    {
+      "path": "WebView2Runtime/WidevineCdm/_platform_specific/win_x64/widevinecdm.dll",
+      "bytes": 22716072
+    },
+    {
+      "path": "WebView2Runtime/dxcompiler.dll",
+      "bytes": 20537160
+    },
+    {
+      "path": "WebView2Runtime/mspdf.dll",
+      "bytes": 18856264
+    },
+    {
+      "path": "System.Private.CoreLib.dll",
+      "bytes": 16033616
+    },
+    {
+      "path": "PresentationFramework.dll",
+      "bytes": 15824680
+    },
+    {
+      "path": "WebView2Runtime/icudtl.dat",
+      "bytes": 12409424
+    },
+    {
+      "path": "WebView2Runtime/onnxruntime.dll",
+      "bytes": 11282760
+    },
+    {
+      "path": "WebView2Runtime/EBWebView/x64/EmbeddedBrowserWebView.dll",
+      "bytes": 9078600
+    },
+    {
+      "path": "WebView2Runtime/mip_core_gn.dll",
+      "bytes": 8606536
+    },
+    {
+      "path": "PresentationCore.dll",
+      "bytes": 8324904
+    },
+    {
+      "path": "System.Private.Xml.dll",
+      "bytes": 7788328
+    },
+    {
+      "path": "WebView2Runtime/oneauth.dll",
+      "bytes": 6596936
+    },
+    {
+      "path": "WebView2Runtime/EBWebView/x86/EmbeddedBrowserWebView.dll",
+      "bytes": 5779272
+    }
+  ]
+}

@@ -23,6 +23,8 @@ if (args.Length == 2 && args[0] == "--files-inline-integration")
 }
 if (args.Length == 2 && args[0] == "--collector-encoding-check")
     return await CollectorEncodingChecks.RunAsync(args[1]);
+if (args.Length is 2 or 3 && args[0] == "--collector-benchmark")
+    return await CollectorBenchmark.RunAsync(args[1], args.Length == 3 ? args[2] : null);
 if (args.Length is 2 or 3 && args[0] == "--monitor-benchmark")
     return await MonitorBenchmark.RunAsync(args[1],args.Length==3?args[2]:null);
 if (args.Length == 2 && args[0] == "--linux-capabilities")

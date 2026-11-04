@@ -149,6 +149,11 @@ internal sealed class RemoteDocumentsWindow : Window
         list.SetResourceReference(StyleProperty, "HomeTableStyle"); list.SelectionMode = DataGridSelectionMode.Single;
         MainWindow.AddColumn(list, "Сервер", "Record.ServerName", 170); MainWindow.AddColumn(list, "Удалённый путь", "Record.Location.Path", 330); MainWindow.AddColumn(list, "Состояние", "StatusText", 150);
         list.Columns[1].Width = new DataGridLength(1, DataGridLengthUnitType.Star); list.Columns[1].MinWidth = 240; list.Columns[2].Width = 190;
+        MainWindow.AddColumn(list, "Изменено", "Record.UpdatedUtc", 150, "{0:dd.MM.yyyy HH:mm}"); ((DataGridTextColumn)list.Columns[3]).Binding = new System.Windows.Data.Binding("Record.UpdatedUtc") { Converter = new LocalTimeConverter(), StringFormat = "{0:dd.MM.yyyy HH:mm}" };
+        TableSorting.Attach(list, "documents", [
+            new("Record.ServerName", d => ((RemoteEditSession)d).Record.ServerName, true), new("Record.Location.Path", d => ((RemoteEditSession)d).Record.Location.Path, true),
+            new("StatusText", d => (int)((RemoteEditSession)d).Record.State), new("Record.UpdatedUtc", d => ((RemoteEditSession)d).Record.UpdatedUtc)],
+            "Record.UpdatedUtc", System.ComponentModel.ListSortDirection.Descending, new("Record.Location.Path", d => ((RemoteEditSession)d).Record.Location.Path, true));
         list.SelectionChanged += (_, _) => RefreshDetails(); root.Children.Add(list); Content = root;
         workspace.Changed += WorkspaceChanged; Closed += (_, _) => workspace.Changed -= WorkspaceChanged; Refresh();
     }
@@ -199,4 +204,11 @@ internal sealed class RemoteDocumentsWindow : Window
         var pause = Ui.AsyncMenu("Приостановить / отменить отправку", async () => await d!.DetachAsync()); pause.IsEnabled = d is not null; menu.Items.Add(pause);
         return menu;
     }
+}
+
+/// <summary>Shows stored UTC document times in local time.</summary>
+public sealed class LocalTimeConverter : System.Windows.Data.IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) => value is DateTime utc ? DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime() : value;
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) => throw new NotSupportedException();
 }

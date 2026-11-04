@@ -132,7 +132,7 @@ internal static class FileInteractionTests
             Complete(InvokeTask(files,"TogglePin",files.CurrentPath));var pinnedMenu=(ContextMenu)Result(files,"BuildContextMenu",true)!;
             Assert(pinnedMenu.Items.OfType<MenuItem>().Any(item=>Equals(item.Header,"Открепить папку"))&&!pinnedMenu.Items.OfType<MenuItem>().Any(item=>Equals(item.Header,"Закрепить / открепить папку")),"current folder pin action is rebuilt as explicit Unpin after pinning");Complete(InvokeTask(files,"TogglePin",files.CurrentPath));
             var viewMenu=(ContextMenu)Result(files,"BuildViewMenu")!;var modes=viewMenu.Items.OfType<MenuItem>().Take(8).ToArray();
-            Assert(modes.Length==8&&modes.Select(item=>(item.Icon as TextBlock)?.Text).Distinct(StringComparer.Ordinal).Count()==8&&modes.Count(item=>item.IsChecked)==1,"all eight file view modes expose distinct glyphs and one current mode");
+            Assert(modes.Length==8&&modes.Select(item=>(item.Icon as VectorIcon)?.Key).Where(key=>key is not null).Distinct(StringComparer.Ordinal).Count()==8&&modes.Count(item=>item.IsChecked)==1,"all eight file view modes expose distinct glyphs and one current mode");
             var commandBar=Descendants<ResponsiveCommandBar>(files.CommandBar).Single();commandBar.Width=190;Layout(main);var overflow=commandBar.CreateOverflowMenu();
             var hiddenRename=overflow.Items.OfType<MenuItem>().Single(item=>Equals(item.Header,"Переименовать"));
             Assert(commandBar.OverflowCommandKeys.Contains("Rename")&&hiddenRename.IsEnabled&&commandBar.VisibleCommandKeys.Contains("Create"),"constrained single-row toolbar keeps high-priority creation and exposes enabled rename in overflow");

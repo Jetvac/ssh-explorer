@@ -1,0 +1,47 @@
+{
+  "host": "vm",
+  "processorCount": 2,
+  "processes": 369,
+  "beta5": {
+    "MedianMilliseconds": 3305.7,
+    "MinMilliseconds": 3210.8,
+    "Forks": 5594,
+    "Bytes": 1052162,
+    "Runs": 5
+  },
+  "protocol2FirstSample": {
+    "MedianMilliseconds": 122,
+    "MinMilliseconds": 122,
+    "Forks": 42,
+    "Bytes": 299993,
+    "Runs": 1
+  },
+  "protocol2CommandLineWarmup": {
+    "MedianMilliseconds": 999.4,
+    "MinMilliseconds": 999.4,
+    "Forks": 1145,
+    "Bytes": 315205,
+    "Runs": 1
+  },
+  "protocol2Processes": {
+    "MedianMilliseconds": 107.8,
+    "MinMilliseconds": 96.8,
+    "Forks": 38,
+    "Bytes": 296337,
+    "Runs": 5
+  },
+  "protocol2SystemOnly": {
+    "MedianMilliseconds": 22.1,
+    "MinMilliseconds": 21.8,
+    "Forks": 35,
+    "Bytes": 7458,
+    "Runs": 5
+  },
+  "serverInfo": {
+    "MedianMilliseconds": 30.9,
+    "MinMilliseconds": 30.2,
+    "Forks": 49,
+    "Bytes": 8200,
+    "Runs": 3
+  }
+}
