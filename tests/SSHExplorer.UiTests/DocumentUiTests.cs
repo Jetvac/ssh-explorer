@@ -33,7 +33,7 @@ internal static class DocumentUiTests
             using var files = new FileBrowserView(session, main); var model = (FileBrowserViewModel)files.DataContext;
             model.CommitNavigation(model.BeginNavigation(), "/srv/fixture", CompositionFixtures.Files(), true, [], 0); model.ApplyFilter(true, true); Invoke(files, "ApplyItems"); Invoke(files, "UpdateBreadcrumbs");
             var tree = (TreeView)Field(files, "tree"); tree.Items.Clear(); var node = (TreeViewItem)Invoke(files, "Node", "fixture", "/srv/fixture")!; node.Items.Clear(); Ui.SetIsCurrentFolder(node, true); tree.Items.Add(node);
-            using var monitor = new MonitorView(new MonitorViewModel(() => CompositionFixtures.Timestamp)); var view = new SessionView(session, main, files, monitor); view.SetActive(false);
+            using var monitor = new MonitorView(new MonitorViewModel(() => CompositionFixtures.Timestamp)); var view = new SessionView(session, main, files, monitor); ((SessionViewModel)Field(view, "viewModel")).StatusText = "Данные стенда · без подключения"; view.SetActive(false);
             Invoke(main, "AddSessionTab", profile, session, view); main.Show(); view.SetActive(false); view.ShowSection("files"); Layout(main);
             var tabs = (TabControl)Field(main, "tabs"); var panel = Descendants<SessionHeaderPanel>(main).Single(); var scroll = (ScrollViewer)panel.Children[1]; var plus = (Button)panel.Children[3];
             evidence.Capture((FrameworkElement)main.Content, "files-two-tabs", new { theme = "Light", fixtureOnly = true, tabs = 2, nativeShellIcons = true });
@@ -51,7 +51,16 @@ internal static class DocumentUiTests
                 evidence.Capture((FrameworkElement)main.Content, "files-native-" + mode.ToLowerInvariant(), new { theme = "Light", fixtureOnly = true, mode, nativeShellIcons = true, shellKinds = SystemFileIconProvider.CachedKinds });
             }
             Check(true, "all eight actual file views render native Shell resources and the command glyph follows the active representation");
+            app.Resources["UIFontSize"] = 22d; Invoke(files, "SetMode", "Medium", false); Layout(main);
+            var enlargedTiles = Descendants<ListBoxItem>(files).Where(i => i.IsVisible).ToArray();
+            foreach (var item in enlargedTiles.Take(12)) foreach (var presenter in Descendants<FileNamePresenter>(item)) { var top = presenter.TranslatePoint(new Point(), item).Y; if (top + presenter.ActualHeight > item.ActualHeight + 1) throw new Exception("Enlarged file-name surface exceeds its tile bounds."); }
+            evidence.Capture((FrameworkElement)main.Content, "files-native-large-text", new { theme = "Light", fixtureOnly = true, nativeShellIcons = true, applicationFontSize = 22, osDpiChanged = false });
+            Check(enlargedTiles.Length > 0, "enlarged application text keeps full file-name surfaces inside the measured virtualized tiles"); app.Resources["UIFontSize"] = 14d;
             Invoke(files, "SetMode", "Details", false); main.Width = 760; Layout(main); evidence.Capture((FrameworkElement)main.Content, "files-native-narrow", new { theme = "Light", fixtureOnly = true, nativeShellIcons = true }); main.Width = 1100; Layout(main);
+            table.SelectedItem = model.VisibleEntries.Single(r => r.Name == "Фото_пример.png"); var imageMenu = (ContextMenu)Invoke(files, "BuildContextMenu", true)!;
+            bool imageEdit = imageMenu.Items.OfType<MenuItem>().Single(i => i.Header?.ToString() == "Редактировать в Блокноте").IsEnabled;
+            table.SelectedItem = model.VisibleEntries.Single(r => r.Name == "script.sh"); var scriptMenu = (ContextMenu)Invoke(files, "BuildContextMenu", true)!;
+            Check(!imageEdit && scriptMenu.Items.OfType<MenuItem>().Single(i => i.Header?.ToString() == "Редактировать в Блокноте").IsEnabled && scriptMenu.Items.OfType<MenuItem>().Any(i => i.Header?.ToString() == "Просмотр"), "the actual editor menu distinguishes text editing from image preview and retains a separate read-only view command");
             var workspace = new RemoteEditWorkspace(store.DirectoryPath); typeof(MainWindow).GetField("editWorkspace", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(main, workspace);
             var transport = new FixtureTransport(profile.Id, session.Id); var document = workspace.OpenAsync(transport, "/srv/fixture/service.sh", "Linux · document fixture", false).GetAwaiter().GetResult();
             int launches = 0; string? launched = null;
@@ -80,7 +89,8 @@ internal static class DocumentUiTests
             document.ResumeAsync(transport, true).GetAwaiter().GetResult(); document.DetachAsync().GetAwaiter().GetResult(); Pump(); Capture("documents-paused");
             Check(document.Record.State == RemoteEditState.Paused && File.Exists(document.WorkingPath), "pausing keeps the working copy and exposes a recoverable state without closing an editor");
             window.Width = 740; window.Height = 440; app.Resources["UIFontSize"] = 22d; Layout(window); Capture("documents-large-text");
-            var footer = (TextBlock)Field(window, "detail"); Check(footer.ActualHeight + 1 >= footer.DesiredSize.Height && footer.ActualWidth > 400, "narrow document status wraps its full selected path and reason within measured bounds at enlarged application text");
+            var footer = (TextBlock)Field(window, "detail"); var detailsScroll = (ScrollViewer)Field(window, "detailScroller"); var documentTable = (DataGrid)Field(window, "list"); var headers = Descendants<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter>(documentTable).Single(); var firstDocumentRow = Descendants<DataGridRow>(documentTable).First();
+            Check(detailsScroll.ViewportHeight >= 60 && detailsScroll.ExtentHeight + 1 >= footer.DesiredSize.Height && documentTable.ActualHeight >= headers.ActualHeight + firstDocumentRow.ActualHeight - 1, "narrow enlarged-text document layout retains a complete row and a scrollable full path/reason instead of clipping either surface");
             app.Resources["UIFontSize"] = 14d; window.Width = 980; window.Height = 540; Theme.Apply("Dark"); Layout(window); Capture("documents-dark"); Theme.Apply("Light");
             Check(!Path.GetFullPath(workspace.Root).StartsWith(Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase), "working documents and operation journals stay outside every published visual-artifact directory");
             window.Close(); bool closed = false; main.Closed += (_, _) => closed = true; main.Close(); WaitFor(() => closed); app.Shutdown();

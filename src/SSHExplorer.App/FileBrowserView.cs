@@ -335,7 +335,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (mode != "Details")
         {
             var width = mode switch { "Huge" => 180d, "Large" => 144d, "Medium" => 112d, "Small" => 180d, "List" => 250d, "Tile" => 310d, _ => 800d };
-            var height = mode switch { "Huge" => 192d, "Large" => 156d, "Medium" => 126d, "Small" => 38d, "List" => 30d, "Tile" => 82d, _ => 92d };
+            var height = TileHeight(mode);
             var factory = new FrameworkElementFactory(mode is "List" or "Content" ? typeof(VirtualizingStackPanel) : typeof(VirtualizingWrapPanel)); if (mode is not "List" and not "Content") { factory.SetValue(VirtualizingWrapPanel.ItemWidthProperty, width); factory.SetValue(VirtualizingWrapPanel.ItemHeightProperty, height); } tiles.ItemsPanel = new ItemsPanelTemplate(factory);
             tiles.ItemTemplate = TileTemplate(mode); tiles.ItemContainerStyle = CreateFileItemContainerStyle(mode);
         }
@@ -344,7 +344,19 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     static Style CreateFileItemContainerStyle(string view)
     {
         var style = new Style(typeof(ListBoxItem), (Style)Application.Current.FindResource(typeof(ListBoxItem))) { Setters = { new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch), new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Stretch), new Setter(FrameworkElement.MarginProperty, new Thickness(3)), new Setter(Control.PaddingProperty, new Thickness(5)), new Setter(OpacityProperty, new Binding(nameof(FileItemViewModel.Opacity))) } };
-        if (view is "List" or "Content") style.Setters.Add(new Setter(HeightProperty, view == "List" ? 32d : 92d)); return style;
+        if (view is "List" or "Content") style.Setters.Add(new Setter(MinHeightProperty, view == "List" ? 32d : 92d)); return style;
+    }
+    double TileHeight(string view)
+    {
+        double font = Math.Max(14, TryFindResource("UIFontSize") is double value ? value : FontSize);
+        double baseline = view switch { "Huge" => 192, "Large" => 156, "Medium" => 126, "Small" => 38, "Tile" => 82, _ => 92 };
+        if (view is "Huge" or "Large" or "Medium") return Math.Max(baseline, (view == "Huge" ? 120 : view == "Large" ? 88 : 56) + 29 + font * 2.7);
+        return Math.Max(baseline, font * 1.35 + 16 + (view == "Tile" ? 28 : 0));
+    }
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.Property == FontSizeProperty && viewModel is not null && tiles is not null && mode != "Details" && FindVisualChild<VirtualizingWrapPanel>(tiles) is { } wrap) wrap.ItemHeight = TileHeight(mode);
     }
     DataTemplate TileTemplate(string view)
     {
@@ -405,7 +417,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         {
             var open = Ui.AsyncMenu("Открыть", Open, "Enter", Ui.FolderGlyph); open.IsEnabled = chosen.Count == 1 && (first.IsDirectory || first.IsSymbolicLink || first.IsRegularFile); open.ToolTip = open.IsEnabled ? "Открыть папку или встроенный просмотр" : "Специальные Linux-объекты не открываются как документы"; m.Items.Add(open);
             var newTab = Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, first.FullPath), glyph: Ui.NewTabGlyph); newTab.IsEnabled = chosen.Count == 1 && first.IsDirectory && !first.IsSymbolicLink; newTab.ToolTip = newTab.IsEnabled ? "Открыть каталог в независимой сессии" : "Доступно для одного обычного каталога"; m.Items.Add(newTab);
-            var editText = Ui.AsyncMenu("Редактировать в Блокноте", Open, glyph: "\uE70F"); editText.IsEnabled = chosen.Count == 1 && (first.IsRegularFile || first.IsSymbolicLink); m.Items.Add(editText);
+            var editText = Ui.AsyncMenu("Редактировать в Блокноте", EditSelectedText, glyph: "\uE70F"); editText.IsEnabled = chosen.Count == 1 && (first.IsSymbolicLink || first.IsRegularFile && DocumentText.CandidateName(first.Name)); m.Items.Add(editText);
             var previewText = Ui.AsyncMenu("Просмотр", () => OpenFileContent(true), glyph: Ui.SearchGlyph); previewText.IsEnabled = chosen.Count == 1 && (first.IsRegularFile || first.IsSymbolicLink); m.Items.Add(previewText);
             m.Items.Add(Ui.AsyncMenu(first.IsDirectory ? "Открыть в терминале" : "Открыть родительскую папку в терминале", () => OpenTerminal(first.IsDirectory && !first.IsSymbolicLink ? first.FullPath : PosixPath.Parent(first.FullPath)), glyph: Ui.TerminalGlyph));
             var strip = new FileContextCommandStrip();
@@ -436,6 +448,17 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     {
         await OpenFileContent(false);
     }
+    async Task EditSelectedText()
+    {
+        var chosen = Selected(); if (chosen.Count != 1) return; var entry = chosen[0].Entry;
+        if (entry.IsSymbolicLink)
+        {
+            if (!Ui.Confirm($"Редактировать согласованную цель ссылки «{entry.Name}»?\n\nСама ссылка останется ссылкой.")) return;
+            var target = await session.Files.FollowLinkAsync(entry.FullPath, lifetime.Token);
+            if (!target.IsRegularFile || !DocumentText.CandidateName(target.Name)) throw new IOException("Цель ссылки не является обычным текстовым документом.");
+        }
+        await main.EditRemoteTextAsync(session, entry, entry.IsSymbolicLink);
+    }
     async Task OpenFileContent(bool previewOnly)
     {
         if (!viewModel.HasSelection) return;
@@ -445,8 +468,8 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (entry.IsDirectory) { await NavigateAsync(entry.FullPath); return; }
         if (IsImage(entry)) { await ShowImage(entry); return; }
         if (!entry.IsRegularFile) throw new InvalidOperationException("Сокеты, устройства и FIFO нельзя открывать как обычные файлы.");
-        if (!previewOnly) { await main.EditRemoteTextAsync(session, row.Entry, row.Entry.IsSymbolicLink); return; }
-        if (entry.Length <= 256 * 1024)
+        if (!previewOnly && DocumentText.CandidateName(entry.Name)) { await main.EditRemoteTextAsync(session, row.Entry, row.Entry.IsSymbolicLink); return; }
+        if (previewOnly && entry.Length <= 256 * 1024)
         {
             var data = await session.Files.ReadBytesAsync(entry.FullPath, 256 * 1024, lifetime.Token);
             string? encoding = null; string text; try { text = DocumentText.Decode(data).Text; } catch (IOException) { encoding = MainWindow.ChooseDocumentEncoding(); if (encoding is null) return; text = DocumentText.Decode(data, encoding).Text; }

@@ -16,6 +16,7 @@ public sealed class FileNamePresenter : Grid
         var presenter = (FileNamePresenter)d;
         presenter.label.TextWrapping = (bool)e.NewValue ? TextWrapping.Wrap : TextWrapping.NoWrap;
         presenter.label.TextAlignment = (bool)e.NewValue ? TextAlignment.Center : TextAlignment.Left;
+        presenter.UpdateWrapping();
     }));
     public bool WrapName { get => (bool)GetValue(WrapNameProperty); set => SetValue(WrapNameProperty, value); }
     readonly TextBlock label = new() { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
@@ -28,6 +29,7 @@ public sealed class FileNamePresenter : Grid
         label.SetBinding(TextBlock.TextProperty, new Binding(nameof(FileItemViewModel.DisplayName)));
         label.SetBinding(ToolTipProperty, new Binding(nameof(FileItemViewModel.Name)));
         label.SetBinding(System.Windows.Automation.AutomationProperties.NameProperty, new Binding(nameof(FileItemViewModel.Name)));
+        label.SizeChanged += (_, _) => UpdateWrapping();
         Children.Add(label); Children.Add(editor);
         editor.TextChanged += (_, _) => { if (edit is not null && !edit.IsBusy && editor.Text != edit.Text) edit.Text = editor.Text; };
         editor.PreviewKeyDown += async (_, e) =>
@@ -39,6 +41,12 @@ public sealed class FileNamePresenter : Grid
         };
         DataContextChanged += (_, _) => Attach(); Loaded += (_, _) => Attach();
         Unloaded += (_, _) => Detach();
+    }
+    void UpdateWrapping()
+    {
+        label.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+        label.LineHeight = WrapName ? label.FontSize * 1.35 : double.NaN;
+        label.MaxHeight = WrapName ? label.FontSize * 2.7 : double.PositiveInfinity;
     }
     FileBrowserView? ParentBrowser()
     {

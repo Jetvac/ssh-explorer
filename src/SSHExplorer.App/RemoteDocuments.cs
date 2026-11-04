@@ -122,6 +122,7 @@ internal sealed class RemoteDocumentsWindow : Window
     readonly RemoteEditWorkspace workspace;
     readonly DataGrid list = new();
     readonly TextBlock detail = Ui.Text("");
+    readonly ScrollViewer detailScroller = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     readonly Dictionary<string, Button> commands = [];
     readonly Func<RemoteEditSession, IRemoteDocumentTransport> resolve;
     readonly Func<RemoteEditSession, Task> openEditor;
@@ -130,7 +131,7 @@ internal sealed class RemoteDocumentsWindow : Window
     {
         this.main = main; this.workspace = workspace; this.resolve = resolve ?? main.DocumentTransport; this.openEditor = openEditor ?? main.OpenDocumentEditorAsync; Title = "Редактируемые документы"; Width = 980; Height = 540; MinWidth = 700; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Style = (Style)Application.Current.FindResource(typeof(Window));
-        var root = new DockPanel(); var heading = Ui.Text("Редактируемые документы", 20, true); heading.Margin = new Thickness(20, 16, 20, 10); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
+        var root = new DockPanel(); root.SetResourceReference(Panel.BackgroundProperty, "Surface"); var heading = Ui.Text("Редактируемые документы", 20, true); heading.Margin = new Thickness(20, 16, 20, 10); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
         var bar = new ResponsiveCommandBar(More) { Margin = new Thickness(12, 0, 12, 8) };
         Add("open", "\uE70F", "Открыть редактор", () => this.openEditor(Require()), 90);
         Add("check", Ui.RefreshGlyph, "Проверить изменения", () => Require().CheckAsync(), 80);
@@ -141,7 +142,9 @@ internal sealed class RemoteDocumentsWindow : Window
         void Add(string key, string glyph, string title, Func<Task> action, int priority) { var b = Ui.AsyncCommandButton(glyph, title, action); commands[key] = b; bar.Add(key, b, () => Ui.AsyncMenu(title, action, glyph: glyph), priority); }
         DockPanel.SetDock(bar, Dock.Top); root.Children.Add(bar);
         var notice = Ui.Text("Ctrl+S в редакторе → обнаружение сохранённой копии → SFTP → подтверждённый хеш. Несохранённый буфер и внешнее «Сохранить как» автоматически не отправляются.", 12); notice.TextWrapping = TextWrapping.Wrap; notice.Margin = new Thickness(20, 0, 20, 8); DockPanel.SetDock(notice, Dock.Top); root.Children.Add(notice);
-        var footer = new Border { Child = detail, Padding = new Thickness(18, 12, 18, 12), MinHeight = 96 }; footer.SetResourceReference(StyleProperty, "StatusBarStyle"); detail.TextWrapping = TextWrapping.Wrap; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
+        detailScroller.Content = detail;
+        var footer = new Border { Child = detailScroller, Padding = new Thickness(18, 12, 18, 12), MinHeight = 90, MaxHeight = 172 }; footer.SetResourceReference(StyleProperty, "StatusBarStyle"); detail.TextWrapping = TextWrapping.Wrap; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
+        SizeChanged += (_, _) => footer.MaxHeight = Math.Clamp(ActualHeight * .32, 100, 180);
         list.SetResourceReference(StyleProperty, "HomeTableStyle"); list.SelectionMode = DataGridSelectionMode.Single;
         MainWindow.AddColumn(list, "Сервер", "Record.ServerName", 170); MainWindow.AddColumn(list, "Удалённый путь", "Record.Location.Path", 330); MainWindow.AddColumn(list, "Состояние", "StatusText", 150);
         list.Columns[1].Width = new DataGridLength(1, DataGridLengthUnitType.Star); list.Columns[1].MinWidth = 240; list.Columns[2].Width = 190;

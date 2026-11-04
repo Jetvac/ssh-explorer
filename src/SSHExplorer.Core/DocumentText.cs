@@ -13,6 +13,7 @@ public static class DocumentText
 {
     public const int MaximumBytes = 32 * 1024 * 1024;
     public static readonly string[] Extensions = [".txt", ".log", ".conf", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml", ".md", ".sh", ".service", ".env", ".csv", ".py", ".js", ".cs", ".bat", ".ps1"];
+    public static bool CandidateName(string name) => !new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".pdf", ".zip", ".7z", ".rar", ".gz", ".bz2", ".xz", ".mp3", ".mp4", ".mkv", ".wav", ".flac", ".exe", ".dll", ".so", ".woff", ".ttf" }.Contains(Path.GetExtension(name), StringComparer.OrdinalIgnoreCase);
     static DocumentText() => System.Text.Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
     public static (string Text, DocumentTextFormat Format) InspectSaved(byte[] bytes, string? originalEncoding)
     {
