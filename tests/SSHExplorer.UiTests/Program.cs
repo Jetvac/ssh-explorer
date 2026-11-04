@@ -8,6 +8,7 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--shell-icons-only") return ShellIconTests.Run();
         if (args.Length == 1 && args[0] == "--resources-only") return ThemeResourceTests.Run();
         if (args.Length == 1 && args[0] == "--motion-only") return MotionTests.Run();
         if (args.Length == 1 && args[0] == "--connection-only") return ConnectionTests.Run();

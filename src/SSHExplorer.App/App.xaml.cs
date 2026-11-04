@@ -38,7 +38,7 @@ public partial class App : Application
             Store = new AppStore(TestSessionHarness.TryGetStoreDirectory(e.Args));
             Theme.Apply(Store.Settings.Theme);
             SystemParameters.StaticPropertyChanged += (_, _) => Dispatcher.BeginInvoke(() => Theme.Apply(Store.Settings.Theme));
-            Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) => Dispatcher.BeginInvoke(() => Theme.Apply(Store.Settings.Theme));
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) => Dispatcher.BeginInvoke(() => { SystemFileIconProvider.Invalidate(); Theme.Apply(Store.Settings.Theme); });
             Transfers.ResolveConflict = conflict => Dispatcher.InvokeAsync(() => Dialogs.Conflict(conflict)).Task;
             MainWindow = new MainWindow(); MainWindow.Show();
             await LocalDiagnostics.RecordAsync("app.started");

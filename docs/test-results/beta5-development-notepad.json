@@ -1,0 +1,19 @@
+{
+  "scope": "Development binary, real installed Windows Notepad edited through Computer Use; synthetic tool input, not physical human input. TestSessionHarness supplied isolated credentials/trust; not ordinary authentication proof.",
+  "version": "0.2.0-beta.5",
+  "baseCommit": "fa36d01258e4d98e4085f0c30faf32eda8bcdc33",
+  "dirty": true,
+  "appSha256": "786b54753d5b6c4fcbd1af40aa447c7ce67a0ecbcb5b09e58a8ce456fc8ad522",
+  "realNotepadOpened": true,
+  "actualCtrlS": true,
+  "serverBytesMatchLocal": true,
+  "expectedEditedMarker": true,
+  "remoteSha256": "052b51ba6f6dcadb3f054e6e3fd00de26c9eac8d4b1a33d2eb1ac1b3d11e8831",
+  "journalBaselineMatchesRemote": true,
+  "mode": "0o755",
+  "state": 4,
+  "workingBytes": 116,
+  "localWorkingCopyPublished": false,
+  "NotepadPrivateDatabasesOrMemoryRead": false,
+  "EditorRemainedOpenAfterClientClosed": true
+}

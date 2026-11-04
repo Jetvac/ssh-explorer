@@ -14,6 +14,12 @@ public static class DocumentText
     public const int MaximumBytes = 32 * 1024 * 1024;
     public static readonly string[] Extensions = [".txt", ".log", ".conf", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml", ".md", ".sh", ".service", ".env", ".csv", ".py", ".js", ".cs", ".bat", ".ps1"];
     static DocumentText() => System.Text.Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    public static (string Text, DocumentTextFormat Format) InspectSaved(byte[] bytes, string? originalEncoding)
+    {
+        if (originalEncoding is not null && !originalEncoding.StartsWith("utf", StringComparison.OrdinalIgnoreCase) && bytes.Any(b => b >= 128))
+            try { return Decode(bytes); } catch (IOException) { }
+        return Decode(bytes, originalEncoding);
+    }
     public static (string Text, DocumentTextFormat Format) Decode(byte[] bytes, string? explicitEncoding = null)
     {
         if (bytes.Length > MaximumBytes) throw new IOException("Документ больше 32 МиБ. Скачайте его отдельно и отправьте через очередь передач.");

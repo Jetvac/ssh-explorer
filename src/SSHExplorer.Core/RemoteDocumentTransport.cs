@@ -43,7 +43,7 @@ public sealed class SftpDocumentTransport : IRemoteDocumentTransport
     {
         VerifyIdentity(); if (!Available) throw new IOException("Основная серверная сессия отключена. Возобновите документ после обычного подключения."); using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, Lifetime);
         using var lease = await session.LeaseSftpAsync(linked.Token).ConfigureAwait(false);
-        using var cancel = linked.Token.Register(lease.Dispose);
+        using var cancel = linked.Token.Register(() => ThreadPool.QueueUserWorkItem(_ => lease.Dispose()));
         return await Task.Run(() => { linked.Token.ThrowIfCancellationRequested(); VerifyIdentity(); return action(lease.Client, linked.Token); }, linked.Token).ConfigureAwait(false);
     }
     public Task<DocumentLocation> LocateAsync(string path, bool followLink, CancellationToken ct) => Run((c, t) =>

@@ -27,7 +27,7 @@ public sealed partial class MainWindow : Window
     readonly Dictionary<string, WeakReference<TabItem>> tabDragTokens = [];
     readonly Dictionary<TabItem, DispatcherTimer> tabHoverTimers = [];
     readonly HashSet<TabItem> closingTabs = [];
-    bool closing, refreshingHome, profileEditorOpen, tabRevealScheduled;
+    bool closing, refreshingHome, profileEditorOpen, tabRevealScheduled, preparingToClose;
     readonly CancellationTokenSource windowLifetime = new();
     readonly ConnectionAttemptRegistry connectionAttempts;
     readonly HashSet<Guid> requireCredentials = [];
@@ -49,16 +49,19 @@ public sealed partial class MainWindow : Window
         var root = new Grid();
         openServerButton = Ui.IconButton(Ui.AddGlyph, AddMenu, "Открыть сервер");
         allTabsButton = Ui.FlyoutButton("\uE70D", "", CreateTabListMenu, "Все вкладки (Ctrl+Shift+A)"); allTabsButton.Name = "AllTabsButton";
-        var actions = Ui.Row(allTabsButton, openServerButton, Ui.IconButton("\uE8AB", ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
+        var actions = Ui.Row(allTabsButton, Ui.IconButton("\uE70F", ShowDocuments, "Редактируемые документы"), Ui.IconButton("\uE8AB", ShowTransfers, "Очередь передач"), Ui.IconButton(Ui.SettingsGlyph, Dialogs.Settings, "Параметры"));
         actions.VerticalAlignment = VerticalAlignment.Top; actions.HorizontalAlignment = HorizontalAlignment.Right; actions.Margin = new Thickness(0, 4, 146, 0); WindowChrome.SetIsHitTestVisibleInChrome(actions, true); root.Children.Add(tabs); root.Children.Add(actions); Content = root;
         home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); SessionTabInfo.SetTitle(home, "Главная"); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
         tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); RevealSelectedTab(); RefreshHome(); };
         tabs.SizeChanged+=(_,_)=>RevealSelectedTab();
+        tabs.Loaded += (_, _) => { tabs.ApplyTemplate(); if (tabs.Template.FindName("PART_NewTab", tabs) is Button add) { openServerButton = add; add.Click += (_, _) => AddMenu(); } };
         tabs.PreviewDragOver += (_, e) => { if (DraggedTab(e.Data) is not null) { e.Effects = DragDropEffects.Move; e.Handled = true; } };
         tabs.AllowDrop = true;
         PreviewKeyDown += OnKey;
         Closing += OnClosing;
         RefreshHome();
+        Loaded += (_, _) => { if (System.IO.Directory.Exists(System.IO.Path.Combine(App.Store.DirectoryPath, "RemoteEdits")) && EditWorkspace.Documents.Any(d => d.Record.State != RemoteEditState.Completed)) ShowDocuments(); };
+        Activated += (_, _) => { if (editWorkspace is not null) _ = editWorkspace.ReconcileAsync(); };
     }
     UIElement BuildHome()
     {
@@ -299,6 +302,7 @@ public sealed partial class MainWindow : Window
         try
         {
             if (App.Transfers.HasActive(view.Session.Id) && !Ui.Confirm("В этой сессии выполняется передача. Прервать передачу и закрыть сессию?")) return;
+            if (!await PrepareDocumentsForCloseAsync(view.Session.Id)) return;
             CancelDragFeedback(); App.Transfers.CancelSession(view.Session.Id); if (tabHoverTimers.Remove(tab, out var timer)) timer.Stop(); await view.DisposeAsync();
             // Choose the right neighbour, then the left. Closing a background tab never changes the active one.
             var index=tabs.Items.IndexOf(tab); var next=ReferenceEquals(tabs.SelectedItem,tab)?tabs.Items.OfType<TabItem>().ElementAtOrDefault(index+1)??tabs.Items.OfType<TabItem>().ElementAtOrDefault(Math.Max(0,index-1)):null;
@@ -309,7 +313,11 @@ public sealed partial class MainWindow : Window
     async void OnClosing(object? sender, CancelEventArgs e)
     {
         if (closing) return; e.Cancel = true;
+        if (preparingToClose) return; preparingToClose = true;
+        try
+        {
         if (sessions.Values.Any(v => App.Transfers.HasActive(v.Session.Id)) && !Ui.Confirm("Есть активные передачи. Прервать их и выйти?")) return;
+        foreach (var view in sessions.Values.ToArray()) if (!await PrepareDocumentsForCloseAsync(view.Session.Id)) return;
         closing = true; connectionAttempts.CancelAll(); windowLifetime.Cancel();
         await LocalDiagnostics.RecordAsync("app.close.requested");
         CancelDragFeedback(); tabHoverTimers.Clear(); tabDragTokens.Clear();
@@ -320,7 +328,10 @@ public sealed partial class MainWindow : Window
         }
         try { await App.Store.SaveAsync(); }
         catch (Exception ex) { await LocalDiagnostics.RecordAsync("app.close.settings.failed", ex); Ui.Error("Не удалось сохранить последние настройки окна. " + ErrorMessages.Describe(ex)); }
-        finally { await LocalDiagnostics.RecordAsync("app.close.completed"); transferWindow?.Close(); Close(); }
+        finally { if (editWorkspace is not null) await editWorkspace.DisposeAsync(); await LocalDiagnostics.RecordAsync("app.close.completed"); documentsWindow?.Close(); transferWindow?.Close(); Close(); }
+        }
+        catch (Exception ex) { Ui.Error("Не удалось завершить отключение: " + ErrorMessages.Describe(ex)); }
+        finally { preparingToClose = false; }
     }
     void OnKey(object sender, KeyEventArgs e)
     {

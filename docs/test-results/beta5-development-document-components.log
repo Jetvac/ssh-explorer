@@ -1,0 +1,16 @@
+PASS document strict detection covers BOM UTF-16 no-BOM UTF-8 and mixed endings without rewriting bytes
+PASS document empty save is confirmed and a duplicate signal does not upload again
+PASS document disappearance preserves server bytes and last snapshot
+PASS document detects external same-length same-mtime content and rechecks a replaced approved version
+PASS document format conversion requires approval bound to the actual snapshot hash
+PASS document immutable snapshots serialize rapid writes and a later version wins
+PASS document failed upload never replaces baseline and retains snapshot
+PASS document post-commit loss recovers by hash and preserves a newer local snapshot
+PASS document detach leaves files and restored journals paused without startup upload
+PASS document cannot rebind to a changed host key or profile target
+PASS document accepts a ten-MiB long line and uploads its exact bytes
+PASS document watcher detects editor atomic rename without a manual signal and avoids duplicate upload
+PASS document cancellation during upload pauses without losing snapshot and explicit retry succeeds
+PASS document explicit legacy encoding detects UTF-8 conversion and retains the confirmed new format
+PASS workspace deduplicates the same remote target while two server identities remain independent
+RESULT: 15 document edit checks passed, 0 failed

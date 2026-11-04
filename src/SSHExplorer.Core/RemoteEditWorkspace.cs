@@ -43,6 +43,22 @@ public sealed class RemoteEditWorkspace : IAsyncDisposable
         foreach (var document in Documents.Where(d => d.Record.State != RemoteEditState.Completed))
             try { await document.ReconcileAsync(lifetime.Token).ConfigureAwait(false); } catch (OperationCanceledException) { } catch { }
     }
+    public async Task<int> ClearCompletedAsync(CancellationToken ct = default)
+    {
+        int count = 0;
+        foreach (var document in Documents.Where(d => d.Record.State == RemoteEditState.Completed))
+        {
+            ct.ThrowIfCancellationRequested(); var directory = Path.GetFullPath(document.DirectoryPath);
+            if (!directory.StartsWith(Path.GetFullPath(Root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || Path.GetFileName(directory) != document.Record.Id.ToString("N") || (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) continue;
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { document.Record.WorkingName, "document.json", "snapshot.bin", "operation.bin" };
+            var files = Directory.GetFiles(directory);
+            if (Directory.EnumerateDirectories(directory).Any() || files.Any(f => !allowed.Contains(Path.GetFileName(f)) || (File.GetAttributes(f) & FileAttributes.ReparsePoint) != 0)) continue;
+            await document.DisposeAsync().ConfigureAwait(false);
+            foreach (var file in files.OrderBy(f => Path.GetFileName(f) == document.Record.WorkingName ? 0 : Path.GetFileName(f) == "document.json" ? 2 : 1)) File.Delete(file);
+            Directory.Delete(directory, false); lock (documents) documents.Remove(document); count++;
+        }
+        OnChanged(this, EventArgs.Empty); return count;
+    }
     public async ValueTask DisposeAsync()
     {
         lifetime.Cancel(); try { await polling.ConfigureAwait(false); } catch (OperationCanceledException) { }

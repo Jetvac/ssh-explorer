@@ -23,6 +23,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     readonly ServerSession session; readonly MainWindow main;
     readonly IFileBrowserOperations operations;
     FileNameEdit? nameEdit;
+    TextBlock? viewModeGlyph;
     bool creating, addressPending;
     int addressRequest;
     readonly DockPanel root = new(); readonly DataGrid table = new(); readonly ListBox tiles = new() { SelectionMode = SelectionMode.Extended };
@@ -89,7 +90,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     TreeViewItem Node(string name, string path)
     {
-        var header = new DockPanel { LastChildFill = true }; var image = new Image { Source = FileSystemIcons.For(new RemoteEntry { IsDirectory = true }), Width = 18, Height = 18, Margin = new Thickness(0, 0, 8, 0) }; DockPanel.SetDock(image, Dock.Left); header.Children.Add(image); var label = Ui.Text(name); label.TextTrimming = TextTrimming.CharacterEllipsis; header.Children.Add(label);
+        var header = new DockPanel { LastChildFill = true }; var image = new ShellFileIcon { Entry = new RemoteEntry { IsDirectory = true }, Width = 16, Height = 16, Margin = new Thickness(0, 0, 8, 0) }; DockPanel.SetDock(image, Dock.Left); header.Children.Add(image); var label = Ui.Text(name); label.TextTrimming = TextTrimming.CharacterEllipsis; header.Children.Add(label);
         var node = new TreeViewItem { Header = header, Tag = path, ToolTip = path, AllowDrop = true }; Ui.SetTreeDepth(node, path.Split('/', StringSplitOptions.RemoveEmptyEntries).Length); Ui.SetIsCurrentFolder(node, path == CurrentPath); node.Items.Add(new TreeViewItem { Header = "Загрузка…", IsEnabled = false });
         node.Expanded += async (_, e) =>
         {
@@ -175,7 +176,9 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         Action("Upload", Ui.UploadGlyph, "Загрузить файлы…", Upload, nameof(FileBrowserViewModel.CanCreate), 10);
         Action("Download", Ui.DownloadGlyph, "Скачать…", Download, nameof(FileBrowserViewModel.HasSelection), 20);
         commands.Add("Sort", Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu), () => Submenu("Сортировать", Ui.SortGlyph, BuildSortMenu), 40);
-        commands.Add("View", Ui.FlyoutButton(Ui.ViewGlyph, "Просмотреть", BuildViewMenu), () => Submenu("Просмотреть", Ui.ViewGlyph, BuildViewMenu), 50);
+        var viewButton = Ui.FlyoutButton(CommandGlyphs.View(mode), "Просмотреть", BuildViewMenu);
+        viewModeGlyph = ((Panel)viewButton.Content).Children.OfType<TextBlock>().First();
+        commands.Add("View", viewButton, () => Submenu("Просмотреть", CommandGlyphs.View(mode), BuildViewMenu), 50);
         var border = new Border { Child = commands, DataContext = viewModel }; border.SetResourceReference(StyleProperty, "CommandBarStyle"); commandBar = border;
         var bottom = new Grid { DataContext = viewModel, Margin = new Thickness(14, 5, 14, 5), Height = 20 }; bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); bottom.ColumnDefinitions.Add(new ColumnDefinition()); status.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); bottom.Children.Add(status); statusBar = bottom;
         message.Margin = new Thickness(16, 0, 0, 0); message.TextWrapping = TextWrapping.NoWrap; message.TextTrimming = TextTrimming.CharacterEllipsis; message.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); message.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); message.SetBinding(ToolTipProperty, new Binding(nameof(FileBrowserViewModel.Message))); Grid.SetColumn(message, 1); bottom.Children.Add(message);
@@ -184,7 +187,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     {
         table.SetResourceReference(StyleProperty, "FileTableStyle");
         table.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(FileBrowserViewModel.VisibleEntries)));
-        var template = new DataTemplate(); var row = new FrameworkElementFactory(typeof(DockPanel)); row.SetValue(DockPanel.LastChildFillProperty, true); var icon = new FrameworkElementFactory(typeof(Image)); icon.SetBinding(Image.SourceProperty, new Binding(nameof(FileItemViewModel.FileIcon))); icon.SetValue(Image.WidthProperty, 20d); icon.SetValue(Image.HeightProperty, 20d); icon.SetValue(MarginProperty, new Thickness(0, 0, 8, 0)); icon.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetValue(DockPanel.DockProperty, Dock.Left); row.AppendChild(icon); var name = new FrameworkElementFactory(typeof(FileNamePresenter)); name.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left); row.AppendChild(name); template.VisualTree = row;
+        var template = new DataTemplate(); var row = new FrameworkElementFactory(typeof(DockPanel)); row.SetValue(DockPanel.LastChildFillProperty, true); var icon = new FrameworkElementFactory(typeof(ShellFileIcon)); icon.SetBinding(ShellFileIcon.EntryProperty, new Binding(nameof(FileItemViewModel.Entry))); icon.SetValue(Image.WidthProperty, CommandGlyphs.SmallFileSize); icon.SetValue(Image.HeightProperty, CommandGlyphs.SmallFileSize); icon.SetValue(MarginProperty, new Thickness(0, 0, 8, 0)); icon.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetValue(DockPanel.DockProperty, Dock.Left); row.AppendChild(icon); var name = new FrameworkElementFactory(typeof(FileNamePresenter)); name.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left); row.AppendChild(name); template.VisualTree = row;
         table.Columns.Add(new DataGridTemplateColumn { Header = "Имя", CellTemplate = template, Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 220, SortMemberPath = "Name" });
         MainWindow.AddColumn(table, "Дата изменения", "Modified", 180, "{0:dd.MM.yyyy HH:mm}"); MainWindow.AddColumn(table, "Тип", "Type", 150); MainWindow.AddColumn(table, "Размер", "Size", 104); MainWindow.AddColumn(table, "Права", "Permissions", 90); MainWindow.AddColumn(table, "Владелец", "Owner", 90); MainWindow.AddColumn(table, "Группа", "Group", 90);
         foreach (var column in table.Columns.OfType<DataGridTextColumn>().Where(c => c.SortMemberPath is "Size" or "Owner" or "Group")) column.ElementStyle = new Style(typeof(TextBlock)) { Setters = { new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right) } };
@@ -327,6 +330,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     void SetMode(string value, bool save = true)
     {
         EndLasso();
+        if (viewModeGlyph is not null) viewModeGlyph.Text = CommandGlyphs.View(value);
         var selection = Selected().Select(r => r.Entry.FullPath).ToList(); mode = value; App.Store.Settings.ViewMode = mode; content.Content = mode == "Details" ? table : tiles;
         if (mode != "Details")
         {
@@ -348,7 +352,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         var template = new DataTemplate(); var panel = new FrameworkElementFactory(horizontal ? typeof(DockPanel) : typeof(StackPanel)); if (horizontal) panel.SetValue(DockPanel.LastChildFillProperty, true);
         var iconHost = new FrameworkElementFactory(typeof(Grid)); iconHost.SetValue(FrameworkElement.WidthProperty, iconSize); iconHost.SetValue(FrameworkElement.HeightProperty, iconSize); iconHost.SetValue(FrameworkElement.MarginProperty, horizontal ? new Thickness(0, 0, 12, 0) : new Thickness(0, 5, 0, 8));
         if (horizontal) iconHost.SetValue(DockPanel.DockProperty, Dock.Left);
-        var icon = new FrameworkElementFactory(typeof(Image)); icon.SetBinding(Image.SourceProperty, new Binding(nameof(FileItemViewModel.FileIcon))); icon.SetValue(Image.StretchProperty, Stretch.Uniform); icon.SetValue(WidthProperty, iconSize); icon.SetValue(HeightProperty, iconSize); icon.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center); icon.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetBinding(VisibilityProperty, new Binding("Thumbnail") { Converter = new IconVisibilityConverter() }); iconHost.AppendChild(icon);
+        var icon = new FrameworkElementFactory(typeof(ShellFileIcon)); icon.SetBinding(ShellFileIcon.EntryProperty, new Binding(nameof(FileItemViewModel.Entry))); icon.SetValue(Image.StretchProperty, Stretch.Uniform); icon.SetValue(WidthProperty, iconSize); icon.SetValue(HeightProperty, iconSize); icon.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center); icon.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center); icon.SetBinding(VisibilityProperty, new Binding("Thumbnail") { Converter = new IconVisibilityConverter() }); iconHost.AppendChild(icon);
         var image = new FrameworkElementFactory(typeof(Image)); image.SetBinding(Image.SourceProperty, new Binding("Thumbnail")); image.SetValue(Image.StretchProperty, Stretch.Uniform); image.AddHandler(FrameworkElement.LoadedEvent, new RoutedEventHandler(async (s, _) => { if (((FrameworkElement)s).DataContext is FileItemViewModel r && IsImage(r.Entry)) await Ui.Guard(() => LoadThumbnail(r)); })); iconHost.AppendChild(image); panel.AppendChild(iconHost);
         var texts = new FrameworkElementFactory(typeof(StackPanel)); texts.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
         var name = new FrameworkElementFactory(typeof(FileNamePresenter)); name.SetValue(FileNamePresenter.WrapNameProperty, !horizontal); texts.AppendChild(name);
@@ -401,6 +405,8 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         {
             var open = Ui.AsyncMenu("Открыть", Open, "Enter", Ui.FolderGlyph); open.IsEnabled = chosen.Count == 1 && (first.IsDirectory || first.IsSymbolicLink || first.IsRegularFile); open.ToolTip = open.IsEnabled ? "Открыть папку или встроенный просмотр" : "Специальные Linux-объекты не открываются как документы"; m.Items.Add(open);
             var newTab = Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, first.FullPath), glyph: Ui.NewTabGlyph); newTab.IsEnabled = chosen.Count == 1 && first.IsDirectory && !first.IsSymbolicLink; newTab.ToolTip = newTab.IsEnabled ? "Открыть каталог в независимой сессии" : "Доступно для одного обычного каталога"; m.Items.Add(newTab);
+            var editText = Ui.AsyncMenu("Редактировать в Блокноте", Open, glyph: "\uE70F"); editText.IsEnabled = chosen.Count == 1 && (first.IsRegularFile || first.IsSymbolicLink); m.Items.Add(editText);
+            var previewText = Ui.AsyncMenu("Просмотр", () => OpenFileContent(true), glyph: Ui.SearchGlyph); previewText.IsEnabled = chosen.Count == 1 && (first.IsRegularFile || first.IsSymbolicLink); m.Items.Add(previewText);
             m.Items.Add(Ui.AsyncMenu(first.IsDirectory ? "Открыть в терминале" : "Открыть родительскую папку в терминале", () => OpenTerminal(first.IsDirectory && !first.IsSymbolicLink ? first.FullPath : PosixPath.Parent(first.FullPath)), glyph: Ui.TerminalGlyph));
             var strip = new FileContextCommandStrip();
             strip.Add(Ui.CutGlyph, "Вырезать · Ctrl+X", () => CopySelection(true), viewModel.HasSelection);
@@ -428,6 +434,10 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     async Task Open()
     {
+        await OpenFileContent(false);
+    }
+    async Task OpenFileContent(bool previewOnly)
+    {
         if (!viewModel.HasSelection) return;
         var row = Selected().FirstOrDefault(); if (row is null) return;
         var entry = row.Entry;
@@ -435,10 +445,12 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         if (entry.IsDirectory) { await NavigateAsync(entry.FullPath); return; }
         if (IsImage(entry)) { await ShowImage(entry); return; }
         if (!entry.IsRegularFile) throw new InvalidOperationException("Сокеты, устройства и FIFO нельзя открывать как обычные файлы.");
+        if (!previewOnly) { await main.EditRemoteTextAsync(session, row.Entry, row.Entry.IsSymbolicLink); return; }
         if (entry.Length <= 256 * 1024)
         {
             var data = await session.Files.ReadBytesAsync(entry.FullPath, 256 * 1024, lifetime.Token);
-            if (!data.Contains((byte)0)) { var w = new Window { Title = entry.Name + " — только просмотр", Width = 850, Height = 600, Owner = main, WindowStartupLocation = WindowStartupLocation.CenterOwner }; w.Content = new TextBox { Text = Encoding.UTF8.GetString(data), IsReadOnly = true, FontFamily = new FontFamily("Consolas"), AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; TrackWindow(w); w.Show(); return; }
+            string? encoding = null; string text; try { text = DocumentText.Decode(data).Text; } catch (IOException) { encoding = MainWindow.ChooseDocumentEncoding(); if (encoding is null) return; text = DocumentText.Decode(data, encoding).Text; }
+            var w = new Window { Title = entry.Name + " — только просмотр", Width = 850, Height = 600, Owner = main, WindowStartupLocation = WindowStartupLocation.CenterOwner }; w.Content = new TextBox { Text = text, IsReadOnly = true, FontFamily = new FontFamily("Consolas"), AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; TrackWindow(w); w.Show(); return;
         }
         if (Ui.Confirm("Для этого типа нет встроенного просмотра. Скачать выбранный файл?")) { if (entry.FullPath == row.Entry.FullPath) await Download(); else { var f = new OpenFolderDialog { Title = "Скачать цель ссылки" }; if (f.ShowDialog(main) == true) { var job = App.Transfers.Download(session, [entry.FullPath], f.FolderName); main.ShowTransfers(); await App.Transfers.WaitAsync(job, lifetime.Token); ReportTransfer(job); } } }
     }

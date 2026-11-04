@@ -12,7 +12,7 @@ public static class Dialogs
 {
     static readonly Dictionary<(Guid, int, bool, bool, string), ConflictDecision> conflictPolicies = [];
     static Window? Owner(Window? owner)=>owner??Application.Current?.MainWindow;
-    static Window Window(string title, double width = 560,Window? owner=null)
+    internal static Window Window(string title, double width = 560,Window? owner=null)
     {
         var window=new Window { Title = title, Width = width, SizeToContent = SizeToContent.Height, MaxHeight = Math.Max(320,SystemParameters.WorkArea.Height-48), ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, ShowInTaskbar = false };
         window.SetResourceReference(FrameworkElement.StyleProperty,"DialogWindowStyle");
@@ -109,8 +109,11 @@ public static class Dialogs
         var pixels = Field(p, "Лимит изображения, мегапикселей (1–100)", (s.PreviewMaxPixels / 1_000_000).ToString());
         var parallel = Field(p, "Одновременных запросов миниатюр (1–4, для новых вкладок)", s.PreviewParallelism.ToString());
         var cache = Field(p, "Кэш изображений на вкладку, МБ (16–1024)", (s.PreviewCacheBytes / 1024 / 1024).ToString());
+        var editor = Field(p, "Текстовый редактор (полный путь EXE; пусто — Блокнот Windows)", s.ExternalEditorPath);
+        p.Children.Add(Ui.Button("Выбрать установленный редактор…", () => { var pick = new Microsoft.Win32.OpenFileDialog { Filter = "Редактор Windows|*.exe", CheckFileExists = true }; if (pick.ShowDialog(w) == true) editor.Text = pick.FileName; }));
         p.Children.Add(Ui.Button("Доверенные ключи серверов…", TrustManagement));
         p.Children.Add(Ui.AsyncButton("Очистить локальные копии для Windows…", ClearTransferCache));
+        p.Children.Add(Ui.AsyncButton("Очистить завершённые документы редактора…", () => ((MainWindow)Application.Current.MainWindow).ClearCompletedDocumentsAsync()));
         var path = Ui.Text("Настройки и защищённые секреты: " + App.Store.DirectoryPath, 12); path.TextWrapping = TextWrapping.Wrap; path.Margin = new Thickness(0, 14, 0, 14); path.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(path);
         p.Children.Add(Ui.Text("F5 в файловом менеджере очищает кэш миниатюр текущей вкладки.", 12));
         var save=Ui.AsyncButton("Сохранить",async()=>
@@ -124,6 +127,8 @@ public static class Dialogs
                 else {Ui.SetValidationMessage(field,"");values.Add(value);}
             }
             if(firstError is not null){firstError.Focus();firstError.SelectAll();firstError.BringIntoView();return;}
+            if (!string.IsNullOrWhiteSpace(editor.Text) && (!System.IO.Path.IsPathFullyQualified(editor.Text) || editor.Text.StartsWith(@"\\") || !editor.Text.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !System.IO.File.Exists(editor.Text))) { Ui.SetValidationMessage(editor, "Выберите существующий локальный EXE редактора."); editor.Focus(); return; }
+            s.ExternalEditorPath = editor.Text;
             s.PollIntervalSeconds=(int)values[0];s.TerminalFontSize=(int)values[1];s.PreviewMaxBytes=values[2]*1024*1024;s.PreviewMaxPixels=values[3]*1_000_000;s.PreviewParallelism=(int)values[4];s.PreviewCacheBytes=values[5]*1024*1024;
             s.Theme=themes.SelectedIndex==1?"Light":themes.SelectedIndex==2?"Dark":"System";Theme.Apply(s.Theme);await App.Store.SaveAsync();w.DialogResult=true;
         });

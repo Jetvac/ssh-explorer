@@ -79,12 +79,15 @@ public sealed class RemoteEditSession : IAsyncDisposable
         var directory = Path.Combine(root, record.Id.ToString("N")); Directory.CreateDirectory(directory);
         var result = new RemoteEditSession(directory, record);
         await AtomicWriteAsync(result.WorkingPath, version.Bytes, ct).ConfigureAwait(false);
+        await AtomicWriteAsync(result.SnapshotPath, version.Bytes, ct).ConfigureAwait(false);
         await result.Persist(ct).ConfigureAwait(false); result.Bind(transport, true); result.Watch(); return result;
     }
     public static RemoteEditSession Restore(string directory)
     {
         if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0 || !Guid.TryParseExact(Path.GetFileName(directory), "N", out var id)) throw new IOException("Неверная папка edit session.");
-        var record = JsonSerializer.Deserialize<RemoteEditRecord>(File.ReadAllBytes(Path.Combine(directory, "document.json")), Json) ?? throw new IOException("Пустой журнал.");
+        var manifest = new FileInfo(Path.Combine(directory, "document.json"));
+        if (manifest.Length > 128 * 1024 || (manifest.Attributes & FileAttributes.ReparsePoint) != 0) throw new IOException("Недопустимый файл журнала.");
+        var record = JsonSerializer.Deserialize<RemoteEditRecord>(File.ReadAllBytes(manifest.FullName), Json) ?? throw new IOException("Пустой журнал.");
         if (record.Id != id || record.WorkingName != Path.GetFileName(record.WorkingName) || !record.WorkingName.StartsWith("document.", StringComparison.Ordinal) || record.Identity is null || record.Location is null || record.Metadata is null || record.Format is null) throw new IOException("Повреждённый журнал документа.");
         var result = new RemoteEditSession(directory, record);
         if (record.State != RemoteEditState.Completed) { record.State = record.Operation is null ? RemoteEditState.Paused : RemoteEditState.Unknown; record.Message = "Восстановленная рабочая копия. Подключитесь к исходному серверу и возобновите явно."; result.Watch(); }
@@ -148,6 +151,10 @@ public sealed class RemoteEditSession : IAsyncDisposable
         finally { gate.Release(); }
     }
     public Task ReconcileAsync(CancellationToken ct = default) => CheckAsync(autoSync, ct);
+    public async Task AttachForReviewAsync(IRemoteDocumentTransport value, CancellationToken ct = default)
+    {
+        await gate.WaitAsync(ct).ConfigureAwait(false); try { Bind(value, false); } finally { gate.Release(); }
+    }
     public async Task<RemoteDocumentVersion> ReviewServerAsync(IRemoteDocumentTransport value, CancellationToken ct = default)
     {
         await gate.WaitAsync(ct).ConfigureAwait(false);
@@ -160,7 +167,7 @@ public sealed class RemoteEditSession : IAsyncDisposable
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller, connection!.Token); var ct = linked.Token;
         var bytes = await File.ReadAllBytesAsync(SnapshotPath, ct).ConfigureAwait(false);
         if (Hash(bytes) != Record.PendingHash) throw new IOException("Не совпал хеш локального snapshot. Рабочая копия сохранена.");
-        var format = await Task.Run(() => DocumentText.Decode(bytes, Record.ExplicitEncoding).Format, ct).ConfigureAwait(false);
+        var format = await Task.Run(() => DocumentText.InspectSaved(bytes, Record.ExplicitEncoding).Format, ct).ConfigureAwait(false);
         if (Record.Format.NeedsConfirmation(format) && approvedFormatHash != Record.PendingHash)
         { Record.State = RemoteEditState.FormatConfirmation; Record.Message = $"Редактор изменил формат: {Record.Format.Description} → {format.Description}. Подтвердите отправку этой версии."; await Persist().ConfigureAwait(false); return; }
         var operation = new DocumentOperation(Guid.NewGuid(), expectedHash ?? Record.BaselineHash, Record.PendingHash, Record.Generation, false, metadata ?? Record.Metadata);
@@ -173,6 +180,7 @@ public sealed class RemoteEditSession : IAsyncDisposable
                 new Progress<long>(n => { BytesTransferred = n; Notify(); }), ct).ConfigureAwait(false);
             if (result.Hash != operation.SnapshotHash) throw new IOException("Сервер не подтвердил отправленный хеш.");
             Record.BaselineHash = result.Hash; Record.Metadata = result.Metadata; Record.Format = format; Record.PendingHash = null; Record.Operation = null; approvedFormatHash = null;
+            if (Record.ExplicitEncoding is not null) Record.ExplicitEncoding = format.Encoding;
             Record.State = RemoteEditState.Confirmed; Record.Message = "На сервере подтверждена версия " + result.Hash[..12] + "."; await Persist().ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -195,7 +203,8 @@ public sealed class RemoteEditSession : IAsyncDisposable
                 var snapshot = await File.ReadAllBytesAsync(OperationPath, ct).ConfigureAwait(false);
                 if (Hash(snapshot) != operation.SnapshotHash) throw new IOException("Повреждён сохранённый snapshot операции.");
                 if (remote.Metadata.Mode != operation.Metadata.Mode || remote.Metadata.UserId != operation.Metadata.UserId || remote.Metadata.GroupId != operation.Metadata.GroupId) throw new DocumentConflictException("Содержимое отправлено, но метаданные не соответствуют ожидаемым. Проверьте сервер.");
-                Record.BaselineHash = remote.Hash; Record.Metadata = remote.Metadata; Record.Format = DocumentText.Decode(snapshot, Record.ExplicitEncoding).Format; Record.Operation = null; Record.PendingHash = null;
+                Record.BaselineHash = remote.Hash; Record.Metadata = remote.Metadata; Record.Format = DocumentText.InspectSaved(snapshot, Record.ExplicitEncoding).Format; Record.Operation = null; Record.PendingHash = null;
+                if (Record.ExplicitEncoding is not null) Record.ExplicitEncoding = Record.Format.Encoding;
             }
             else if (remote.Hash != (Record.Operation?.PreviousHash ?? Record.BaselineHash)) { Record.State = RemoteEditState.Conflict; Record.Message = "На сервере другая версия. Выберите решение конфликта."; await Persist().ConfigureAwait(false); return; }
             else Record.Operation = null;

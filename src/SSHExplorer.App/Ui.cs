@@ -211,11 +211,13 @@ public static class Theme
     }
     public static void Apply(string mode)
     {
+        if (Current != mode) SystemFileIconProvider.Invalidate();
         Current = mode;
         bool dark = mode == "Dark" || mode == "System" && Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1) is int x && x == 0;
         var nativeTheme = SystemParameters.HighContrast ? "HC" : dark ? "Dark" : "Light";
         if (fluentTheme != nativeTheme)
         {
+            SystemFileIconProvider.Invalidate();
             var dictionaries = Application.Current.Resources.MergedDictionaries;
             var dictionary = dictionaries.FirstOrDefault(d => d.Source?.OriginalString.Contains("PresentationFramework.Fluent", StringComparison.OrdinalIgnoreCase) == true);
             var replacement = new ResourceDictionary { Source = new Uri($"/PresentationFramework.Fluent;component/Themes/Fluent.{nativeTheme}.xaml", UriKind.Relative) };

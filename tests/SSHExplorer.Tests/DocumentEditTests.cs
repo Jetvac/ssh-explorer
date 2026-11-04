@@ -22,6 +22,7 @@ internal static class DocumentEditTests
         {
             var original = t.Bytes.ToArray(); File.Delete(d.WorkingPath); await d.CheckAsync(true);
             TestSuite.True(original.SequenceEqual(t.Bytes)); TestSuite.Equal(0, t.Writes); TestSuite.Equal(RemoteEditState.Error, d.Record.State);
+            var retained = await File.ReadAllBytesAsync(d.SnapshotPath); TestSuite.True(original.SequenceEqual(retained));
         });
         await Case(suite, "document detects external same-length same-mtime content and rechecks a replaced approved version", async (d, t) =>
         {
@@ -70,6 +71,25 @@ internal static class DocumentEditTests
         {
             var content = Enumerable.Repeat((byte)'a', 10 * 1024 * 1024).ToArray(); await File.WriteAllBytesAsync(d.WorkingPath, content); await d.CheckAsync(true);
             TestSuite.True(content.SequenceEqual(t.Bytes)); TestSuite.Equal(RemoteEditState.Confirmed, d.Record.State);
+        });
+        await Case(suite, "document watcher detects editor atomic rename without a manual signal and avoids duplicate upload", async (d, t) =>
+        {
+            var temporary = d.WorkingPath + ".editor-tmp"; await File.WriteAllTextAsync(temporary, "atomic-save\n"); File.Move(temporary, d.WorkingPath, true);
+            for (int i = 0; i < 100 && t.Writes == 0; i++) await Task.Delay(40);
+            await d.CheckAsync(true); TestSuite.Equal(1, t.Writes); TestSuite.Equal("atomic-save\n", Encoding.UTF8.GetString(t.Bytes));
+        });
+        await Case(suite, "document cancellation during upload pauses without losing snapshot and explicit retry succeeds", async (d, t) =>
+        {
+            t.Delay = 1500; await File.WriteAllTextAsync(d.WorkingPath, "cancel-retry\n"); var send = d.CheckAsync(true); await Task.Delay(300); var detach = d.DetachAsync(); await send; await detach;
+            TestSuite.Equal(0, t.Writes); TestSuite.True(d.HasUnconfirmed && File.Exists(d.SnapshotPath)); t.Delay = 0; await d.ResumeAsync(t); TestSuite.Equal("cancel-retry\n", Encoding.UTF8.GetString(t.Bytes));
+        });
+        await suite.Run("document explicit legacy encoding detects UTF-8 conversion and retains the confirmed new format", async () =>
+        {
+            var root = Path.Combine(Environment.CurrentDirectory, ".tools", "sshx-document-tests-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+            var transport = new Fake { Bytes = Encoding.GetEncoding(1251).GetBytes("Привет\n") };
+            await using var d = await RemoteEditSession.OpenAsync(root, transport, "/CON:*.conf", "fixture", false, "windows-1251");
+            TestSuite.Equal("document.conf", Path.GetFileName(d.WorkingPath)); await File.WriteAllTextAsync(d.WorkingPath, "Привет, UTF-8\n"); await d.CheckAsync(true); TestSuite.Equal(RemoteEditState.FormatConfirmation, d.Record.State);
+            await d.ResumeAsync(transport, true); TestSuite.Equal("utf-8", d.Record.Format.Encoding); await File.WriteAllTextAsync(d.WorkingPath, "ascii\n"); await d.CheckAsync(true); TestSuite.Equal(RemoteEditState.Confirmed, d.Record.State); TestSuite.Equal("utf-8", d.Record.Format.Encoding);
         });
         await suite.Run("workspace deduplicates the same remote target while two server identities remain independent", async () =>
         {

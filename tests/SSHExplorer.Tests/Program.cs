@@ -3,6 +3,12 @@ using SSHExplorer.Monitoring;
 
 var suite = new TestSuite();
 #if CORE_TESTS
+if (args.Length == 2 && args[0] == "--document-edit-integration")
+{
+    await DocumentEditIntegration.RunAsync(suite, args[1]);
+    Console.WriteLine($"RESULT: {suite.Passed} real SFTP document checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 1 && args[0] == "--document-edit")
 {
     await DocumentEditTests.RunAsync(suite);

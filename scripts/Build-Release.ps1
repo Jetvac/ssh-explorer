@@ -47,7 +47,7 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw 'Windows virtualization tests failed.' }
     & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build -- --resources-only | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Theme resource tests failed.' }
-    foreach ($mode in @('--motion-only','--connection-only','--monitor-graph-only','--monitor-state-only','--monitor-poll-only','--drag-payload-only','--file-state-only','--monitor-refinement-only')) {
+    foreach ($mode in @('--motion-only','--connection-only','--monitor-graph-only','--monitor-state-only','--monitor-poll-only','--drag-payload-only','--file-state-only','--monitor-refinement-only','--shell-icons-only')) {
         & $sdk run --project tests\SSHExplorer.UiTests\SSHExplorer.UiTests.csproj -c Release --no-build -- $mode | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "Headless UI contract checks failed: $mode" }
     }

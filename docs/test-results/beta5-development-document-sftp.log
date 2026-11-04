@@ -1,0 +1,11 @@
+PASS REAL SFTP document byte roundtrip .sh/.conf/.txt UTF-8 BOM UTF-16 mixed endings empty and executable mode
+PASS REAL SFTP document detects external same-length same-mtime writer and repeated conflict
+DIAGNOSTIC document symlink create
+DIAGNOSTIC document symlink explicit locate/open
+DIAGNOSTIC document symlink send
+DIAGNOSTIC document symlink retarget
+PASS REAL SFTP document symlink requires explicit target and changed target stops replacement
+PASS REAL SFTP document ten-MiB long line hashes and preserves mode
+PASS REAL SFTP document metadata refusal leaves original and local snapshot intact
+PASS REAL SFTP document cancellation before finalization preserves destination
+RESULT: 6 real SFTP document checks passed, 0 failed
