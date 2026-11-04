@@ -37,6 +37,7 @@ public sealed class SettingsWindow : Window
     readonly CheckBox showHidden = new() { Content = "Показывать скрытые файлы и папки" };
     readonly CheckBox terminalCopyKeys = new() { Content = "Ctrl+C и Ctrl+V копируют и вставляют", Name = "SettingsTerminalCopyKeys" };
     readonly CheckBox dockerModule = new() { Content = "Docker — контейнеры, журналы и сохранённые параметры запуска", Name = "SettingsDockerModule" };
+    readonly CheckBox scriptsModule = new() { Content = "Скрипты — сохранённые команды: вручную, при подключении, по расписанию", Name = "SettingsScriptsModule" };
     readonly CheckBox showExtensions = new() { Content = "Показывать расширения имён файлов" };
     readonly NumberField poll = new("Интервал обновления", "с", 1, 60, 1);
     readonly NumberField font = new("Размер шрифта терминала", "пт", 8, 36, 1);
@@ -60,7 +61,7 @@ public sealed class SettingsWindow : Window
         theme.ItemsSource = new[] { "Как в Windows", "Светлая", "Тёмная" };
         theme.SelectedIndex = settings.Theme == "Light" ? 1 : settings.Theme == "Dark" ? 2 : 0;
         AutomationProperties.SetName(theme, "Тема приложения");
-        reduceMotion.IsChecked = settings.ReduceMotion; showHidden.IsChecked = settings.ShowHidden; terminalCopyKeys.IsChecked = settings.TerminalCtrlCCopies; dockerModule.IsChecked = settings.DockerModule; showExtensions.IsChecked = settings.ShowExtensions;
+        reduceMotion.IsChecked = settings.ReduceMotion; showHidden.IsChecked = settings.ShowHidden; terminalCopyKeys.IsChecked = settings.TerminalCtrlCCopies; dockerModule.IsChecked = settings.DockerModule; scriptsModule.IsChecked = settings.ScriptsModule; showExtensions.IsChecked = settings.ShowExtensions;
         poll.Value = settings.PollIntervalSeconds; font.Value = settings.TerminalFontSize;
         maxBytes.Value = settings.PreviewMaxBytes / 1024 / 1024; pixels.Value = settings.PreviewMaxPixels / 1_000_000;
         parallel.Value = settings.PreviewParallelism; cache.Value = settings.PreviewCacheBytes / 1024 / 1024;
@@ -114,7 +115,8 @@ public sealed class SettingsWindow : Window
             Group("Тема", Setting("Тема приложения", "«Как в Windows» следует светлому или тёмному режиму системы. В режиме высокой контрастности используются системные цвета.", theme)),
             Group("Анимация", Setting(null, UiMotion.SystemAnimationsEnabled ? "Короткие переходы состояния. Системное отключение анимации Windows всегда имеет приоритет." : "Анимация отключена в параметрах Windows; переходы выполняются без движения.", reduceMotion)),
             Group("Файлы", Setting(null, null, showHidden), Setting(null, "Файлы, начинающиеся с точки, в Linux считаются скрытыми.", showExtensions)),
-            Group("Модули", Setting(null, "Добавляет раздел «Docker» в навигацию сервера. Команды docker выполняются по SSH от вашей учётной записи (или через sudo без пароля, если он разрешён); на сервер ничего не устанавливается.", dockerModule)));
+            Group("Модули", Setting(null, "Добавляет раздел «Docker» в навигацию сервера. Команды docker выполняются по SSH от вашей учётной записи (или через sudo без пароля, если он разрешён); на сервер ничего не устанавливается.", dockerModule),
+                Setting(null, "Добавляет раздел «Скрипты»: списки команд сервера и их запуск. Автоматический запуск работает, пока приложение открыто и сервер подключён.", scriptsModule)));
         _ = hc;
 
         var trustList = new ListBox { MinHeight = 120, MaxHeight = 220, DisplayMemberPath = nameof(TrustRow.DisplayName) };
@@ -233,7 +235,8 @@ public sealed class SettingsWindow : Window
         settings.PreviewMaxBytes = maxBytes.Value * 1024 * 1024; settings.PreviewMaxPixels = pixels.Value * 1_000_000;
         settings.PreviewParallelism = (int)parallel.Value; settings.PreviewCacheBytes = cache.Value * 1024 * 1024;
         settings.TransferParallelism = (int)transfers.Value; settings.TransferLimitKiBps = (int)speed.Value; settings.ApplyTo(App.Transfers);
-        bool modulesChanged = settings.DockerModule != (dockerModule.IsChecked == true); settings.DockerModule = dockerModule.IsChecked == true;
+        bool modulesChanged = settings.DockerModule != (dockerModule.IsChecked == true) || settings.ScriptsModule != (scriptsModule.IsChecked == true);
+        settings.DockerModule = dockerModule.IsChecked == true; settings.ScriptsModule = scriptsModule.IsChecked == true;
         settings.TerminalCtrlCCopies = terminalCopyKeys.IsChecked == true;
         settings.ShowHidden = showHidden.IsChecked == true; settings.ShowExtensions = showExtensions.IsChecked == true;
         settings.ReduceMotion = reduceMotion.IsChecked == true; UiMotion.UserReduced = settings.ReduceMotion;

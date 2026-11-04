@@ -487,7 +487,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; EventHandler? modulesChanged; readonly Button reconnect;
+    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -510,7 +510,14 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         // After the task manager and its pages, so the module never splits them.
         // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
         var dockerNav = Nav(IconCatalog.Docker, "Docker", "docker"); side.Children.Add(dockerNav);
-        void ApplyModules() { dockerNav.Visibility = App.Store.Settings.DockerModule ? Visibility.Visible : Visibility.Collapsed; if (!App.Store.Settings.DockerModule && section == "docker") ShowSection("files"); }
+        var scriptsNav = Nav("", "Скрипты", "scripts"); side.Children.Add(scriptsNav);
+        void ApplyModules()
+        {
+            var settings = App.Store.Settings;
+            dockerNav.Visibility = settings.DockerModule ? Visibility.Visible : Visibility.Collapsed;
+            scriptsNav.Visibility = settings.ScriptsModule ? Visibility.Visible : Visibility.Collapsed;
+            if (!settings.DockerModule && section == "docker" || !settings.ScriptsModule && section == "scripts") ShowSection("files");
+        }
         ApplyModules(); App.ModulesChanged += modulesChanged = (_, _) => ApplyModules();
         var line = new Border { Height = 1, Margin = new Thickness(8, 10, 8, 10) }; line.SetResourceReference(Border.BackgroundProperty, "Edge"); side.Children.Add(line);
         side.Children.Add(Nav("\uE8B7", "Файлы", "files"));
@@ -564,7 +571,22 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             if (disposed || failed) return;
             viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected); UpdateConnectionStatusVisibility();
+            // Scheduled scripts run while this server is connected, whether or not their section is open.
+            if (Session.State == SessionState.Connected && !presentationOnly) EnsureScriptRunner();
         });
+    }
+    internal ScriptRunner EnsureScriptRunner()
+    {
+        if (scriptRunner is not null) return scriptRunner;
+        scriptRunner = new ScriptRunner(Session, () => App.Store.Profiles.FirstOrDefault(p => p.Id == Session.Profile.Id)?.Scripts ?? Session.Profile.Scripts, () => App.Store.Settings.ScriptsModule);
+        scriptRunner.Finished += (_, run) => Dispatcher.BeginInvoke(async () =>
+        {
+            if (disposed) return;
+            try { await App.Store.SaveAsync(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { await LocalDiagnostics.RecordAsync("scripts.save.failed", ex); }
+            if (!run.Succeeded && run.Reason != "Вручную") SetNotice($"Скрипт «{run.ScriptName}» ({run.Reason.ToLowerInvariant()}) завершился с ошибкой: {(run.TimedOut ? "таймаут" : "код " + run.ExitCode)}. Подробности — в разделе «Скрипты».");
+        });
+        if (!presentationOnly) scriptRunner.StartSchedule();
+        return scriptRunner;
     }
     internal async Task<bool> ConnectAsync(SessionCredentials credentials, ConnectionInteraction prompts, ConnectionAttempt attempt, Func<HostKeyPrompt, Task<TrustDecision>>? trustOverride = null)
     {
@@ -626,7 +648,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         if (disposed) return;
         if (section == key && key != "monitor" && screen.Content is not null &&
-            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker))) return;
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView))) return;
         var previousContent = screen.Content; var previousPage = monitor?.Page;
         section = key;
         UpdateConnectionStatusVisibility();
@@ -640,6 +662,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             button.FontWeight = name == "monitor" && key == "monitor" ? FontWeights.SemiBold : FontWeights.Normal;
         }
         if (key == "terminal") { _ = OpenTerminalAsync(); return; }
+        if (key == "scripts")
+        {
+            scriptsView ??= new ScriptsView(Session, EnsureScriptRunner());
+            screen.Content = scriptsView;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
         if (key == "docker")
         {
             docker ??= new DockerView(new DockerService(Session));
@@ -698,7 +727,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminal?.Dispose();
         try { await Session.DisposeAsync(); }

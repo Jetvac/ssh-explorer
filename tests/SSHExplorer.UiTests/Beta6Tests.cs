@@ -306,6 +306,23 @@ internal static class Beta6Tests
             Check(!navigation["docker"].IsVisible && !Descendants<DockerView>(sessionView).Any(v => v.IsVisible), "disabling the module hides Docker and leaves its section");
             Ui.ErrorOverride = null; Check(tabErrors.Count == 0, "opening Docker in a tab raised no error dialog" + (tabErrors.Count > 0 ? ": " + string.Join(" | ", tabErrors) : ""));
             DockerUiChecks.Run(store, evidence, Check);
+            // Modules sit after the task manager and its pages, never between them.
+            var side = (Panel)VisualTreeHelper.GetParent(navigation["docker"]); var monitorPages = (Panel)VisualTreeHelper.GetParent(navigation["processes"]);
+            Check(side.Children.IndexOf(navigation["docker"]) > side.Children.IndexOf(monitorPages) && side.Children.IndexOf(navigation["scripts"]) > side.Children.IndexOf(navigation["docker"]), "Docker and «Скрипты» come after the task manager pages");
+            var scriptErrors = new List<string>(); Ui.ErrorOverride = scriptErrors.Add;
+            App.Store.Settings.ScriptsModule = true; App.RaiseModulesChanged(); Pump(); Layout(main);
+            navigation["scripts"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
+            Check(navigation["scripts"].IsVisible && Descendants<ScriptsView>(sessionView).Any(v => v.IsVisible), "enabling «Скрипты» shows its section in an open tab");
+            App.Store.Settings.ScriptsModule = false; App.RaiseModulesChanged(); Pump(); Ui.ErrorOverride = null;
+            Check(!navigation["scripts"].IsVisible && scriptErrors.Count == 0, "disabling «Скрипты» hides it without errors: " + string.Join(" | ", scriptErrors));
+            ScriptsUiChecks.Run(store, evidence, Check);
+            // Middle click (press and release on the same tab) closes a server tab.
+            var (middleTab, _) = AddTab(main, store, "Закрытие средней кнопкой"); Pump(); Layout(main);
+            var allTabs = (TabControl)Field(main, "tabs");
+            middleTab.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Middle) { RoutedEvent = UIElement.PreviewMouseDownEvent });
+            middleTab.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Middle) { RoutedEvent = UIElement.PreviewMouseUpEvent });
+            for (int i = 0; i < 50 && allTabs.Items.Contains(middleTab); i++) Pump();
+            Check(!allTabs.Items.Contains(middleTab), "middle click closes the server tab");
             // 0.3 A1: import from an OpenSSH config — preview, duplicate unchecked, only the checked host is saved.
             var existingProfile = store.Profiles.First();
             var importText = string.Join("\n", "Host imported-web", " HostName 10.9.0.5", " User deploy", " ProxyJump bastion", " ProxyCommand nc %h %p",
