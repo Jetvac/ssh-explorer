@@ -42,7 +42,7 @@ jobs:
           {
             echo "Port 2222"; echo "ListenAddress 127.0.0.1"; echo "HostKey $fixture/host_ed25519"; echo "PidFile $fixture/sshd.pid"
             echo "PasswordAuthentication no"; echo "KbdInteractiveAuthentication no"; echo "PubkeyAuthentication yes"; echo "UsePAM yes"
-            echo "StrictModes no"; echo "AuthorizedKeysFile %h/.ssh/authorized_keys"
+            echo "StrictModes no"; echo "AuthorizedKeysFile %h/.ssh/authorized_keys"; echo "Subsystem sftp internal-sftp"
           } > "$fixture/sshd_config"
           sudo mkdir -p /run/sshd
           sudo /usr/sbin/sshd -f "$fixture/sshd_config" -E "$fixture/sshd.log"

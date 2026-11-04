@@ -101,7 +101,7 @@ internal sealed class CiVisualEvidence
             var popup=authentication.Template.FindName("PART_Popup",authentication) as Popup??throw new InvalidOperationException("The applied authentication ComboBox has no PART_Popup.");
             if(!authentication.IsDropDownOpen||popup.Child is not FrameworkElement popupVisual||!popupVisual.IsVisible)throw new InvalidOperationException("F4 did not open the actual authentication popup.");
             var items=Descendants<ComboBoxItem>(popupVisual).Where(item=>item.IsVisible).ToArray();
-            assert?.Invoke(items.Length==3&&popupVisual.ActualWidth+1>=authentication.ActualWidth&&items.All(item=>item.ActualHeight>20),"applied authentication popup exposes all three real selectable rows at the field width");
+            assert?.Invoke(items.Length==4&&popupVisual.ActualWidth+1>=authentication.ActualWidth&&items.All(item=>item.ActualHeight>20),"applied authentication popup exposes all four real selectable rows (password, key, keyboard-interactive, SSH agent) at the field width");
             Capture(popupVisual,"profile-auth-popup",new{theme="Light",fixtureOnly=true,openedBy="routed F4 KeyDown",physicalKeyboardInput=false,selectedIndex=authentication.SelectedIndex,fieldWidthDip=authentication.ActualWidth,realizedItems=items.Length});
             SendKey(authentication,Key.Escape);Pump();
             assert?.Invoke(!authentication.IsDropDownOpen&&dialog.IsVisible,"Escape closes the actual ComboBox popup without cancelling its owner dialog");

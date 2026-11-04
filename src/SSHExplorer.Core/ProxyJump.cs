@@ -29,7 +29,9 @@ public static class ProxyJumpSpec
             }
             else if (rest.Count(c => c == ':') == 1) { var parts = rest.Split(':'); host = parts[0]; port = ParsePort(parts[1], raw); }
             else host = rest; // bare IPv6 without brackets has no port
-            if (host.Length == 0 || host.Any(char.IsWhiteSpace) || host.IndexOfAny(['/', '\\']) >= 0) throw new ArgumentException($"ProxyJump «{raw}»: недопустимый адрес.");
+            // A bare item may be a profile name, which can contain spaces; an address form (user@ or :port) cannot.
+            bool nameOnly = user is null && port is null;
+            if (host.Length == 0 || (!nameOnly && host.Any(char.IsWhiteSpace)) || host.IndexOfAny(['/', '\\']) >= 0) throw new ArgumentException($"ProxyJump «{raw}»: недопустимый адрес.");
             hops.Add(new ProxyJumpHop(raw, user, host, port));
         }
         if (hops.Count > MaxHops) throw new ArgumentException($"ProxyJump: не более {MaxHops} промежуточных узлов.");
@@ -61,6 +63,7 @@ public static class ProxyJumpSpec
         }
         else
         {
+            if (last.Host.Any(char.IsWhiteSpace)) throw new InvalidOperationException($"ProxyJump: профиль «{last.Host}» не найден.");
             if (target.Authentication is not (AuthenticationKind.Agent or AuthenticationKind.PrivateKey))
                 throw new InvalidOperationException($"Промежуточный узел «{last.Text}» задан адресом, а профиль входит по паролю. Пароль не передаётся другому узлу: создайте профиль для «{last.Host}» и укажите его имя в ProxyJump или используйте ключ/агент.");
             hop = new ServerProfile
