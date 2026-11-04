@@ -75,7 +75,7 @@ public sealed class DockerService(ServerSession session)
                 envFile = PosixPath.Combine(directory, "env-" + Guid.NewGuid().ToString("N"));
                 // Create empty, restrict to the owner, then write: the values are never readable by others.
                 using (sftp.Open(envFile, FileMode.CreateNew, FileAccess.Write)) { }
-                sftp.ChangePermissions(envFile, Convert.ToInt16("600", 8));
+                sftp.ChangePermissions(envFile, 600); // SSH.NET reads the digits as octal: 600 = rw------- (not the numeric value 384)
                 using (var stream = sftp.Open(envFile, FileMode.Open, FileAccess.Write)) // just created empty; SSH.NET does not support Truncate
                 using (var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false)))
                     await writer.WriteAsync(DockerCommands.EnvFile(template, DockerSecrets.ValueOf).AsMemory(), ct).ConfigureAwait(false);
