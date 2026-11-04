@@ -16,13 +16,16 @@ public static partial class ProcParser
     public const int MaxProtocolCharacters = 16 * 1024 * 1024;
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
-    public static IReadOnlyDictionary<string, string?> DecodeFrames(string text)
+    public static IReadOnlyDictionary<string, string?> DecodeFrames(string text) => DecodeFrames(text, "SSHXMON1", "SSHXMON2");
+
+    /// <summary>Decodes a framed response whose first line is one of <paramref name="headers"/>.</summary>
+    public static IReadOnlyDictionary<string, string?> DecodeFrames(string text, params string[] headers)
     {
         if (text.Length > MaxProtocolCharacters)
             throw new MonitoringUnavailableException("Ответ мониторинга превысил 16 МиБ. Уменьшите лимит процессов.");
         using var reader = new StringReader(text);
         var header = reader.ReadLine()?.TrimEnd('\r');
-        if (header is not ("SSHXMON1" or "SSHXMON2"))
+        if (header is null || !headers.Contains(header, StringComparer.Ordinal))
             throw new MonitoringUnavailableException("Сервер не вернул протокол мониторинга /proc.");
         var result = new Dictionary<string, string?>(StringComparer.Ordinal);
         string? line;

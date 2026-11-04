@@ -241,6 +241,7 @@ public static class Theme
             r["NavigationSelected"] = SystemColors.HighlightBrush; r["NavigationSelectedInk"] = SystemColors.HighlightTextBrush; r["ValidationInk"] = SystemColors.WindowTextBrush;
             r["AccentHover"] = SystemColors.HighlightBrush; r["AccentPressed"] = SystemColors.HighlightBrush;
             r["FocusStroke"] = SystemColors.WindowTextBrush; r["SelectedFocusStroke"] = SystemColors.HighlightTextBrush; r["PrimaryFocusStroke"] = SystemColors.HighlightTextBrush;
+            r["DangerFill"] = SystemColors.HighlightBrush; r["CaptionHover"] = SystemColors.HighlightBrush; r["CaptionPressed"] = SystemColors.HighlightBrush; r["CaptionInactiveInk"] = SystemColors.GrayTextBrush;
             Changed?.Invoke();
             return;
         }
@@ -256,6 +257,11 @@ public static class Theme
         r["Accent"] = new SolidColorBrush(accent); r["AccentInk"] = accent.R * .299 + accent.G * .587 + accent.B * .114 > 165 ? Brushes.Black : Brushes.White; r["Selected"] = new SolidColorBrush(Mix(accent, dark ? Color.FromRgb(32, 32, 32) : Colors.White, dark ? .34 : .16)); r["DropTarget"] = new SolidColorBrush(Mix(accent, dark ? Color.FromRgb(32, 32, 32) : Colors.White, dark ? .55 : .28));
         r["AccentHover"] = new SolidColorBrush(Mix(accent, Colors.Black, .92)); r["AccentPressed"] = new SolidColorBrush(Mix(accent, Colors.Black, .84));
         r["FocusStroke"] = r["Accent"]; r["SelectedFocusStroke"] = r["Accent"]; r["PrimaryFocusStroke"] = r["AccentInk"];
+        // Caption buttons: Windows 11 subtle fills over the caption surface; inactive glyphs dimmed.
+        r["CaptionHover"] = new SolidColorBrush(dark ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x10, 0x00, 0x00, 0x00));
+        r["CaptionPressed"] = new SolidColorBrush(dark ? Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0A, 0x00, 0x00, 0x00));
+        r["CaptionInactiveInk"] = B(dark ? "#7C7C7C" : "#8F8F8F");
+        r["DangerFill"] = B(dark ? "#D13438" : "#C42B1C");
         Changed?.Invoke();
     }
 }

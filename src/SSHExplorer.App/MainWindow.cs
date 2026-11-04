@@ -387,7 +387,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; readonly Button reconnect;
+    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -402,7 +402,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var statusRow = new DockPanel { LastChildFill = true, MinHeight = 30 }; DockPanel.SetDock(state, Dock.Right); statusRow.Children.Add(state); statusRow.Children.Add(fileStatusHost); connectionStatus.Child = statusRow; connectionStatus.Padding = new Thickness(0); connectionStatus.SetResourceReference(StyleProperty, "StatusBarStyle"); Grid.SetRow(connectionStatus, 3); host.Children.Add(connectionStatus);
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Clamp(App.Store.Settings.TreeWidth, 190, 420)), MinWidth = 190, MaxWidth = 420 }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 340 });
         side.Margin = new Thickness(5, 8, 5, 8); side.SetResourceReference(Panel.BackgroundProperty, "NavigationSurface");
-        side.Children.Add(Nav(Ui.TerminalGlyph, "Терминал", "terminal")); side.Children.Add(Nav(IconCatalog.Performance, "Диспетчер задач", "monitor"));
+        side.Children.Add(Nav(IconCatalog.Server, "Сервер", "server")); side.Children.Add(Nav(IconCatalog.Terminal, "Терминал", "terminal")); side.Children.Add(Nav(IconCatalog.Performance, "Диспетчер задач", "monitor"));
         monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
         monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
         monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
@@ -437,6 +437,14 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         files.NavigationCommitted += () => { if (initialFolderFailed && !disposed) { initialFolderFailed = false; hasNotice = false; viewModel.Update(Session); UpdateConnectionStatusVisibility(); } };
         addressHost.Content = files.AddressBar; commandHost.Content = files.CommandBar; fileStatusHost.Content = files.StatusBar; fileNavigationHost.Content = files.Navigation;
     }
+    /// <summary>Work that a reboot/power-off of this server would interrupt.</summary>
+    (int Transfers, int Documents) PendingWork()
+    {
+        int transfers = App.Transfers.Jobs.Count(job => job.SessionId == Session.Id && job.CanCancel);
+        int documents = main.EditWorkspace.Documents.Count(d => d.Record.Identity.ProfileId == Session.Profile.Id && d.Record.State is RemoteEditState.Pending or RemoteEditState.Uploading or RemoteEditState.Conflict or RemoteEditState.Error or RemoteEditState.Paused or RemoteEditState.Unknown or RemoteEditState.FormatConfirmation);
+        return (transfers, documents);
+    }
+    internal ServerPanelView? ServerPanel => serverPanel;
     internal void ShowSection(string key)
     {
         if (key is "processes" or "performance") { monitorPage = key == "processes" ? MonitorPage.Processes : MonitorPage.Performance; key = "monitor"; }
@@ -479,6 +487,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             }
             viewModel.Update(Session);
             if (!Session.SftpAvailable) SetNotice("Вход выполнен; SFTP недоступен. " + Session.SftpError);
+            if (Session.ShellAvailable && SSHExplorer.Monitoring.PowerVerificationRegistry.IsPending(Session.Profile.Id, Session.Profile.Endpoint)) Show("server");
             return true;
         }
         catch (Exception ex)
@@ -525,6 +534,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             button.FontWeight = name == "monitor" && key == "monitor" ? FontWeights.SemiBold : FontWeights.Normal;
         }
         if (key == "terminal") { _ = OpenTerminalAsync(); return; }
+        if (key == "server")
+        {
+            serverPanel ??= new ServerPanelView(Session, presentationOnly ? null : () => main.Reconnect(this, files?.CurrentPath), Session.ShellAvailable ? () => ShowSection("terminal") : null, PendingWork);
+            screen.Content = serverPanel;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
         if (key == "monitor")
         {
             if (monitor is null && !Session.ShellAvailable) return;

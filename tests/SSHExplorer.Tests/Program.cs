@@ -40,6 +40,7 @@ if (args.Length == 2 && args[0] == "--network-failure")
 #endif
 await MonitorTests.RunAsync(suite);
 await MetricStateTests.RunAsync(suite);
+await ServerPanelTests.RunAsync(suite);
 #if CORE_TESTS
 await CoreTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
