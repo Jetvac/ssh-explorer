@@ -67,7 +67,22 @@ public sealed class TransferRow(TransferJob job) : ObservableObject
         // Unknown time is "—", never 0: completed jobs show their result instead.
         Update(nameof(Remaining), RemainingKey is { } remaining ? FormatDuration(remaining) : "—");
         Update(nameof(Result), job.Error ?? (job.State == TransferState.Completed ? job.Summary + " · " + FormatDuration(job.Elapsed) : job.State == TransferState.Cancelled ? "Отменено пользователем. " + job.Summary : job.Summary));
-        Raise(nameof(ProgressValue)); Raise(nameof(ProgressKnown)); Raise(nameof(IsRunning)); Raise(nameof(StateKind));
+        // Derived and typed sort-key properties notify only on a real change: an unchanged refresh
+        // must not churn bindings, live sorting or selection.
+        var snapshot = (ProgressValue, ProgressKnown, IsRunning, StateKind, StateRank, ProgressKey, SpeedKey, RemainingKey, TransferredKey);
+        if (derived is not { } previous) { derived = snapshot; return; }
+        if (previous == snapshot) return;
+        derived = snapshot;
+        if (previous.ProgressValue != snapshot.ProgressValue) Raise(nameof(ProgressValue));
+        if (previous.ProgressKnown != snapshot.ProgressKnown) Raise(nameof(ProgressKnown));
+        if (previous.IsRunning != snapshot.IsRunning) Raise(nameof(IsRunning));
+        if (previous.StateKind != snapshot.StateKind) Raise(nameof(StateKind));
+        if (previous.StateRank != snapshot.StateRank) Raise(nameof(StateRank));
+        if (previous.ProgressKey != snapshot.ProgressKey) Raise(nameof(ProgressKey));
+        if (previous.SpeedKey != snapshot.SpeedKey) Raise(nameof(SpeedKey));
+        if (previous.RemainingKey != snapshot.RemainingKey) Raise(nameof(RemainingKey));
+        if (previous.TransferredKey != snapshot.TransferredKey) Raise(nameof(TransferredKey));
     }
+    (double ProgressValue, bool ProgressKnown, bool IsRunning, string StateKind, int StateRank, double? ProgressKey, double? SpeedKey, TimeSpan? RemainingKey, long TransferredKey)? derived;
     public static string FormatDuration(TimeSpan value) => value.TotalHours >= 24 ? $"{(int)value.TotalDays} д {value.Hours} ч" : value.TotalHours >= 1 ? $"{(int)value.TotalHours} ч {value.Minutes:00} мин" : value.TotalMinutes >= 1 ? $"{value.Minutes} мин {value.Seconds:00} с" : $"{Math.Max(0, value.Seconds)} с";
 }
