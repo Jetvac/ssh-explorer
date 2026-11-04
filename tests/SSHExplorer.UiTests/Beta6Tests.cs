@@ -274,7 +274,7 @@ internal static class Beta6Tests
             var serverProfile = new ServerProfile { Name = "Боевой сервер", Host = "10.0.0.5", Username = "root" }; var serverSession = new ServerSession(serverProfile, store);
             var panel = new ServerPanelView(serverSession, null, null, () => (1, 2));
             var info = ServerInfoCollector.Parse(ServerInfoFixture, DateTimeOffset.UtcNow);
-            typeof(ServerPanelView).GetMethod("Render", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(panel, [info]);
+            typeof(ServerPanelView).GetMethod("Render", BindingFlags.Instance | BindingFlags.NonPublic, [typeof(ServerInfo)])!.Invoke(panel, [info]);
             typeof(ServerPanelView).GetProperty(nameof(ServerPanelView.Info))!.SetValue(panel, info);
             var host = new Window { Width = 1100, Height = 760, Content = panel, ShowInTaskbar = false, Left = 60, Top = 60 }; host.Show(); Layout(host);
             try

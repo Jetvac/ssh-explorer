@@ -47,7 +47,7 @@ internal static class DocumentUiTests
                 var icons = Descendants<ShellFileIcon>(files).Where(i => i.IsVisible && i.Entry is not null).ToArray();
                 foreach (var icon in icons.Take(12)) SystemFileIconProvider.GetAsync(icon.Entry!, Math.Max(icon.ActualWidth, icon.ActualHeight)).GetAwaiter().GetResult();
                 Pump(); Layout(main);
-                if (icons.Length == 0 || !icons.Any(i => i.Source is BitmapSource { IsFrozen: true }) || ((TextBlock)Field(files, "viewModeGlyph")).Text != CommandGlyphs.View(mode)) throw new Exception("Materialized Shell icons/current view command failed for " + mode);
+                if (icons.Length == 0 || !icons.Any(i => i.Source is BitmapSource { IsFrozen: true }) || !ViewIconMatches(((Panel)Field(files, "viewModeRow")).Children[0], CommandGlyphs.View(mode))) throw new Exception("Materialized Shell icons/current view command failed for " + mode);
                 evidence.Capture((FrameworkElement)main.Content, "files-native-" + mode.ToLowerInvariant(), new { theme = "Light", fixtureOnly = true, mode, nativeShellIcons = true, shellKinds = SystemFileIconProvider.CachedKinds });
             }
             Check(true, "all eight actual file views render native Shell resources and the command glyph follows the active representation");
@@ -104,6 +104,8 @@ internal static class DocumentUiTests
         }
         catch (Exception ex) { Console.WriteLine(ex); return 1; }
     }
+    // The view command shows the current mode in its icon slot (a vector key or a font glyph), never in its label.
+    static bool ViewIconMatches(UIElement icon, string key) => icon is VectorIcon vector ? vector.Key == key : icon is TextBlock glyph && glyph.Text == key;
     static object Field(object value, string name) => value.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(value)!;
     static object? Invoke(object value, string name, params object[] args) => value.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(value, args);
     static void Layout(FrameworkElement element) { element.UpdateLayout(); Pump(); element.UpdateLayout(); }
