@@ -1,0 +1,13 @@
+{
+  "scope": "Re-zipped subsets of the published v0.2.0-beta.5 portable tree (zip -9, Linux Info-ZIP). Estimates of package size only; no variant was built, started or tested.",
+  "source": "SSHExplorer-0.2.0-beta.5-win-x64.zip from the v0.2.0-beta.5 release",
+  "variants": [
+    { "name": "published beta.5", "unpackedBytes": 866053547, "zipBytes": 392175022, "files": 863 },
+    { "name": "without WebView2Runtime/ (system Evergreen WebView2 instead)", "unpackedBytes": 159843616, "zipBytes": 69503806, "files": 606 },
+    {
+      "name": "without WebView2Runtime/, docs/, developer markdown, *.xml and non-ru WPF satellite folders",
+      "unpackedBytes": 148655640, "zipBytes": 63926698,
+      "note": "unpackedBytes still contains the three WebView2 *.xml IntelliSense files (800 718 bytes); the satellite folders are cs de es fr it ja ko pl pt-BR tr zh-Hans zh-Hant"
+    }
+  ]
+}

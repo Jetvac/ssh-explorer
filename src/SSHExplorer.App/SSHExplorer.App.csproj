@@ -15,6 +15,10 @@
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>false</PublishSingleFile>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- The UI is Russian: keep only ru framework/WPF satellite resources (English is neutral, no folder). -->
+    <SatelliteResourceLanguages>ru</SatelliteResourceLanguages>
+    <!-- Package IntelliSense XML (WebView2 *.xml) is for developers, not for the portable bundle. -->
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SSHExplorer.Core\SSHExplorer.Core.csproj" />
