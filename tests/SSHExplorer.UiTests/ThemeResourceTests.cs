@@ -71,9 +71,18 @@ internal static class ThemeResourceTests
             if (!ReferenceEquals(trailingHost.Content, trailingProbe)) throw new Exception($"TrailingHost content is not the tab control's TrailingContent (actual: {trailingHost.Content?.GetType().Name ?? "null"}; binding={System.Windows.Data.BindingOperations.GetBindingExpressionBase(trailingHost, ContentPresenter.ContentProperty)?.Status.ToString() ?? "none"}; source={trailingHost.ReadLocalValue(ContentPresenter.ContentProperty)}; templated={trailingHost.TemplatedParent?.GetType().Name}).");
             if (!strip.IsAncestorOf(trailingProbe) || trailingProbe.ActualWidth < 30) throw new Exception($"TrailingContent is not in the measured caption row (ancestor={strip.IsAncestorOf(trailingProbe)}, width={trailingProbe.ActualWidth}).");
             Console.WriteLine("PASS caption-row trailing actions are presented inside the measured session tab template");
+            var grid = new CardGridPanel(); for (int i = 0; i < 5; i++) grid.Children.Add(new Border { Height = 100 + i * 10 }); var wide = new Border { Height = 80 }; Grid.SetColumnSpan(wide, 2); grid.Children.Add(wide);
+            grid.Measure(new Size(1000, double.PositiveInfinity)); grid.Arrange(new Rect(0, 0, 1000, grid.DesiredSize.Height));
+            var boxes = grid.Children.Cast<FrameworkElement>().Select(c => LayoutInformation.GetLayoutSlot(c)).ToArray();
+            bool filled = grid.Columns == 3 && Math.Abs(boxes[2].Right - 1000) < .5 && boxes.Take(3).All(b => Math.Abs(b.Width - boxes[0].Width) < .5 && Math.Abs(b.Height - 120) < .5);
+            bool spanned = Math.Abs(boxes[5].Width - (boxes[0].Width * 2 + 12)) < .5 && boxes[5].Top > boxes[3].Top;
+            grid.Measure(new Size(400, double.PositiveInfinity)); grid.Arrange(new Rect(0, 0, 400, grid.DesiredSize.Height));
+            bool narrow = grid.Columns == 1 && grid.Children.Cast<FrameworkElement>().All(c => Math.Abs(LayoutInformation.GetLayoutSlot(c).Width - 400) < .5);
+            if (!(filled && spanned && narrow)) throw new Exception($"Server card grid geometry is wrong (filled={filled}, spanned={spanned}, narrow={narrow}).");
+            Console.WriteLine("PASS server cards fill the width in equal columns, equalise row height, span tables and collapse to one column");
             var stateChecks = ViewModelTests.Run((condition, description) => { if (!condition) throw new Exception(description); Console.WriteLine("PASS " + description); });
             if (app.Windows.Count != 0) throw new Exception("A headless resource/state check unexpectedly created a Window.");
-            app.Shutdown(); Console.WriteLine($"RESULT: 9 resource/contract + {stateChecks} MVVM checks passed; no Windows were created; layout, focus and live UI are separate"); return 0;
+            app.Shutdown(); Console.WriteLine($"RESULT: 10 resource/contract + {stateChecks} MVVM checks passed; no Windows were created; layout, focus and live UI are separate"); return 0;
         }
         catch (Exception ex) { Console.WriteLine(ex); return 1; }
     }

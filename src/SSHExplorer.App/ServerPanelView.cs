@@ -19,7 +19,7 @@ public sealed class ServerPanelView : UserControl
     readonly Func<Task>? reconnect;
     readonly Action? openTerminal;
     readonly Func<(int Transfers, int Documents)> pendingWork;
-    readonly WrapPanel cards = new() { Orientation = Orientation.Horizontal };
+    readonly CardGridPanel cards = new() { Name = "ServerCards" };
     readonly TextBlock subtitle = Ui.Text("", 12);
     readonly TextBlock state = Ui.Text("", 12);
     readonly Border banner = new() { CornerRadius = new CornerRadius(6), Padding = new Thickness(14, 10, 14, 10), Margin = new Thickness(0, 0, 0, 12), BorderThickness = new Thickness(1), Visibility = Visibility.Collapsed };
@@ -115,7 +115,7 @@ public sealed class ServerPanelView : UserControl
     void RenderPlaceholder(string text)
     {
         cards.Children.Clear();
-        var message = Ui.Text(text); message.TextWrapping = TextWrapping.Wrap; message.MaxWidth = 560; message.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); message.Margin = new Thickness(4, 24, 4, 24);
+        var message = Ui.Text(text); message.TextWrapping = TextWrapping.Wrap; message.MaxWidth = 560; message.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); message.Margin = new Thickness(4, 24, 4, 24); Grid.SetColumnSpan(message, int.MaxValue);
         cards.Children.Add(message);
     }
 
@@ -131,7 +131,7 @@ public sealed class ServerPanelView : UserControl
         string perCore = info.Load1 is { } l1 && info.CpuCount is > 0 ? (l1 / info.CpuCount.Value).ToString("0.00", CultureInfo.CurrentCulture) + " на ядро" : "";
         cards.Children.Add(Card("Процессор", IconCatalog.Performance,
             ("Модель", Or(info.CpuModel)), ("Логических ЦП", info.CpuCount?.ToString(CultureInfo.CurrentCulture) ?? "Недоступно"),
-            ("Средняя загрузка 1/5/15 мин", load), ("", perCore.Length > 0 ? perCore + ". Это длина очереди задач, а не процент ЦП; процент — в «Производительности»." : "Средняя загрузка — длина очереди задач, а не процент ЦП.")));
+            ("Загрузка 1 / 5 / 15 мин", load), ("", perCore.Length > 0 ? perCore + ". Это длина очереди задач, а не процент ЦП; процент — в «Производительности»." : "Средняя загрузка — длина очереди задач, а не процент ЦП.")));
         string swap = info.SwapTotalBytes is > 0 ? $"{Ui.Size(info.SwapUsedBytes)} из {Ui.Size(info.SwapTotalBytes)}" : info.SwapTotalBytes == 0 ? "Не настроен" : "Недоступно";
         cards.Children.Add(Card("Память", IconCatalog.ViewLarge,
             ("Всего", Ui.Size(info.MemoryTotalBytes)), ("Доступно", Ui.Size(info.MemoryAvailableBytes)), ("Подкачка", swap)));
@@ -143,7 +143,7 @@ public sealed class ServerPanelView : UserControl
             ("Выключение", info.PowerOff.Available ? "Доступно: " + info.PowerOff.Command : "Недоступно"),
             ("Команды", info.Tools.Count == 0 ? "—" : string.Join(", ", info.Tools))));
         storageTable.ItemsSource = info.Storage.Select(s => new StorageView(s.MountPoint, s.FileSystem, s.TotalBytes, s.AvailableBytes)).ToList();
-        var storageCard = CardShell("Хранилища", IconCatalog.Storage, 640); ((StackPanel)storageCard.Child).Children.Add(info.Storage.Count == 0 ? Muted("df недоступен или не вернул данных.") : storageTable);
+        var storageCard = CardShell("Хранилища", IconCatalog.Storage); Grid.SetColumnSpan(storageCard, 2); ((StackPanel)storageCard.Child).Children.Add(info.Storage.Count == 0 ? Muted("df недоступен или не вернул данных.") : storageTable);
         if (storageTable.Parent is Panel old && !ReferenceEquals(old, storageCard.Child)) old.Children.Remove(storageTable);
         cards.Children.Add(storageCard);
         if (info.Limitations.Count > 0) cards.Children.Add(Card("Ограничения", Ui.PropertiesGlyph, info.Limitations.Select(l => ("", l)).ToArray()));
@@ -151,9 +151,9 @@ public sealed class ServerPanelView : UserControl
 
     static TextBlock Muted(string text) { var t = Ui.Text(text, 12); t.TextWrapping = TextWrapping.Wrap; t.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); return t; }
 
-    static Border CardShell(string title, string icon, double width = 310)
+    static Border CardShell(string title, string icon)
     {
-        var card = new Border { Width = width, Margin = new Thickness(0, 0, 12, 12), Padding = new Thickness(16, 12, 16, 14), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
+        var card = new Border { Padding = new Thickness(16, 12, 16, 14), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
         card.SetResourceReference(Border.BackgroundProperty, "Surface"); card.SetResourceReference(Border.BorderBrushProperty, "Edge");
         var stack = new StackPanel(); var head = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
         var glyph = Ui.Icon(icon, 16, false); glyph.Margin = new Thickness(0, 0, 10, 0); DockPanel.SetDock(glyph, Dock.Left); head.Children.Add(glyph); head.Children.Add(Ui.Text(title, 14, true));
@@ -167,8 +167,8 @@ public sealed class ServerPanelView : UserControl
         foreach (var (label, value) in rows)
         {
             if (label.Length == 0) { var note = Muted(value); note.Margin = new Thickness(0, 2, 0, 4); stack.Children.Add(note); continue; }
-            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) }); row.ColumnDefinitions.Add(new ColumnDefinition());
-            var caption = Ui.Text(label, 12); caption.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); caption.TextWrapping = TextWrapping.Wrap; row.Children.Add(caption);
+            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(132) }); row.ColumnDefinitions.Add(new ColumnDefinition());
+            var caption = Ui.Text(label, 12); caption.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); caption.TextWrapping = TextWrapping.Wrap; caption.Margin = new Thickness(0, 0, 12, 0); caption.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(caption);
             var text = new TextBox { Text = value, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Padding = new Thickness(0), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
             AutomationProperties.SetName(text, label); Grid.SetColumn(text, 1); row.Children.Add(text); stack.Children.Add(row);
         }
