@@ -234,10 +234,20 @@ internal static class Beta6Tests
         var main = NewMain();
         try
         {
+            // The real "Сервер" navigation button (beta.6 crash: the section key was not accepted).
+            var (serverTab, _) = AddTab(main, store, "Навигация по разделам"); Pump(); Layout(main);
+            var sessionView = (SessionView)serverTab.Content; var navigation = (Dictionary<string, Button>)Field(sessionView, "navigationButtons");
+            navigation["server"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
+            Check(Descendants<ServerPanelView>(sessionView).Any(p => p.IsVisible), "clicking the actual «Сервер» navigation button shows the server panel without a crash");
+            navigation["files"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
+            navigation["server"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
+            Check(Descendants<ServerPanelView>(sessionView).Count(p => p.IsVisible) == 1, "returning to «Сервер» reuses its single panel");
             var settings = new SettingsWindow { ShowInTaskbar = false, Left = 80, Top = 80 }; settings.Show(); Layout(settings);
             try
             {
-                foreach (var section in SettingsWindow.Sections) { settings.Show(section.Key); Layout(settings); evidence.Capture((FrameworkElement)settings.Content, "settings-" + section.Key, new { theme = "Light", fixtureOnly = true }); }
+                var pageHost = (FrameworkElement)Field(settings, "page"); bool transitions = true;
+                foreach (var section in SettingsWindow.Sections) { settings.Show(section.Key); transitions &= !UiMotion.Enabled || section.Key == "general" || UiMotion.ActiveClockCount(pageHost) > 0; UiMotion.Stop(pageHost); Layout(settings); evidence.Capture((FrameworkElement)settings.Content, "settings-" + section.Key, new { theme = "Light", fixtureOnly = true }); }
+                Check(transitions && pageHost.Opacity == 1 && UiMotion.ActiveClockCount(pageHost) == 0, $"settings section change runs the shared surface transition (motion {(UiMotion.Enabled ? "on" : "off on this runner")}) and finishes at its final state");
                 var theme = Descendants<ComboBox>(settings).FirstOrDefault(c => c.Name == "SettingsTheme");
                 settings.Show("general"); Layout(settings);
                 theme = Descendants<ComboBox>(settings).Single(c => c.Name == "SettingsTheme");

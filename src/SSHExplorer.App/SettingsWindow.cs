@@ -95,7 +95,9 @@ public sealed class SettingsWindow : Window
     public void Show(string key)
     {
         if (!pages.TryGetValue(key, out var content)) key = "general";
-        CurrentSection = key; page.Content = pages[key];
+        var previous = page.Content; CurrentSection = key; page.Content = pages[key];
+        // Same section transition as Files ↔ Monitor (167 ms, presentation only); skipped when motion is off.
+        if (previous is not null && !ReferenceEquals(previous, page.Content)) UiMotion.SurfaceChanged(page);
         var entry = navigation.Items.OfType<ListBoxItem>().FirstOrDefault(i => (string)i.Tag == key);
         if (!ReferenceEquals(navigation.SelectedItem, entry)) navigation.SelectedItem = entry;
     }
