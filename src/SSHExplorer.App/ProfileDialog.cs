@@ -77,7 +77,12 @@ public sealed class ProfileDialog:Window,ICancellableModal
         agentNote.SetBinding(VisibilityProperty,new Binding(nameof(_model.UsesSecret)){Converter=new InverseBooleanToVisibilityConverter()});panel.Children.Insert(panel.Children.IndexOf(secretLabel),agentNote);
         _advanced.Header="Дополнительные параметры";_advanced.Margin=new(0,4,0,0);var advanced=new StackPanel{Margin=new(0,8,0,0)};
         advanced.Children.Add(Field("Стартовая папка",nameof(_model.InitialPath),nameof(_model.InitialPathError)));
+        advanced.Children.Add(Field("Промежуточные узлы (ProxyJump)",nameof(_model.ProxyJump),nameof(_model.ProxyJumpError)));
+        var jumpHint=Ui.Text("Имя профиля или пользователь@узел:порт, через запятую, до трёх. Ключ каждого узла проверяется отдельно.",12);jumpHint.TextWrapping=TextWrapping.Wrap;jumpHint.SetResourceReference(TextBlock.ForegroundProperty,"Muted");jumpHint.Margin=new(0,-6,0,10);advanced.Children.Add(jumpHint);
+        advanced.Children.Add(Field("Группа на «Главной»",nameof(_model.Group),nameof(_model.GroupError)));
         var timeout=Field("Таймаут подключения, 3–120 секунд",nameof(_model.Timeout),nameof(_model.TimeoutError));timeout.HorizontalAlignment=HorizontalAlignment.Left;timeout.Width=245;advanced.Children.Add(timeout);_advanced.Content=advanced;panel.Children.Add(_advanced);
+        // A profile that already routes through jump hosts shows that route without an extra click.
+        if(_model.ProxyJump.Trim().Length>0)_advanced.IsExpanded=true;
         root.Children.Add(new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Content=root;
         Loaded+=async(_,_)=>
         {
@@ -125,7 +130,7 @@ public sealed class ProfileDialog:Window,ICancellableModal
         }
         else if(_model.FirstInvalidField is string key)
         {
-            if(key is nameof(_model.Timeout) or nameof(_model.InitialPath))_advanced.IsExpanded=true;
+            if(key is nameof(_model.Timeout) or nameof(_model.InitialPath) or nameof(_model.ProxyJump))_advanced.IsExpanded=true;
             if(_fields.TryGetValue(key,out var field)){if(field is SecretEntry secret)secret.FocusInput();else field.Focus();field.BringIntoView();}
         }
     }

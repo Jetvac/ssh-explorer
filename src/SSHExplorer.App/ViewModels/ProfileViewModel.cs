@@ -14,8 +14,11 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     private readonly Guid _id;
     private readonly List<string> _bookmarks;
     /// <summary>Jump host chain and Home group survive editing even before they have their own fields.</summary>
-    public string ProxyJump { get; set; } = "";
-    public string Group { get; set; } = "";
+    string _proxyJump="",_group="";
+    public string ProxyJump{get=>_proxyJump;set=>Set(ref _proxyJump,value);}
+    public string Group{get=>_group;set=>Set(ref _group,value);}
+    public string ProxyJumpError=>Error(nameof(ProxyJump));
+    public string GroupError=>Error(nameof(Group));
     private readonly Dictionary<string,string> _errors=[];
     private string _profileName,_host,_port,_username,_keyPath,_initialPath,_timeout,_status="";
     private int _authenticationIndex;
@@ -70,7 +73,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         RaiseErrors();
         if(_errors.Count==0&&Status==ValidationSummary)Status="";
     }
-    void RaiseErrors(){foreach(var name in new[]{nameof(NameError),nameof(HostError),nameof(PortError),nameof(UserError),nameof(KeyError),nameof(InitialPathError),nameof(TimeoutError),nameof(SecretError)})Changed(name);}
+    void RaiseErrors(){foreach(var name in new[]{nameof(NameError),nameof(HostError),nameof(PortError),nameof(UserError),nameof(KeyError),nameof(InitialPathError),nameof(ProxyJumpError),nameof(TimeoutError),nameof(SecretError)})Changed(name);}
     public void SecretChanged()=>ClearError("Secret");
     public bool Validate(string secret)
         =>Validate(secret,deferSecretUntilAuthentication:false);
@@ -88,6 +91,10 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         if(!int.TryParse(Timeout.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out int timeout)||timeout is <3 or >120)_errors[nameof(Timeout)]="Таймаут: число от 3 до 120 секунд.";
         try{_ = PosixPath.Normalize(string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim());}
         catch(ArgumentException){_errors[nameof(InitialPath)]="Используйте абсолютный POSIX-путь или ~ домашней папки.";}
+        try{_ = ProxyJumpSpec.Parse(ProxyJump);}
+        catch(ArgumentException ex){_errors[nameof(ProxyJump)]=ex.Message;}
+        if(ProxyJump.Trim().Length>0&&(AuthenticationKind)AuthenticationIndex is AuthenticationKind.Password or AuthenticationKind.KeyboardInteractive&&ProxyJumpSpec.Parse(ProxyJump.Trim()) is {Count:>0} hops&&hops[^1] is {User:not null} or {Port:not null})
+            _errors[nameof(ProxyJump)]="Для входа по паролю последний промежуточный узел укажите именем его профиля: пароль этого сервера не передаётся другому узлу.";
         if(SaveSecret&&UsesSecret&&!IsKeyAuthentication&&string.IsNullOrEmpty(secret)&&!_hasStoredSecret&&!deferSecretUntilAuthentication)_errors["Secret"]="Введите пароль для сохранения или отключите сохранение секрета.";
         RaiseErrors();Status=_errors.Count==0?"":ValidationSummary;return _errors.Count==0;
     }

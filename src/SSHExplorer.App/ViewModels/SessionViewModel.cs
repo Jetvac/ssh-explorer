@@ -19,7 +19,7 @@ public sealed class SessionViewModel : ObservableObject
         {
             SessionState.Connecting => "Подключение…",
             SessionState.AwaitingTrust => "Ожидание решения о доверии ключу сервера…",
-            SessionState.Connected => $"{session.Profile.Username}@{session.Profile.Endpoint}" + (!session.SftpAvailable ? " · SFTP недоступен" : "") + (!session.ShellAvailable ? " · Shell недоступен" : ""),
+            SessionState.Connected => $"{session.Profile.Username}@{session.Profile.Endpoint}" + (session.Route is { } route ? " · через " + route : "") + (!session.SftpAvailable ? " · SFTP недоступен" : "") + (!session.ShellAvailable ? " · Shell недоступен" : ""),
             SessionState.Disconnected => "Связь потеряна · данные устарели. " + session.Error,
             SessionState.Closing => "Закрытие…",
             _ => "Сессия закрыта"

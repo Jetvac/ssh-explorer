@@ -123,7 +123,7 @@ public sealed partial class ServerSession : IAsyncDisposable
         finally { Volatile.Write(ref _connecting, 0); }
     }
 
-    private ConnectionInfo BuildConnectionInfo(ConnectionContext context, CancellationToken ct, Action<IDisposable> registerKey)
+    private ConnectionInfo BuildConnectionInfo(ConnectionContext context, (string Host, int Port) endpoint, CancellationToken ct, Action<IDisposable> registerKey)
     {
         var credentials = _credentials ?? throw new InvalidOperationException("Сессия не подключена.");
         var methods = SessionAuthentication.CreateMethods(Profile, credentials, registerKey, prompt =>
@@ -141,7 +141,7 @@ public sealed partial class ServerSession : IAsyncDisposable
                 Report(context.Id, context.Parent, ConnectionStage.InteractivePrompt, Outcome(ex), ex); throw;
             }
         });
-        return new ConnectionInfo(Profile.Host.Trim('[', ']'), Profile.Port, Profile.Username, methods)
+        return new ConnectionInfo(endpoint.Host, endpoint.Port, Profile.Username, methods)
         { Timeout = TimeSpan.FromSeconds(Profile.TimeoutSeconds), Encoding = new UTF8Encoding(false, true) };
     }
     private async Task<T> ConnectClientAsync<T>(Func<ConnectionInfo, T> factory, CancellationToken caller, Guid? operationId = null) where T : BaseClient
@@ -162,7 +162,9 @@ public sealed partial class ServerSession : IAsyncDisposable
         try
         {
             // Key file decoding/decryption is local I/O and CPU work; it also belongs off the UI.
-            connection = await Task.Run(() => BuildConnectionInfo(context, ct, privateKeys.Add), ct).ConfigureAwait(false);
+            // With ProxyJump this opens (or reuses) the session's tunnel; trust is still checked for Profile.Host:Port.
+            var endpoint = await ConnectEndpointAsync(ct).ConfigureAwait(false);
+            connection = await Task.Run(() => BuildConnectionInfo(context, endpoint, ct, privateKeys.Add), ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             client = factory(connection);
             ownership = new ClientResource(client);

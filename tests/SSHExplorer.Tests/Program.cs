@@ -9,6 +9,12 @@ if (args.Length == 2 && args[0] == "--document-edit-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real SFTP document checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 6 && args[0] == "--jump-integration")
+{
+    await JumpIntegration.RunAsync(suite, args[1], args[2], int.Parse(args[3]), int.Parse(args[4]), int.Parse(args[5]));
+    Console.WriteLine($"RESULT: {suite.Passed} real jump-host checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length is 4 or 5 && args[0] == "--agent-integration")
 {
     await AgentIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3], args.Length == 5 ? args[4] : null);
@@ -53,6 +59,7 @@ await ServerPanelTests.RunAsync(suite);
 await CoreTests.RunAsync(suite);
 await SshConfigTests.RunAsync(suite);
 await AgentTests.RunAsync(suite);
+await ProxyJumpTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

@@ -50,7 +50,25 @@ jobs:
           ssh-add -q "$fixture/client_ed25519" "$fixture/client_rsa"
           empty_sock="$RUNNER_TEMP/empty-agent.sock"; ssh-agent -a "$empty_sock" > /dev/null
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --agent-integration 127.0.0.1 2222 "$USER" "$empty_sock" 2>&1 | tee artifacts-agent.log
-          sudo kill "$(cat "$fixture/sshd.pid")" || true
+
+          # 0.3 A3 ProxyJump: the test runs in a network namespace that reaches only the bastion (10.200.1.1:2225).
+          # The inner bastion (2224) and the target (2223) listen on the host loopback: reachable only through the chain.
+          start_sshd() { # name listen-address port
+            local conf="$fixture/sshd_$1"
+            sed -e "s/^Port .*/Port $3/" -e "s/^ListenAddress .*/ListenAddress $2/" -e "s#^PidFile .*#PidFile $fixture/$1.pid#" "$fixture/sshd_config" > "$conf"
+            sudo /usr/sbin/sshd -f "$conf" -E "$fixture/$1.log"
+          }
+          sudo ip netns add client
+          sudo ip link add veth-host type veth peer name veth-client
+          sudo ip link set veth-client netns client
+          sudo ip addr add 10.200.1.1/24 dev veth-host && sudo ip link set veth-host up
+          sudo ip netns exec client ip addr add 10.200.1.2/24 dev veth-client
+          sudo ip netns exec client ip link set veth-client up && sudo ip netns exec client ip link set lo up
+          start_sshd bastion 10.200.1.1 2225; start_sshd inner 127.0.0.1 2224; start_sshd target 127.0.0.1 2223
+          dotnet_bin="$(command -v dotnet)"; tests_dll="$PWD/tests/SSHExplorer.Tests/bin/Release/net10.0/SSHExplorer.Tests.dll"
+          sudo ip netns exec client sudo -u "$USER" env HOME="$HOME" SSH_AUTH_SOCK="$SSH_AUTH_SOCK" DOTNET_ROOT="${DOTNET_ROOT:-$(dirname "$dotnet_bin")}" DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+            "$dotnet_bin" "$tests_dll" --jump-integration "$USER" 10.200.1.1 2225 2224 2223 2>&1 | tee artifacts-jump.log
+          for pid in "$fixture"/*.pid; do sudo kill "$(cat "$pid")" || true; done
       - name: Collector benchmark beta.5 vs protocol 2 (same runner, +300 processes)
         run: |
           mkdir -p artifacts
@@ -64,5 +82,6 @@ jobs:
           path: |
             artifacts-core.log
             artifacts-agent.log
+            artifacts-jump.log
             artifacts/collector-benchmark.json
           retention-days: 14
