@@ -277,6 +277,10 @@ internal static class Beta6Tests
                 transfers.RefreshRows(); Pump();
                 Check(ReferenceEquals((transfers.Table.SelectedItem as TransferRow)?.Job, running), "refresh keeps the selected transfer");
                 Check(transfers.Model.Rows.Single(r => r.Job == done).Remaining == "—" && transfers.Model.Rows.Single(r => r.Job == failed).Speed == "—", "finished rows show unknown time/speed as «—», never zero");
+                Layout(transfers);
+                var runningBar = Descendants<ProgressBar>(transfers.Table).Single(b => ReferenceEquals((b.DataContext as TransferRow)?.Job, running)); var runningCell = Descendants<DataGridCell>(transfers.Table).First(c => c.IsAncestorOf(runningBar));
+                Check(runningBar.ActualWidth >= runningCell.ActualWidth * .4 && Math.Abs(runningBar.Value - 39.0625) < .01, $"running transfer progress bar fills its cell ({runningBar.ActualWidth:0} of {runningCell.ActualWidth:0} DIP) at its real value");
+                Check(TransferRow.FormatDuration(TimeSpan.FromMilliseconds(300)) == "< 1 с" && TransferRow.FormatDuration(TimeSpan.Zero) == "0 с", "sub-second remaining time reads «< 1 с», never a misleading zero");
                 evidence.Capture((FrameworkElement)transfers.Content, "transfers-states", new { theme = "Light", fixtureOnly = true });
             }
             finally { transfers.Close(); ClearJobs(); }

@@ -84,5 +84,5 @@ public sealed class TransferRow(TransferJob job) : ObservableObject
         if (previous.TransferredKey != snapshot.TransferredKey) Raise(nameof(TransferredKey));
     }
     (double ProgressValue, bool ProgressKnown, bool IsRunning, string StateKind, int StateRank, double? ProgressKey, double? SpeedKey, TimeSpan? RemainingKey, long TransferredKey)? derived;
-    public static string FormatDuration(TimeSpan value) => value.TotalHours >= 24 ? $"{(int)value.TotalDays} д {value.Hours} ч" : value.TotalHours >= 1 ? $"{(int)value.TotalHours} ч {value.Minutes:00} мин" : value.TotalMinutes >= 1 ? $"{value.Minutes} мин {value.Seconds:00} с" : $"{Math.Max(0, value.Seconds)} с";
+    public static string FormatDuration(TimeSpan value) => value.TotalHours >= 24 ? $"{(int)value.TotalDays} д {value.Hours} ч" : value.TotalHours >= 1 ? $"{(int)value.TotalHours} ч {value.Minutes:00} мин" : value.TotalMinutes >= 1 ? $"{value.Minutes} мин {value.Seconds:00} с" : value.TotalSeconds is > 0 and < 1 ? "< 1 с" : $"{Math.Max(0, value.Seconds)} с";
 }

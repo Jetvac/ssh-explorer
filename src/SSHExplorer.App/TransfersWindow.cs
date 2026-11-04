@@ -58,7 +58,10 @@ public sealed class TransfersWindow : Window
         grid.Columns.Add(new DataGridTemplateColumn { Header = "Объект", CellTemplate = NameTemplate(), SortMemberPath = "Name", Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 180 });
         MainWindow.AddColumn(grid, "Направление", "Direction", 200);
         grid.Columns.Add(new DataGridTemplateColumn { Header = "Состояние", CellTemplate = StateTemplate(), SortMemberPath = "State", Width = 120, MinWidth = 100 });
-        grid.Columns.Add(new DataGridTemplateColumn { Header = "Прогресс", CellTemplate = ProgressTemplate(), SortMemberPath = "Progress", Width = 150, MinWidth = 110 });
+        // The bar must fill the cell: with the default Left content alignment the cell shrank to the bar's
+        // desired width, so a running transfer showed a dot instead of its progress.
+        var progressCell = new Style(typeof(DataGridCell), (Style)FindResource(typeof(DataGridCell))); progressCell.Setters.Add(new Setter(HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        grid.Columns.Add(new DataGridTemplateColumn { Header = "Прогресс", CellTemplate = ProgressTemplate(), CellStyle = progressCell, SortMemberPath = "Progress", Width = 150, MinWidth = 110 });
         MainWindow.AddColumn(grid, "Скорость", "Speed", 100); MainWindow.AddColumn(grid, "Осталось", "Remaining", 100);
         grid.ItemsSource = transfers.Rows;
         TableSorting.Attach(grid, "transfers", [
