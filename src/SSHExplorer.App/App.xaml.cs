@@ -15,6 +15,9 @@ public partial class App : Application
     internal int DesktopStartupCount { get; private set; }
     public static AppStore Store { get; private set; } = null!;
     public static TransferQueue Transfers { get; } = new();
+    /// <summary>Raised after «Параметры» changes which optional modules are enabled.</summary>
+    public static event EventHandler? ModulesChanged;
+    internal static void RaiseModulesChanged() => ModulesChanged?.Invoke(null, EventArgs.Empty);
     protected override async void OnStartup(StartupEventArgs e)
     {
         StartupCallbackObserved = true;

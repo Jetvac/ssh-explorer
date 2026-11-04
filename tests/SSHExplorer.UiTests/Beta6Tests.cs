@@ -292,6 +292,18 @@ internal static class Beta6Tests
             navigation["files"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
             navigation["server"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
             Check(Descendants<ServerPanelView>(sessionView).Count(p => p.IsVisible) == 1, "returning to «Сервер» reuses its single panel");
+            // 0.3 G: the Docker module appears only when enabled, at once in open tabs; an unconnected session explains itself in place.
+            App.Store.Settings.DockerModule = false; App.RaiseModulesChanged(); Pump();
+            Check(!navigation["docker"].IsVisible, "Docker is hidden while the module is off");
+            App.Store.Settings.DockerModule = true; App.RaiseModulesChanged(); Pump(); Layout(main);
+            Check(navigation["docker"].IsVisible, "enabling the module shows Docker in an already open tab");
+            navigation["docker"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
+            var dockerInTab = Descendants<DockerView>(sessionView).Single();
+            for (int i = 0; i < 50 && !Descendants<TextBlock>(dockerInTab).Any(b => b.Name == "DockerProblem"); i++) Pump();
+            Check(Descendants<TextBlock>(dockerInTab).Any(b => b.Name == "DockerProblem" && b.IsVisible && b.Text.StartsWith("Не удалось проверить Docker", StringComparison.Ordinal)), "opening Docker on an unconnected session explains the problem in place, without a dialog");
+            App.Store.Settings.DockerModule = false; App.RaiseModulesChanged(); Pump();
+            Check(!navigation["docker"].IsVisible && !Descendants<DockerView>(sessionView).Any(v => v.IsVisible), "disabling the module hides Docker and leaves its section");
+            DockerUiChecks.Run(store, evidence, Check);
             // 0.3 A1: import from an OpenSSH config — preview, duplicate unchecked, only the checked host is saved.
             var existingProfile = store.Profiles.First();
             var importText = string.Join("\n", "Host imported-web", " HostName 10.9.0.5", " User deploy", " ProxyJump bastion", " ProxyCommand nc %h %p",

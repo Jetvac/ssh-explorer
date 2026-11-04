@@ -482,7 +482,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; readonly Button reconnect;
+    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -498,6 +498,10 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Clamp(App.Store.Settings.TreeWidth, 190, 420)), MinWidth = 190, MaxWidth = 420 }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 340 });
         side.Margin = new Thickness(5, 8, 5, 8); side.SetResourceReference(Panel.BackgroundProperty, "NavigationSurface");
         side.Children.Add(Nav(IconCatalog.Server, "Сервер", "server")); side.Children.Add(Nav(IconCatalog.Terminal, "Терминал", "terminal")); side.Children.Add(Nav(IconCatalog.Performance, "Диспетчер задач", "monitor"));
+        // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
+        var dockerNav = Nav(IconCatalog.Docker, "Docker", "docker"); side.Children.Add(dockerNav);
+        void ApplyModules() { dockerNav.Visibility = App.Store.Settings.DockerModule ? Visibility.Visible : Visibility.Collapsed; if (!App.Store.Settings.DockerModule && section == "docker") ShowSection("files"); }
+        ApplyModules(); App.ModulesChanged += modulesChanged = (_, _) => ApplyModules();
         monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
         monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
         monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
@@ -615,7 +619,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         if (disposed) return;
         if (section == key && key != "monitor" && screen.Content is not null &&
-            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel))) return;
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker))) return;
         var previousContent = screen.Content; var previousPage = monitor?.Page;
         section = key;
         UpdateConnectionStatusVisibility();
@@ -629,6 +633,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             button.FontWeight = name == "monitor" && key == "monitor" ? FontWeights.SemiBold : FontWeights.Normal;
         }
         if (key == "terminal") { _ = OpenTerminalAsync(); return; }
+        if (key == "docker")
+        {
+            docker ??= new DockerView(new DockerService(Session));
+            screen.Content = docker;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
         if (key == "server")
         {
             serverPanel ??= new ServerPanelView(Session, presentationOnly ? null : () => main.Reconnect(this, files?.CurrentPath), Session.ShellAvailable ? () => ShowSection("terminal") : null, PendingWork);
@@ -680,7 +691,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminal?.Dispose();
         try { await Session.DisposeAsync(); }
