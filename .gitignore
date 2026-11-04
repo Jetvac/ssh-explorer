@@ -17,3 +17,4 @@ id_ed25519
 **/secret-*.dpapi
 **/settings.json
 **/hostkeys.json
+**/RemoteEdits/

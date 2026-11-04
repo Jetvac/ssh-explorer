@@ -24,6 +24,7 @@ public sealed partial class ServerSession : IAsyncDisposable
     private Guid _connectOperationId;
     public Guid Id { get; } = Guid.NewGuid();
     public ServerProfile Profile { get; }
+    public string? VerifiedHostKey { get; private set; }
     public SessionState State { get; private set; } = SessionState.Closed;
     public string? Error { get; private set; }
     public string? SftpError { get; private set; }
@@ -179,6 +180,7 @@ public sealed partial class ServerSession : IAsyncDisposable
                     e.CanTrust = _store.Trust.VerifyAsync(Profile.Host, Profile.Port, e.HostKeyName, e.HostKey, _sessionTrusted,
                         key => _prompt!(key, ct), ct).GetAwaiter().GetResult();
                     if (!e.CanTrust) throw new OperationCanceledException("Доверие ключу сервера не подтверждено.", ct);
+                    lock (_lifecycle) VerifiedHostKey ??= e.HostKeyName + ":SHA256:" + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(e.HostKey)).TrimEnd('=');
                     Report(context.Id, context.Parent, ConnectionStage.HostTrust, ConnectionStageOutcome.Succeeded);
                     if (initial && State == SessionState.AwaitingTrust) SetState(SessionState.Connecting);
                     if (!authenticationStarted) { authenticationStarted = true; Report(context.Id, context.Parent, ConnectionStage.Authentication, ConnectionStageOutcome.Started); }

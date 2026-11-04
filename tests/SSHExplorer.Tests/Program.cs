@@ -3,6 +3,12 @@ using SSHExplorer.Monitoring;
 
 var suite = new TestSuite();
 #if CORE_TESTS
+if (args.Length == 1 && args[0] == "--document-edit")
+{
+    await DocumentEditTests.RunAsync(suite);
+    Console.WriteLine($"RESULT: {suite.Passed} document edit checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 2 && args[0] == "--files-inline-integration")
 {
     await FileCreationIntegration.RunAsync(suite, args[1]);
@@ -30,6 +36,7 @@ await MonitorTests.RunAsync(suite);
 await MetricStateTests.RunAsync(suite);
 #if CORE_TESTS
 await CoreTests.RunAsync(suite);
+await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);
 else if (args.Length != 0)

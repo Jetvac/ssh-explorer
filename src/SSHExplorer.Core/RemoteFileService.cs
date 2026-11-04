@@ -197,7 +197,7 @@ public sealed class RemoteFileService
         Length = f.Length, LastAccessTimeUtc = f.LastAccessTimeUtc, LastWriteTimeUtc = f.LastWriteTimeUtc, UserId = f.UserId, GroupId = f.GroupId,
         Permissions = ReadMode(f.Attributes)
     };
-    private static short ReadMode(SftpFileAttributes attributes)
+    internal static short ReadMode(SftpFileAttributes attributes)
     {
         // GetBytes serializes only attributes changed since receipt, so it cannot be used to
         // read a fetched mode. Public flags include all twelve POSIX permission bits.
