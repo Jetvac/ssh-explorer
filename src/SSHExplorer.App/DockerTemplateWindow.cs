@@ -12,8 +12,10 @@ public sealed class DockerEnvRow : ObservableObject
 {
     string key = "", value = ""; bool secret;
     public string Key { get => key; set => Set(ref key, value); }
-    public string Value { get => value; set { Set(ref this.value, value); Raise(nameof(Hint)); } }
-    public bool Secret { get => secret; set { Set(ref secret, value); Raise(nameof(Hint)); } }
+    public string Value { get => value; set { Set(ref this.value, value); Raise(nameof(Hint)); Raise(nameof(Display)); } }
+    public bool Secret { get => secret; set { Set(ref secret, value); Raise(nameof(Hint)); Raise(nameof(Display)); } }
+    /// <summary>What the table shows outside editing: a secret is never displayed.</summary>
+    public string Display => Secret ? (Value.Length > 0 ? new string('•', Math.Min(12, Value.Length)) : "") : Value;
     /// <summary>Encrypted value already saved for this key (kept unless a new value is typed).</summary>
     public string StoredProtected { get; init; } = "";
     public string Hint => Secret && StoredProtected.Length > 0 && Value.Length == 0 ? "сохранено · введите, чтобы заменить" : Secret ? "секрет · хранится зашифрованным" : "";
@@ -57,9 +59,13 @@ public sealed class DockerTemplateWindow : Window
         envHint.TextWrapping = TextWrapping.Wrap; envHint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); envHint.Margin = new Thickness(0, 2, 0, 6); form.Children.Add(envHint);
         EnvTable.SetResourceReference(StyleProperty, "ProcessTableStyle");
         EnvTable.Columns.Add(new DataGridTextColumn { Header = "Ключ", Binding = new Binding(nameof(DockerEnvRow.Key)) { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = 200 });
-        EnvTable.Columns.Add(new DataGridTextColumn { Header = "Значение", Binding = new Binding(nameof(DockerEnvRow.Value)) { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 180 });
+        // Secret values are masked outside editing; the editor is a plain field only while the cell is being edited.
+        var shown = new FrameworkElementFactory(typeof(TextBlock)); shown.SetBinding(TextBlock.TextProperty, new Binding(nameof(DockerEnvRow.Display))); shown.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center); shown.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        var editing = new FrameworkElementFactory(typeof(TextBox)); editing.SetBinding(TextBox.TextProperty, new Binding(nameof(DockerEnvRow.Value)) { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }); editing.SetValue(BorderThicknessProperty, new Thickness(0));
+        EnvTable.Columns.Add(new DataGridTemplateColumn { Header = "Значение", CellTemplate = new DataTemplate { VisualTree = shown }, CellEditingTemplate = new DataTemplate { VisualTree = editing }, Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 180 });
         EnvTable.Columns.Add(new DataGridCheckBoxColumn { Header = "Секрет", Binding = new Binding(nameof(DockerEnvRow.Secret)) { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = 70 });
-        EnvTable.Columns.Add(new DataGridTextColumn { Header = "", Binding = new Binding(nameof(DockerEnvRow.Hint)), IsReadOnly = true, Width = 190 });
+        var hintStyle = new Style(typeof(TextBlock)); hintStyle.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap)); hintStyle.Setters.Add(new Setter(TextBlock.FontSizeProperty, 11.0)); hintStyle.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
+        EnvTable.Columns.Add(new DataGridTextColumn { Header = "", Binding = new Binding(nameof(DockerEnvRow.Hint)), IsReadOnly = true, Width = 200, ElementStyle = hintStyle });
         EnvTable.ItemsSource = EnvRows; form.Children.Add(EnvTable);
         var add = Ui.Button("Добавить переменную", () => { var row = new DockerEnvRow(); EnvRows.Add(row); EnvTable.SelectedItem = row; EnvTable.ScrollIntoView(row); EnvTable.CurrentCell = new DataGridCellInfo(row, EnvTable.Columns[0]); EnvTable.BeginEdit(); });
         var remove = Ui.Button("Удалить выбранную", () => { if (EnvTable.SelectedItem is DockerEnvRow row) EnvRows.Remove(row); });

@@ -58,6 +58,11 @@ internal static class DockerUiChecks
             for (int i = 0; i < 50 && !Cmd("Recreate").IsEnabled; i++) Pump();
             var saved = App.Store.Profiles.Single(p => p.Id == profile.Id).DockerTemplates.SingleOrDefault(t => t.ContainerName == "db");
             check(Cmd("Recreate").IsEnabled && saved is { RestartPolicy: "always" } && saved.Env.Single().Key == "POSTGRES_DB", "saved run parameters are stored in the profile and enable «Пересоздать с параметрами»");
+            var bar = Descendants<ResponsiveCommandBar>(view).Single(); var subtitleBlock = Descendants<TextBlock>(view).First(b => b.Text.Contains("fixture@", StringComparison.Ordinal));
+            check(bar.ActualWidth + bar.TransformToAncestor(view).Transform(new Point()).X <= view.ActualWidth + 1 && Descendants<Button>(bar).Where(b => b.IsVisible && b.Name.StartsWith("Docker", StringComparison.Ordinal)).All(b => b.TransformToAncestor(view).TransformBounds(new Rect(b.RenderSize)).Right <= view.ActualWidth + 1)
+                && !Descendants<ScrollBar>(view).Any(s => s.Orientation == Orientation.Horizontal && s.IsVisible && s.TransformToAncestor(view).Transform(new Point()).Y < 60), "Docker commands fit the window (extra ones in «…») and nothing scrolls over the heading");
+            var logBox = Descendants<TextBox>(view).Single(b => b.Name == "DockerLog");
+            check(logBox.VerticalContentAlignment == VerticalAlignment.Top, "the log starts at the top of its pane");
             evidence.Capture(view, "docker", new { theme = "Light", fixtureOnly = true });
         }
         finally { host.Close(); view.Dispose(); }
@@ -76,6 +81,9 @@ internal static class DockerUiChecks
             check(built is not null && kept is { Secret: true, Value: "" } && DockerSecrets.ValueOf(kept) == "kept-secret" && typed is { Secret: true, Value: "" } && typed.Protected.Length > 0
                 && !typed.Protected.Contains("s3cr3t", StringComparison.Ordinal) && DockerSecrets.ValueOf(typed) == "s3cr3t-typed",
                 "secret env values are DPAPI-encrypted and an untouched stored secret is kept: " + string.Join(" | ", problems));
+            Layout(editor);
+            var cellTexts = Descendants<TextBlock>(editor.EnvTable).Select(b => b.Text).ToArray();
+            check(!cellTexts.Any(text => text.Contains("s3cr3t", StringComparison.Ordinal)) && cellTexts.Any(text => text.StartsWith("•", StringComparison.Ordinal)) && cellTexts.Contains("prod"), "secret values are masked in the env table while plain values stay readable");
             evidence.Capture((FrameworkElement)editor.Content, "docker-template", new { theme = "Light", fixtureOnly = true });
         }
         finally { editor.Close(); }

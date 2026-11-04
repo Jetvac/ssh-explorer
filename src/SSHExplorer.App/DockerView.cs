@@ -19,7 +19,7 @@ public sealed class DockerView : UserControl, IDisposable
     readonly ListCollectionView view;
     readonly TextBox search = new() { Name = "DockerSearch", MinHeight = 32, MinWidth = 220 };
     readonly TextBlock subtitle = Ui.Text("", 12), state = Ui.Text("", 12), logTitle = Ui.Text("Журнал", 14, true);
-    readonly TextBox log = new() { Name = "DockerLog", IsReadOnly = true, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12, TextWrapping = TextWrapping.NoWrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, BorderThickness = new Thickness(0), Padding = new Thickness(12, 8, 12, 8) };
+    readonly TextBox log = new() { Name = "DockerLog", IsReadOnly = true, VerticalContentAlignment = VerticalAlignment.Top, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12, TextWrapping = TextWrapping.NoWrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, BorderThickness = new Thickness(0), Padding = new Thickness(12, 8, 12, 8) };
     readonly ComboBox tail = new() { ItemsSource = new[] { 200, 1000, 5000 }, SelectedIndex = 0, MinWidth = 90, Name = "DockerLogTail" };
     readonly CheckBox follow = new() { Content = "Следить", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0), Name = "DockerLogFollow" };
     readonly DispatcherTimer followTimer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -38,20 +38,25 @@ public sealed class DockerView : UserControl, IDisposable
         docker = service; Name = "DockerView";
         SetResourceReference(BackgroundProperty, "Paper");
         var title = Ui.Text("Docker", 18, true);
-        subtitle.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); subtitle.Text = docker.Session.Profile.Name + " · " + docker.Session.Profile.Username + "@" + docker.Session.Profile.Endpoint;
+        subtitle.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); subtitle.TextTrimming = TextTrimming.CharacterEllipsis; subtitle.MaxWidth = 340; subtitle.Text = docker.Session.Profile.Name + " · " + docker.Session.Profile.Username + "@" + docker.Session.Profile.Endpoint;
         var heading = new StackPanel { Margin = new Thickness(4, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center }; heading.Children.Add(title); heading.Children.Add(subtitle);
-        Button Command(string key, string glyph, string label, Func<Task> action, string tooltip) { var b = Ui.AsyncCommandButton(glyph, label, () => Run(action), tooltip); b.Name = "Docker" + key; commands[key] = b; return b; }
-        var bar = Ui.Row(heading, Ui.Line(),
-            Command("Refresh", Ui.RefreshGlyph, "Обновить", () => RefreshAsync(), "Обновить список контейнеров"),
-            Command("Start", "", "Запустить", () => Act(c => docker.StartAsync(c.Id, lifetime.Token)), "docker start"),
-            Command("Stop", "", "Остановить", () => Act(c => docker.StopAsync(c.Id, lifetime.Token)), "docker stop"),
-            Command("Restart", IconCatalog.Restart, "Перезапустить", () => Act(c => docker.RestartAsync(c.Id, lifetime.Token)), "docker restart — те же параметры"),
-            Command("Remove", Ui.DeleteGlyph, "Удалить…", RemoveAsync, "Удалить контейнер (данные в его слое будут потеряны)"),
-            Ui.Line(),
-            Command("New", Ui.AddGlyph, "Новый контейнер…", NewAsync, "Задать параметры и запустить новый контейнер"),
-            Command("Edit", IconCatalog.Settings, "Параметры запуска…", EditAsync, "Изменить env, порты, тома и образ; сохранить и пересоздать"),
-            Command("Recreate", IconCatalog.Reconnect, "Пересоздать с параметрами", RecreateAsync, "Удалить и запустить заново по сохранённым параметрам"));
-        var barHost = new Border { Child = new ScrollViewer { Content = bar, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false }, Padding = new Thickness(10, 4, 10, 4) };
+        // A responsive row: commands that do not fit go into «…», so nothing is cut off or scrolls over the heading.
+        var bar = new ResponsiveCommandBar { Name = "DockerCommandBar", VerticalAlignment = VerticalAlignment.Center };
+        void Command(string key, string glyph, string label, Func<Task> action, string tooltip, int priority)
+        {
+            var b = Ui.AsyncCommandButton(glyph, label, () => Run(action), tooltip); b.Name = "Docker" + key; commands[key] = b;
+            bar.Add(key, b, () => Ui.AsyncMenu(label, () => Run(action), glyph: glyph), priority);
+        }
+        Command("Refresh", Ui.RefreshGlyph, "Обновить", () => RefreshAsync(), "Обновить список контейнеров", 100);
+        Command("Start", "", "Запустить", () => Act(c => docker.StartAsync(c.Id, lifetime.Token)), "docker start", 90);
+        Command("Stop", "", "Остановить", () => Act(c => docker.StopAsync(c.Id, lifetime.Token)), "docker stop", 90);
+        Command("Recreate", IconCatalog.Reconnect, "Пересоздать с параметрами", RecreateAsync, "Удалить и запустить заново по сохранённым параметрам", 80);
+        Command("Edit", IconCatalog.Settings, "Параметры запуска…", EditAsync, "Изменить env, порты, тома и образ; сохранить и пересоздать", 70);
+        Command("Restart", IconCatalog.Restart, "Перезапустить", () => Act(c => docker.RestartAsync(c.Id, lifetime.Token)), "docker restart — те же параметры", 60);
+        Command("New", Ui.AddGlyph, "Новый контейнер…", NewAsync, "Задать параметры и запустить новый контейнер", 50);
+        Command("Remove", Ui.DeleteGlyph, "Удалить…", RemoveAsync, "Удалить контейнер (данные в его слое будут потеряны)", 10);
+        var barRow = new DockPanel(); DockPanel.SetDock(heading, Dock.Left); barRow.Children.Add(heading); var divider = Ui.Line(); DockPanel.SetDock(divider, Dock.Left); barRow.Children.Add(divider); barRow.Children.Add(bar);
+        var barHost = new Border { Child = barRow, Padding = new Thickness(10, 4, 10, 4) };
         barHost.SetResourceReference(StyleProperty, "CommandBarStyle");
 
         var searchHost = new Grid { Margin = new Thickness(16, 10, 16, 6) }; searchHost.Children.Add(search);
