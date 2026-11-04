@@ -282,6 +282,25 @@ public sealed partial class ServerSession : IAsyncDisposable
         }
         finally { _execGate.Release(); }
     }
+    /// <summary>
+    /// A command that may run long (docker stop/run with an image pull) on its own SSH connection with its own timeout,
+    /// so it never holds the shared exec channel that monitoring and quick commands use.
+    /// </summary>
+    public async Task<CommandResult> ExecuteLongAsync(string command, TimeSpan timeout, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, Lifetime);
+        var client = await CreateSshClientAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            using var cmd = client.CreateCommand(command, Encoding.UTF8);
+            cmd.CommandTimeout = timeout;
+            await cmd.ExecuteAsync(linked.Token).ConfigureAwait(false);
+            if (cmd.Result.Length > 16 * 1024 * 1024 || cmd.Error.Length > 1024 * 1024) throw new IOException("Ответ сервера превысил ограничение размера.");
+            return new CommandResult(cmd.Result, cmd.Error, cmd.ExitStatus ?? -1);
+        }
+        finally { Release(client); }
+    }
     public async Task<ShellStream> CreateShellAsync(uint columns = 100, uint rows = 30, string? directory = null, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

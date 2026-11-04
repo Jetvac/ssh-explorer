@@ -27,7 +27,9 @@ internal static class DockerIntegration
                 firstId = await docker.RunAsync(template, replaceExisting: false);
                 var listed = (await docker.ListAsync()).Single(c => c.Name == name);
                 TestSuite.True(listed.IsRunning && listed.Ports.Contains("18766", StringComparison.Ordinal), listed.ToString());
-                var leaks = await session.ExecuteAsync($"grep -l {PosixPath.Quote(Secret)} /proc/[0-9]*/cmdline 2>/dev/null | wc -l");
+                // The value is assembled inside the shell and handed to awk through its environment: neither this probe's
+                // own command line nor awk's argv contains it, so any hit is a real leak.
+                var leaks = await session.ExecuteAsync("S=\"$(printf 'ci-secret-value-%s' 7f3a)\"; export S; for f in /proc/[0-9]*/cmdline; do tr '\\0' '\\n' <\"$f\" 2>/dev/null | awk 'index($0, ENVIRON[\"S\"]) { hit = 1 } END { exit !hit }' && echo \"$f\"; done | wc -l");
                 TestSuite.Equal("0", leaks.Output.Trim());
                 var leftovers = await session.ExecuteAsync("ls -A ~/.cache/sshexplorer 2>/dev/null | wc -l");
                 TestSuite.Equal("0", leftovers.Output.Trim());

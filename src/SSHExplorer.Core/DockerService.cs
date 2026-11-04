@@ -17,6 +17,9 @@ public sealed class DockerService(ServerSession session)
     /// <summary>Replaces SSH exec in UI fixtures (no server); production always uses the session.</summary>
     internal Func<string, CancellationToken, Task<CommandResult>>? ExecuteOverride { get; set; }
     Task<CommandResult> Exec(string command, CancellationToken ct) => ExecuteOverride?.Invoke(command, ct) ?? session.ExecuteAsync(command, ct);
+    /// <summary>Stop/restart/remove wait for the container (up to its grace period); run may pull an image: own connection, longer timeout.</summary>
+    Task<CommandResult> ExecLong(string command, TimeSpan timeout, CancellationToken ct) => ExecuteOverride?.Invoke(command, ct) ?? session.ExecuteLongAsync(command, timeout, ct);
+    static readonly TimeSpan LifecycleTimeout = TimeSpan.FromSeconds(90), RunTimeout = TimeSpan.FromMinutes(15);
 
     public async Task<bool> ProbeAsync(CancellationToken ct = default)
     {
@@ -26,19 +29,19 @@ public sealed class DockerService(ServerSession session)
 
     string Cli => cli ?? throw new InvalidOperationException(Problem ?? "Docker ещё не проверен.");
 
-    async Task<CommandResult> RunChecked(string command, CancellationToken ct)
+    async Task<CommandResult> RunChecked(string command, CancellationToken ct, TimeSpan? longTimeout = null)
     {
-        var result = await Exec(command, ct).ConfigureAwait(false);
+        var result = longTimeout is { } t ? await ExecLong(command, t, ct).ConfigureAwait(false) : await Exec(command, ct).ConfigureAwait(false);
         if (result.ExitStatus != 0) throw new IOException(FirstLine(result.Error) ?? FirstLine(result.Output) ?? $"Docker завершился с кодом {result.ExitStatus}.");
         return result;
     }
     static string? FirstLine(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
 
     public async Task<IReadOnlyList<DockerContainer>> ListAsync(CancellationToken ct = default) => DockerCommands.ParseList((await RunChecked(DockerCommands.List(Cli), ct).ConfigureAwait(false)).Output);
-    public Task StartAsync(string id, CancellationToken ct = default) => RunChecked(DockerCommands.Action(Cli, "start", id), ct);
-    public Task StopAsync(string id, CancellationToken ct = default) => RunChecked(DockerCommands.Action(Cli, "stop", id), ct);
-    public Task RestartAsync(string id, CancellationToken ct = default) => RunChecked(DockerCommands.Action(Cli, "restart", id), ct);
-    public Task RemoveAsync(string id, bool force, CancellationToken ct = default) => RunChecked(DockerCommands.Remove(Cli, id, force), ct);
+    public Task StartAsync(string id, CancellationToken ct = default) => RunChecked(DockerCommands.Action(Cli, "start", id), ct, LifecycleTimeout);
+    public Task StopAsync(string id, CancellationToken ct = default) => RunChecked(DockerCommands.Action(Cli, "stop", id), ct, LifecycleTimeout);
+    public Task RestartAsync(string id, CancellationToken ct = default) => RunChecked(DockerCommands.Action(Cli, "restart", id), ct, LifecycleTimeout);
+    public Task RemoveAsync(string id, bool force, CancellationToken ct = default) => RunChecked(DockerCommands.Remove(Cli, id, force), ct, LifecycleTimeout);
     public async Task<string> LogsAsync(string id, int tail, CancellationToken ct = default) => (await Exec(DockerCommands.Logs(Cli, id, tail), ct).ConfigureAwait(false)).Output;
 
     /// <summary>Takes the run parameters of an existing container as a template (image env defaults left out).</summary>
@@ -80,8 +83,8 @@ public sealed class DockerService(ServerSession session)
                 using (var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false)))
                     await writer.WriteAsync(DockerCommands.EnvFile(template, DockerSecrets.ValueOf).AsMemory(), ct).ConfigureAwait(false);
             }
-            if (replaceExisting) await Exec(DockerCommands.Remove(Cli, template.ContainerName, force: true) + " 2>/dev/null || true", ct).ConfigureAwait(false);
-            var result = await RunChecked(DockerCommands.Run(Cli, template, envFile), ct).ConfigureAwait(false);
+            if (replaceExisting) await ExecLong(DockerCommands.Remove(Cli, template.ContainerName, force: true) + " 2>/dev/null || true", LifecycleTimeout, ct).ConfigureAwait(false);
+            var result = await RunChecked(DockerCommands.Run(Cli, template, envFile), ct, RunTimeout).ConfigureAwait(false);
             return result.Output.Trim();
         }
         finally
