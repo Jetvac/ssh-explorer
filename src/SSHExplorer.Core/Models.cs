@@ -17,6 +17,10 @@ public sealed class ServerProfile
     public int TimeoutSeconds { get; set; } = 20;
     public bool SaveSecret { get; set; }
     public List<string> Bookmarks { get; set; } = [];
+    /// <summary>OpenSSH-style jump host chain: "[user@]host[:port]" or a profile name, comma separated (empty — direct).</summary>
+    public string ProxyJump { get; set; } = "";
+    /// <summary>Optional group on the Home list (empty — ungrouped).</summary>
+    public string Group { get; set; } = "";
     public string Endpoint => $"{(Host.Contains(':') ? $"[{Host}]" : Host)}:{Port}";
     public void Validate()
     {

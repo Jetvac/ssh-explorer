@@ -89,6 +89,9 @@ internal static class Program
         corrected.Host="corrected.example.invalid";corrected.Username="tester";
         Check(corrected.Status.Length==0&&corrected.FirstInvalidField is null,"correcting the last marked field clears only its obsolete validation summary without resubmitting");
         var model=ValidModel();Check(model.Validate(""),"offline DNS and Cyrillic display name save without network access");
+        var importedStore=NewStore("vm-proxyjump");var imported=new ServerProfile{Name="Импорт",Host="app.example.invalid",Username="tester",ProxyJump="bastion,jump2:2200",Group="Прод"};
+        var edit=new ProfileViewModel(new ProfilePersistence(importedStore),imported);edit.ProfileName="Импорт (изменён)";
+        Check(Pump(edit.SaveAsync(""))&&importedStore.Profiles.Single().ProxyJump=="bastion,jump2:2200"&&importedStore.Profiles.Single().Group=="Прод","editing an imported profile keeps its jump host chain and group");
         foreach(var host in new[]{"127.0.0.1","2001:db8::1","[2001:db8::1]","localhost","пример.рф"}){model.Host=host;Check(model.Validate(""),"valid host accepted: "+host);}
         foreach(var host in new[]{"","https://example.com","host:22","999.1.1.1","[broken","name/path","bad host"}){model.Host=host;Check(!model.Validate("")&&!string.IsNullOrEmpty(model.HostError),"invalid host stays inline: "+(host.Length==0?"empty":host));}
         model.Host="offline.example.invalid";model.ProfileName="";Check(!model.Validate("")&&model.NameError.Length>0,"empty name stays inline");model.ProfileName="Тест";

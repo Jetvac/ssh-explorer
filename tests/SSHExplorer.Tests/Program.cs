@@ -45,6 +45,7 @@ await MetricStateTests.RunAsync(suite);
 await ServerPanelTests.RunAsync(suite);
 #if CORE_TESTS
 await CoreTests.RunAsync(suite);
+await SshConfigTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

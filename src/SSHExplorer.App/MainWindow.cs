@@ -83,6 +83,8 @@ public sealed partial class MainWindow : Window
         var searchHost = new Grid(); searchHost.Children.Add(search); var searchHint = Ui.Text("Поиск серверов", 14); searchHint.Margin = new Thickness(10, 0, 6, 0); searchHint.IsHitTestVisible = false; searchHint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); searchHost.Children.Add(searchHint); search.TextChanged += (_, _) => searchHint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; Grid.SetColumn(searchHost, 1); navigation.Children.Add(searchHost); DockPanel.SetDock(navigation, Dock.Top); p.Children.Add(navigation);
         var commands = new ResponsiveCommandBar { Name = "HomeCommandBar" };
         commands.Add("add", Ui.AsyncCommandButton(Ui.AddGlyph, "Добавить сервер", AddProfile), () => Ui.AsyncMenu("Добавить сервер", AddProfile, glyph: Ui.AddGlyph), 100);
+        var import = Ui.FlyoutButton(ImportGlyph, "Импорт", ImportMenu, "Импорт серверов из других программ"); import.Name = "HomeImport";
+        commands.Add("import", import, () => { var item = new MenuItem { Header = "Импорт", Icon = Ui.Icon(ImportGlyph, 16, false) }; foreach (var entry in ImportEntries()) item.Items.Add(entry); return item; }, 20);
         foreach (var (key,glyph,label,action,priority) in new (string,string,string,Func<Task>,int)[] { ("connect","\uE768","Подключиться",ConnectSelected,80), ("edit",Ui.RenameGlyph,"Изменить",EditSelected,50), ("remove",Ui.DeleteGlyph,"Удалить профиль",RemoveSelected,10) })
         {
             var button = Ui.AsyncCommandButton(glyph,label,action); button.SetBinding(IsEnabledProperty,new Binding(nameof(HomeViewModel.HasSelectedProfile)));
@@ -115,6 +117,43 @@ public sealed partial class MainWindow : Window
         refreshingHome = true;
         try { viewModel.Refresh(App.Store.Profiles, sessions.Values.Select(v => (v.Session.Profile.Id, v.Session.State))); }
         finally { refreshingHome = false; }
+    }
+    const string ImportGlyph = "";
+    ContextMenu ImportMenu()
+    {
+        var menu = new ContextMenu(); foreach (var entry in ImportEntries()) menu.Items.Add(entry); return menu;
+    }
+    IEnumerable<MenuItem> ImportEntries() => [Ui.AsyncMenu("Из файла OpenSSH (~/.ssh/config)…", ImportSshConfig, glyph: Ui.FileGlyph)];
+    async Task ImportSshConfig()
+    {
+        if (profileEditorOpen || closing) return;
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); var sshDirectory = System.IO.Path.Combine(home, ".ssh");
+        var path = System.IO.Path.Combine(sshDirectory, "config");
+        if (!System.IO.File.Exists(path))
+        {
+            var pick = new Microsoft.Win32.OpenFileDialog { Title = "Файл конфигурации OpenSSH", InitialDirectory = System.IO.Directory.Exists(sshDirectory) ? sshDirectory : home, Filter = "Конфигурация OpenSSH|config;*.conf;*|Все файлы|*.*" };
+            if (pick.ShowDialog(this) != true) return;
+            path = pick.FileName; sshDirectory = System.IO.Path.GetDirectoryName(path)!;
+        }
+        var text = await System.IO.File.ReadAllTextAsync(path, windowLifetime.Token);
+        var config = SshConfig.Parse(text, sshDirectory, System.IO.Path.GetFileName(path));
+        var candidates = ProfileImport.FromSshConfig(config, Environment.UserName, home, App.Store.Profiles);
+        await ImportProfilesAsync(path, candidates, config.Warnings);
+    }
+    internal async Task<int> ImportProfilesAsync(string source, IReadOnlyList<ImportCandidate> candidates, IReadOnlyList<string> warnings, Func<ImportProfilesWindow, bool?>? show = null)
+    {
+        profileEditorOpen = true;
+        try
+        {
+            var window = new ImportProfilesWindow(source, candidates, warnings) { Owner = this };
+            if ((show?.Invoke(window) ?? ModalRunner.Show(window, this, windowLifetime.Token)) != true) return 0;
+            ServerProfile? last = null;
+            foreach (var profile in window.Accepted) { await App.Store.SaveProfileAsync(profile, null, windowLifetime.Token); last = profile; }
+            RefreshHome();
+            if (last is not null) { viewModel.SelectedProfile = viewModel.VisibleProfiles.FirstOrDefault(p => p.Profile.Id == last.Id); if (viewModel.SelectedProfile is not null) servers.ScrollIntoView(viewModel.SelectedProfile); }
+            return window.Accepted.Count;
+        }
+        finally { profileEditorOpen = false; }
     }
     async Task AddProfile()
     {

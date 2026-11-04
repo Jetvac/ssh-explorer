@@ -253,6 +253,27 @@ internal static class Beta6Tests
             navigation["files"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
             navigation["server"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
             Check(Descendants<ServerPanelView>(sessionView).Count(p => p.IsVisible) == 1, "returning to «Сервер» reuses its single panel");
+            // 0.3 A1: import from an OpenSSH config — preview, duplicate unchecked, only the checked host is saved.
+            var existingProfile = store.Profiles.First();
+            var importText = string.Join("\n", "Host imported-web", " HostName 10.9.0.5", " User deploy", " ProxyJump bastion", " ProxyCommand nc %h %p",
+                "Host dup-alias", $" HostName {existingProfile.Host}", $" User {existingProfile.Username}", $" Port {existingProfile.Port}", "Match exec true", " User x");
+            var importConfig = SshConfig.Parse(importText, @"C:\fixture\.ssh", "config");
+            var importCandidates = ProfileImport.FromSshConfig(importConfig, "fixture", @"C:\fixture", store.Profiles, _ => false);
+            int profilesBefore = store.Profiles.Count;
+            var importTask = main.ImportProfilesAsync(@"C:\fixture\.ssh\config", importCandidates, importConfig.Warnings, window =>
+            {
+                window.Show(); Layout(window);
+                var rows = window.Rows.ToDictionary(r => r.Name);
+                Check(rows["imported-web"].Selected && !rows["dup-alias"].Selected && rows["dup-alias"].Notes.Contains(existingProfile.Name, StringComparison.Ordinal), "import preview checks the new host and leaves the duplicate of an existing profile unchecked");
+                Check(window.ImportButton.IsEnabled && Equals(window.ImportButton.Content, "Импортировать (1)") && rows["imported-web"].Notes.Contains("ProxyCommand", StringComparison.Ordinal) && Descendants<TextBlock>(window).Any(t => t.Name == "ImportWarnings" && t.Text.Contains("Match", StringComparison.Ordinal)), "import names its count, reports ignored directives and unapplied Match blocks");
+                var importColumns = window.Table.Columns.Sum(c => c.ActualWidth);
+                Check(importColumns >= window.Table.ActualWidth - 24, $"import table fills its width ({importColumns:0} of {window.Table.ActualWidth:0} DIP)");
+                evidence.Capture((FrameworkElement)window.Content, "import-ssh-config", new { theme = "Light", fixtureOnly = true });
+                window.Close(); return true;
+            });
+            Complete(importTask);
+            var imported = store.Profiles.SingleOrDefault(p => p.Name == "imported-web");
+            Check(importTask.Result == 1 && store.Profiles.Count == profilesBefore + 1 && imported is { Host: "10.9.0.5", Username: "deploy", ProxyJump: "bastion", Authentication: AuthenticationKind.Password }, "import saves exactly the checked host with its jump host and no secret");
             var settings = new SettingsWindow { ShowInTaskbar = false, Left = 80, Top = 80 }; settings.Show(); Layout(settings);
             try
             {
