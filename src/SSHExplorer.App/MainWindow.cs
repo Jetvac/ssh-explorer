@@ -60,7 +60,12 @@ public sealed partial class MainWindow : Window
         home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); SessionTabInfo.SetTitle(home, "Главная"); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
         tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); RevealSelectedTab(); RefreshHome(); };
         tabs.SizeChanged+=(_,_)=>RevealSelectedTab();
-        tabs.Loaded += (_, _) => { tabs.ApplyTemplate(); if (tabs.Template.FindName("PART_NewTab", tabs) is Button add) { openServerButton = add; add.Click += (_, _) => AddMenu(); } };
+        tabs.Loaded += (_, _) =>
+        {
+            tabs.ApplyTemplate(); if (tabs.Template.FindName("PART_NewTab", tabs) is Button add) { openServerButton = add; add.Click += (_, _) => AddMenu(); }
+            // Adding or closing tabs changes the extent after selection already scheduled a reveal.
+            if (tabs.Template.FindName("HeaderScroller", tabs) is ScrollViewer headerScroller) headerScroller.ScrollChanged += (_, e) => { if (Math.Abs(e.ExtentWidthChange) > .5 || Math.Abs(e.ViewportWidthChange) > .5) RevealSelectedTab(); };
+        };
         tabs.PreviewDragOver += (_, e) => { if (DraggedTab(e.Data) is not null) { e.Effects = DragDropEffects.Move; e.Handled = true; } };
         tabs.AllowDrop = true;
         PreviewKeyDown += OnKey;
@@ -300,7 +305,9 @@ public sealed partial class MainWindow : Window
         if(tabRevealScheduled||closing)return;tabRevealScheduled=true;
         // Add/resize can select a header before its first measure. Use the next
         // layout turn, not a timer or a second selection, to reveal its close target.
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,()=>{tabRevealScheduled=false;if(!closing&&tabs.SelectedItem is TabItem tab)(tab.Header as FrameworkElement)?.BringIntoView();});
+        // Reveal the whole TabItem (its chrome and padding, not only the header content) after a
+        // settled layout pass, so the scroller already knows the extent of a just-added tab.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,()=>{tabRevealScheduled=false;if(closing||tabs.SelectedItem is not TabItem tab)return;tabs.UpdateLayout();tab.BringIntoView();});
     }
     internal Task CloseSessionTabAsync(TabItem tab)=>CloseTab(tab);
     async Task CloseTab(TabItem tab)

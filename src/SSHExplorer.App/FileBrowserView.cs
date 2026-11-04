@@ -24,7 +24,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     readonly ServerSession session; readonly MainWindow main;
     readonly IFileBrowserOperations operations;
     FileNameEdit? nameEdit;
-    TextBlock? viewModeGlyph;
+    Panel? viewModeRow;
     bool creating, addressPending;
     int addressRequest;
     readonly DockPanel root = new(); readonly DataGrid table = new(); readonly ListBox tiles = new() { SelectionMode = SelectionMode.Extended };
@@ -182,7 +182,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         Action("Download", Ui.DownloadGlyph, "Скачать…", Download, nameof(FileBrowserViewModel.HasSelection), 20);
         commands.Add("Sort", Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu), () => Submenu("Сортировать", Ui.SortGlyph, BuildSortMenu), 40);
         var viewButton = Ui.FlyoutButton(CommandGlyphs.View(mode), "Просмотреть", BuildViewMenu);
-        viewModeGlyph = ((Panel)viewButton.Content).Children.OfType<TextBlock>().First();
+        viewModeRow = (Panel)viewButton.Content;
         commands.Add("View", viewButton, () => Submenu("Просмотреть", CommandGlyphs.View(mode), BuildViewMenu), 50);
         var border = new Border { Child = commands, DataContext = viewModel }; border.SetResourceReference(StyleProperty, "CommandBarStyle"); commandBar = border; border.PreviewKeyDown += HandleBarShortcut;
         var bottom = new Grid { DataContext = viewModel, Margin = new Thickness(14, 5, 14, 5), Height = 20 }; bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); bottom.ColumnDefinitions.Add(new ColumnDefinition()); status.SetResourceReference(TextBlock.FontSizeProperty, "UICaptionSize"); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); bottom.Children.Add(status); statusBar = bottom;
@@ -364,7 +364,8 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     void SetMode(string value, bool save = true)
     {
         EndLasso();
-        if (viewModeGlyph is not null) viewModeGlyph.Text = CommandGlyphs.View(value);
+        // The icon slot is the first child (a VectorIcon or glyph TextBlock); the label follows it.
+        if (viewModeRow is { Children.Count: > 0 }) { viewModeRow.Children.RemoveAt(0); viewModeRow.Children.Insert(0, Ui.Icon(CommandGlyphs.View(value), 16, true)); }
         var selection = Selected().Select(r => r.Entry.FullPath).ToList(); mode = value; App.Store.Settings.ViewMode = mode; content.Content = mode == "Details" ? table : tiles;
         if (mode != "Details")
         {

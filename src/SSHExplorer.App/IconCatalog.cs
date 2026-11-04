@@ -134,7 +134,9 @@ public sealed class VectorIcon : FrameworkElement
         var geometry = IconCatalog.Geometry(Key);
         double scale = IconSize / 16, strokeDip = IconSize >= 19 ? 1.25 : 1.0;
         var pen = new Pen(Foreground, strokeDip / scale) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
-        pen.Freeze();
+        // An inherited foreground may be animated or data-bound (menus, hover states) and then
+        // cannot be frozen; freezing is only an optimisation, so skip it in that case.
+        if (pen.CanFreeze) pen.Freeze();
         drawing.PushTransform(new ScaleTransform(scale, scale));
         drawing.DrawGeometry(null, pen, geometry);
         drawing.Pop();

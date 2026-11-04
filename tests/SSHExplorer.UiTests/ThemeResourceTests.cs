@@ -63,9 +63,17 @@ internal static class ThemeResourceTests
             if (!ReferenceEquals(menu.PlacementTarget, owner) || menu.Placement != PlacementMode.Bottom || menu.StaysOpen) throw new Exception("Flyout is not anchored/dismissible.");
             if (Ui.Menu("Произвольный перевод", () => { }, glyph: Ui.CopyGlyph).Icon is not TextBlock { Text: Ui.CopyGlyph } || Ui.Menu("Удалить", () => { }).Icon is not null) throw new Exception("Menu icon depends on a localized label.");
             Console.WriteLine("PASS flyout placement and explicit command icons do not depend on translated labels");
+            // beta.6 caption row: actions and caption buttons live in the TabControl template's TrailingHost.
+            var strip = new TabControl(); strip.SetResourceReference(FrameworkElement.StyleProperty, "SessionTabControlStyle"); strip.Items.Add(new TabItem { Header = "Главная" });
+            var trailingProbe = new Button { Name = "TrailingProbe", Width = 36, Height = 36 }; SessionTabInfo.SetTrailingContent(strip, trailingProbe);
+            strip.Measure(new Size(1000, 400)); strip.Arrange(new Rect(0, 0, 1000, 400)); strip.UpdateLayout();
+            if (strip.Template?.FindName("TrailingHost", strip) is not ContentPresenter trailingHost) throw new Exception("Session tab template has no TrailingHost.");
+            if (!ReferenceEquals(trailingHost.Content, trailingProbe)) throw new Exception($"TrailingHost content is not the tab control's TrailingContent (actual: {trailingHost.Content?.GetType().Name ?? "null"}; binding={System.Windows.Data.BindingOperations.GetBindingExpressionBase(trailingHost, ContentPresenter.ContentProperty)?.Status.ToString() ?? "none"}; source={trailingHost.ReadLocalValue(ContentPresenter.ContentProperty)}; templated={trailingHost.TemplatedParent?.GetType().Name}).");
+            if (!strip.IsAncestorOf(trailingProbe) || trailingProbe.ActualWidth < 30) throw new Exception($"TrailingContent is not in the measured caption row (ancestor={strip.IsAncestorOf(trailingProbe)}, width={trailingProbe.ActualWidth}).");
+            Console.WriteLine("PASS caption-row trailing actions are presented inside the measured session tab template");
             var stateChecks = ViewModelTests.Run((condition, description) => { if (!condition) throw new Exception(description); Console.WriteLine("PASS " + description); });
             if (app.Windows.Count != 0) throw new Exception("A headless resource/state check unexpectedly created a Window.");
-            app.Shutdown(); Console.WriteLine($"RESULT: 8 resource/contract + {stateChecks} MVVM checks passed; no Windows were created; layout, focus and live UI are separate"); return 0;
+            app.Shutdown(); Console.WriteLine($"RESULT: 9 resource/contract + {stateChecks} MVVM checks passed; no Windows were created; layout, focus and live UI are separate"); return 0;
         }
         catch (Exception ex) { Console.WriteLine(ex); return 1; }
     }
