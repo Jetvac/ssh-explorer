@@ -18,7 +18,7 @@ internal static class CompositionFixtures
         return Enumerable.Range(0,180).Select(i=>
         {
             bool folder=i==160,link=i==168;
-            string name=i switch{160=>"000_Документы",161=>"000_Очень длинное имя документа — проверка Unicode и выравнивания.txt",162=>".bashrc",163=>"Фото_пример.png",164=>"таблица.csv",165=>"архив.zip",166=>"script.sh",167=>"отчёт.pdf",168=>"ссылка-на-документ",_=>$"document-{i:000}.txt"};
+            string name=i switch{160=>"000_Документы",161=>"000_Очень длинное имя документа — проверка Unicode и выравнивания.txt",162=>".bashrc",163=>"Фото_пример.png",164=>"таблица.csv",165=>"архив.zip",166=>"script.sh",167=>"отчёт.pdf",168=>"ссылка-на-документ",169=>"server.conf",170=>"settings.json",171=>"unknown.sshx-unknown",_=>$"document-{i:000}.txt"};
             return new RemoteEntry{Name=name,FullPath="/srv/fixture/"+name,IsDirectory=folder,IsSymbolicLink=link,IsRegularFile=!folder&&!link,Length=folder?0:4096+i,LastWriteTimeUtc=Timestamp.UtcDateTime.AddHours(-i)};
         }).ToArray();
     }

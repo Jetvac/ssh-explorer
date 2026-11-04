@@ -1,0 +1,16 @@
+PASS REAL SFTP-only document transport is available while the ordinary exec probe is rejected
+PASS REAL SFTP document byte roundtrip .sh/.conf/.txt UTF-8 BOM UTF-16 mixed endings empty and executable mode
+PASS REAL SFTP document detects external same-length same-mtime writer and repeated conflict
+DIAGNOSTIC document symlink create
+DIAGNOSTIC document symlink explicit locate/open
+DIAGNOSTIC document symlink send
+DIAGNOSTIC document symlink retarget
+PASS REAL SFTP document symlink requires explicit target and changed target stops replacement
+PASS REAL SFTP document ten-MiB long line hashes and preserves mode
+PASS REAL SFTP document metadata refusal leaves original and local snapshot intact
+PASS REAL SFTP document cancellation before finalization preserves destination
+PASS REAL SFTP permission denied during sibling creation preserves the document and local snapshot
+PASS REAL SFTP-only FIFO is refused before document content is opened
+PASS REAL SFTP-only inability to preserve root owner prevents replacement
+PASS REAL SFTP-only ENOSPC leaves the original intact and retains the complete local version
+RESULT: 11 real SFTP document checks passed, 0 failed

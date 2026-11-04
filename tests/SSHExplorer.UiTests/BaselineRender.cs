@@ -10,7 +10,7 @@ using SSHExplorer.App.ViewModels;
 using SSHExplorer.Core;
 using SSHExplorer.Monitoring;
 
-/// <summary>Compiled separately against the exact published beta.3 assemblies.
+/// <summary>Compiled separately against the exact published beta.4 assemblies.
 /// No later application API is referenced in this binary. All HWND creation is CI-only.</summary>
 internal static class BaselineRender
 {
@@ -20,17 +20,17 @@ internal static class BaselineRender
         try
         {
             CiVisualEvidence.RequireCi();
-            if(!args.Contains("--render-beta3baseline",StringComparer.Ordinal))throw new ArgumentException("Explicit baseline render mode is required.");
-            string output=Value(args,"--render-dir")??"artifacts/ui-beta4-before";
+            if(!args.Contains("--render-beta4baseline",StringComparer.Ordinal))throw new ArgumentException("Explicit baseline render mode is required.");
+            string output=Value(args,"--render-dir")??"artifacts/ui-beta5-before";
             var evidence=new CiVisualEvidence(output);
             var app=new App(startDesktop:false);app.InitializeComponent();app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
             CultureInfo.CurrentCulture=CultureInfo.GetCultureInfo("ru-RU");CultureInfo.CurrentUICulture=CultureInfo.GetCultureInfo("ru-RU");
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
-            var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","beta3-render-store",Guid.NewGuid().ToString("N")));
+            var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","beta4-render-store",Guid.NewGuid().ToString("N")));
             typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);store.Settings.ShowHidden=true;
             Pump();
             if(!app.StartupCallbackObserved||app.DesktopStartupCount!=0||app.Windows.Count!=0||!ReferenceEquals(App.Store,store))throw new InvalidOperationException("Baseline startup was not safely suppressed before creating windows.");
-            Console.WriteLine("SAFETY exact beta.3 App(false) consumed queued startup; desktop starts=0; no windows; isolated store identity unchanged");
+            Console.WriteLine("SAFETY exact beta.4 App(false) consumed queued startup; desktop starts=0; no windows; isolated store identity unchanged");
             Theme.Apply("Light");
             var profile=new ServerProfile{Name="Linux · UI fixture",Host="127.0.0.1",Username="fixture"};
             store.Profiles.Add(profile);var session=new ServerSession(profile,store);var main=new MainWindow{Width=1320,Height=850,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-10000,Top=-10000};
@@ -53,7 +53,7 @@ internal static class BaselineRender
             evidence.Capture((FrameworkElement)main.Content,"files-tree",new{theme="Light",fixtureOnly=true,fileCount=180,selectedFile="document-005.txt",verticalOffset=fileScroll.VerticalOffset});
             evidence.CaptureRelatedScenes(main,files,store);
             bool closed=false;main.Closed+=(_,_)=>closed=true;main.Close();WaitFor(()=>closed&&!app.Windows.Cast<Window>().Contains(main));app.Shutdown();
-            Console.WriteLine("RESULT: exact published beta.3 actual-WPF client renders completed; no SSH or process signals; CI-only HWNDs");return 0;
+            Console.WriteLine("RESULT: exact published beta.4 actual-WPF client renders completed; no SSH or process signals; CI-only HWNDs");return 0;
         }
         catch(Exception ex){Console.WriteLine(ex);return 1;}
     }

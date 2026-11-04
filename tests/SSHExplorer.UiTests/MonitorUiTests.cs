@@ -31,7 +31,7 @@ internal static class MonitorUiTests
             var app=TestApplication.Create();Theme.Apply("Light");int checks=0;
             CultureInfo.CurrentCulture=CultureInfo.GetCultureInfo("ru-RU");CultureInfo.CurrentUICulture=CultureInfo.GetCultureInfo("ru-RU");
             void Assert(bool value,string text){Check(value,text);checks++;}
-            var evidence=new CiVisualEvidence(Value(args,"--render-dir")??"artifacts/ui-beta4-after");
+            var evidence=new CiVisualEvidence(Value(args,"--render-dir")??"artifacts/ui-beta5-after");
             checks+=GraphChecks(Check);
             var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","monitor-ui-store",Guid.NewGuid().ToString("N")));
             typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);store.Settings.ShowHidden=true;

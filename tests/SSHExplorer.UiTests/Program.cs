@@ -9,6 +9,7 @@ internal static class Program
     static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--shell-icons-only") return ShellIconTests.Run();
+        if (args.Length > 0 && args[0] == "--documents-ui") return DocumentUiTests.Run(args.Skip(1).ToArray());
         if (args.Length == 1 && args[0] == "--resources-only") return ThemeResourceTests.Run();
         if (args.Length == 1 && args[0] == "--motion-only") return MotionTests.Run();
         if (args.Length == 1 && args[0] == "--connection-only") return ConnectionTests.Run();

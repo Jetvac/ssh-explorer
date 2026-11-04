@@ -48,7 +48,7 @@ internal static class FileInteractionTests
         {
             var app=TestApplication.Create();SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));Theme.Apply("Light");CultureInfo.CurrentCulture=CultureInfo.GetCultureInfo("ru-RU");CultureInfo.CurrentUICulture=CultureInfo.GetCultureInfo("ru-RU");
             int checks=0;void Assert(bool value,string label){Check(value,label);checks++;}
-            var evidence=new CiVisualEvidence(Value(args,"--render-dir")??"artifacts/ui-beta4-interactions");
+            var evidence=new CiVisualEvidence(Value(args,"--render-dir")??"artifacts/ui-beta5-interactions");
             var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","file-interaction-store",Guid.NewGuid().ToString("N")));
             typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);store.Settings.ShowHidden=true;
             var profile=new ServerProfile{Name="Файлы · управляемый стенд",Host="127.0.0.1",Username="fixture"};store.Profiles.Add(profile);

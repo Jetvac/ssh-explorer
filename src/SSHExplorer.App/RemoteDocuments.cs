@@ -123,14 +123,16 @@ internal sealed class RemoteDocumentsWindow : Window
     readonly DataGrid list = new();
     readonly TextBlock detail = Ui.Text("");
     readonly Dictionary<string, Button> commands = [];
+    readonly Func<RemoteEditSession, IRemoteDocumentTransport> resolve;
+    readonly Func<RemoteEditSession, Task> openEditor;
     RemoteEditSession? Selected => list.SelectedItem as RemoteEditSession;
-    public RemoteDocumentsWindow(MainWindow main, RemoteEditWorkspace workspace)
+    public RemoteDocumentsWindow(MainWindow main, RemoteEditWorkspace workspace, Func<RemoteEditSession, IRemoteDocumentTransport>? resolve = null, Func<RemoteEditSession, Task>? openEditor = null)
     {
-        this.main = main; this.workspace = workspace; Title = "Редактируемые документы"; Width = 980; Height = 540; MinWidth = 700; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        this.main = main; this.workspace = workspace; this.resolve = resolve ?? main.DocumentTransport; this.openEditor = openEditor ?? main.OpenDocumentEditorAsync; Title = "Редактируемые документы"; Width = 980; Height = 540; MinWidth = 700; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Style = (Style)Application.Current.FindResource(typeof(Window));
         var root = new DockPanel(); var heading = Ui.Text("Редактируемые документы", 20, true); heading.Margin = new Thickness(20, 16, 20, 10); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
         var bar = new ResponsiveCommandBar(More) { Margin = new Thickness(12, 0, 12, 8) };
-        Add("open", "\uE70F", "Открыть редактор", () => main.OpenDocumentEditorAsync(Require()), 90);
+        Add("open", "\uE70F", "Открыть редактор", () => this.openEditor(Require()), 90);
         Add("check", Ui.RefreshGlyph, "Проверить изменения", () => Require().CheckAsync(), 80);
         Add("send", Ui.UploadGlyph, "Отправить сейчас", Send, 100);
         Add("retry", Ui.RefreshGlyph, "Повторить / возобновить", Send, 70);
@@ -142,6 +144,7 @@ internal sealed class RemoteDocumentsWindow : Window
         var footer = new Border { Child = detail, Padding = new Thickness(18, 12, 18, 12), MinHeight = 96 }; footer.SetResourceReference(StyleProperty, "StatusBarStyle"); detail.TextWrapping = TextWrapping.Wrap; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         list.SetResourceReference(StyleProperty, "HomeTableStyle"); list.SelectionMode = DataGridSelectionMode.Single;
         MainWindow.AddColumn(list, "Сервер", "Record.ServerName", 170); MainWindow.AddColumn(list, "Удалённый путь", "Record.Location.Path", 330); MainWindow.AddColumn(list, "Состояние", "StatusText", 150);
+        list.Columns[1].Width = new DataGridLength(1, DataGridLengthUnitType.Star); list.Columns[1].MinWidth = 240; list.Columns[2].Width = 190;
         list.SelectionChanged += (_, _) => RefreshDetails(); root.Children.Add(list); Content = root;
         workspace.Changed += WorkspaceChanged; Closed += (_, _) => workspace.Changed -= WorkspaceChanged; Refresh();
     }
@@ -169,7 +172,7 @@ internal sealed class RemoteDocumentsWindow : Window
     {
         var d = Require(); bool approve = d.Record.State == RemoteEditState.FormatConfirmation;
         if (approve && !Ui.Confirm(d.Record.Message + "\n\nОтправить именно эту сохранённую версию?")) return;
-        await d.ResumeAsync(main.DocumentTransport(d), approve); Refresh();
+        await d.ResumeAsync(resolve(d), approve); Refresh();
     }
     async Task Finish()
     {
@@ -181,9 +184,9 @@ internal sealed class RemoteDocumentsWindow : Window
     {
         var menu = new ContextMenu(); var d = Selected;
         void Item(string name, Func<Task> action) { var item = Ui.AsyncMenu(name, action); item.IsEnabled = d is not null && !d.IsBusy; menu.Items.Add(item); }
-        Item("Получить серверную версию…", async () => { var value = await d!.ReviewServerAsync(main.DocumentTransport(d)); var save = new SaveFileDialog { FileName = "server-version" + Path.GetExtension(d.WorkingPath) }; if (save.ShowDialog(this) == true) await RemoteEditSession.AtomicWriteAsync(save.FileName, value.Bytes); });
-        Item("Заменить проверенную серверную версию…", async () => { var remote = await d!.ReviewServerAsync(main.DocumentTransport(d)); if (Ui.Confirm($"Заменить серверную версию {remote.Hash[..12]}?\n\n{d.Record.Identity.Display}\n{d.Record.Location.TargetPath}\n\nНовое внешнее изменение снова остановит замену.")) await d.ReplaceApprovedVersionAsync(remote); });
-        Item("Сохранить на сервер рядом…", async () => { await d!.AttachForReviewAsync(main.DocumentTransport(d)); var path = Ui.Prompt("Отдельная серверная копия", "Полный новый POSIX-путь (существующий объект не заменяется)", d.Record.Location.TargetPath + ".edited"); if (path is not null) await d.SaveRemoteCopyAsync(path); });
+        Item("Получить серверную версию…", async () => { var value = await d!.ReviewServerAsync(resolve(d)); var save = new SaveFileDialog { FileName = "server-version" + Path.GetExtension(d.WorkingPath) }; if (save.ShowDialog(this) == true) await RemoteEditSession.AtomicWriteAsync(save.FileName, value.Bytes); });
+        Item("Заменить проверенную серверную версию…", async () => { var remote = await d!.ReviewServerAsync(resolve(d)); if (Ui.Confirm($"Заменить серверную версию {remote.Hash[..12]}?\n\n{d.Record.Identity.Display}\n{d.Record.Location.TargetPath}\n\nНовое внешнее изменение снова остановит замену.")) await d.ReplaceApprovedVersionAsync(remote); });
+        Item("Сохранить на сервер рядом…", async () => { await d!.AttachForReviewAsync(resolve(d)); var path = Ui.Prompt("Отдельная серверная копия", "Полный новый POSIX-путь (существующий объект не заменяется)", d.Record.Location.TargetPath + ".edited"); if (path is not null) await d.SaveRemoteCopyAsync(path); });
         menu.Items.Add(new Separator());
         Item("Подключить копию из «Сохранить как»…", async () => { var pick = new OpenFileDialog { Title = "Выберите сохранённую локальную копию" }; if (pick.ShowDialog(this) == true && Ui.Confirm($"Использовать выбранную копию для документа?\n\n{d!.Record.Identity.Display}\n{d.Record.Location.Path}\n\nОтправка требует команды «Отправить сейчас».")) await d.UseLocalCopyAsync(pick.FileName); });
         var pause = Ui.AsyncMenu("Приостановить / отменить отправку", async () => await d!.DetachAsync()); pause.IsEnabled = d is not null; menu.Items.Add(pause);

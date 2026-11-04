@@ -21,7 +21,7 @@ internal static class FormTabTests
         {
             var app=TestApplication.Create();SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));Theme.Apply("Light");CultureInfo.CurrentCulture=CultureInfo.GetCultureInfo("ru-RU");CultureInfo.CurrentUICulture=CultureInfo.GetCultureInfo("ru-RU");
             var store=new AppStore(Path.Combine(Environment.CurrentDirectory,".tools","form-tab-ui-store",Guid.NewGuid().ToString("N")));typeof(App).GetProperty(nameof(App.Store))!.SetValue(null,store);
-            int index=Array.IndexOf(args,"--render-dir");var evidence=new CiVisualEvidence(index<0?"artifacts/ui-beta4-forms":args[index+1]);
+            int index=Array.IndexOf(args,"--render-dir");var evidence=new CiVisualEvidence(index<0?"artifacts/ui-beta5-forms":args[index+1]);
             var main=new MainWindow{Width=1320,Height=850,ShowInTaskbar=false,ShowActivated=false,Left=-10000,Top=-10000,WindowStartupLocation=WindowStartupLocation.Manual};main.Show();Pump();int count=0;
             Run(main,store,evidence,(value,label)=>{if(!value)throw new InvalidOperationException(label);count++;Console.WriteLine("PASS "+label);});
             bool closed=false;main.Closed+=(_,_)=>closed=true;main.Close();var watch=System.Diagnostics.Stopwatch.StartNew();
