@@ -145,7 +145,6 @@ public sealed partial class MainWindow : Window
     }
     Task ConnectSelected() => viewModel.SelectedProfile is { } row ? OpenServer(row.Profile) : Task.CompletedTask;
     void AddMenu() => Ui.OpenFlyout(openServerButton!, BuildAddMenu());
-    internal ContextMenu AddMenuForTests() => BuildAddMenu();
     ContextMenu BuildAddMenu()
     {
         var menu = new ContextMenu();

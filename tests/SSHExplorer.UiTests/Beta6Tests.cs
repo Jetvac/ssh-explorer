@@ -184,9 +184,14 @@ internal static class Beta6Tests
             Layout(main); var homeColumns = servers.Columns.Sum(c => c.ActualWidth);
             Check(homeColumns >= servers.ActualWidth - 24, $"Home: columns fill the table ({homeColumns:0} of {servers.ActualWidth:0} DIP), no empty filler header");
             // Submenu headers (no own command) must align with ordinary items: the Fluent template collapses the icon column without an Icon.
-            var add = main.AddMenuForTests(); var host = new Button(); Ui.OpenFlyout(host, add); Pump();
-            var withSubmenu = add.Items.OfType<MenuItem>().Where(i => i.HasItems).ToArray();
-            Check(withSubmenu.All(i => i.Icon is not null), $"submenu headers carry an icon so their text aligns with other items ({withSubmenu.Length} submenus)");
+            Invoke(main, "AddMenu"); Pump(); Layout(main);
+            var add = PresentationSource.CurrentSources.Cast<PresentationSource>().Select(src => src.RootVisual).Where(v => v is not null).SelectMany(v => Descendants<ContextMenu>(v!)).Single(m => m.IsOpen);
+            var ordinary = add.Items.OfType<MenuItem>().Single(i => !i.HasItems); var submenu = add.Items.OfType<MenuItem>().First(i => i.HasItems);
+            double X(FrameworkElement e) => e.TransformToAncestor(add).Transform(new Point()).X;
+            TextBlock HeaderText(MenuItem item) => Descendants<TextBlock>(item).First(t => t.Text == item.Header?.ToString());
+            double iconOrdinary = X((FrameworkElement)ordinary.Icon), iconSubmenu = X((FrameworkElement)submenu.Icon), textOrdinary = X(HeaderText(ordinary)), textSubmenu = X(HeaderText(submenu));
+            Check(Math.Abs(iconOrdinary - iconSubmenu) <= 2 && Math.Abs(textOrdinary - textSubmenu) <= 2, $"submenu header icon and text align with ordinary items (icon {iconSubmenu:0}/{iconOrdinary:0}, text {textSubmenu:0}/{textOrdinary:0} DIP)");
+            evidence.Capture(add, "menu-submenu-alignment", new { theme = "Light", fixtureOnly = true });
             add.IsOpen = false; Pump();
             evidence.Capture((FrameworkElement)main.Content, "sort-home", new { theme = "Light", fixtureOnly = true });
 
