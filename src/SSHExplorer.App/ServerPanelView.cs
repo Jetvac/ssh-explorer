@@ -149,6 +149,8 @@ public sealed class ServerPanelView : UserControl
         if (info.Limitations.Count > 0) cards.Children.Add(Card("Ограничения", Ui.PropertiesGlyph, info.Limitations.Select(l => ("", l)).ToArray()));
     }
 
+    internal static bool IsLongToken(string value) => value.Length > 20 && !value.Any(char.IsWhiteSpace);
+
     static TextBlock Muted(string text) { var t = Ui.Text(text, 12); t.TextWrapping = TextWrapping.Wrap; t.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); return t; }
 
     static Border CardShell(string title, string icon)
@@ -167,10 +169,23 @@ public sealed class ServerPanelView : UserControl
         foreach (var (label, value) in rows)
         {
             if (label.Length == 0) { var note = Muted(value); note.Margin = new Thickness(0, 2, 0, 4); stack.Children.Add(note); continue; }
-            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(132) }); row.ColumnDefinitions.Add(new ColumnDefinition());
-            var caption = Ui.Text(label, 12); caption.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); caption.TextWrapping = TextWrapping.Wrap; caption.Margin = new Thickness(0, 0, 12, 0); caption.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(caption);
+            var caption = Ui.Text(label, 12); caption.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); caption.TextWrapping = TextWrapping.Wrap; caption.VerticalAlignment = VerticalAlignment.Center;
             var text = new TextBox { Text = value, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Padding = new Thickness(0), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
-            AutomationProperties.SetName(text, label); Grid.SetColumn(text, 1); row.Children.Add(text); stack.Children.Add(row);
+            AutomationProperties.SetName(text, label);
+            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+            if (IsLongToken(value))
+            {
+                // An unbreakable value (IPv6 address, path, hash) gets the card's full width under its label
+                // instead of being split mid-token inside the narrow value column.
+                row.Name = "StackedFact"; row.RowDefinitions.Add(new RowDefinition()); row.RowDefinitions.Add(new RowDefinition());
+                caption.Margin = new Thickness(0, 0, 0, 2); row.Children.Add(caption); Grid.SetRow(text, 1); row.Children.Add(text);
+            }
+            else
+            {
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(132) }); row.ColumnDefinitions.Add(new ColumnDefinition());
+                caption.Margin = new Thickness(0, 0, 12, 0); row.Children.Add(caption); Grid.SetColumn(text, 1); row.Children.Add(text);
+            }
+            stack.Children.Add(row);
         }
         return card;
     }

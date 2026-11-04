@@ -94,7 +94,7 @@ public sealed partial class MainWindow : Window
         servers.Margin = new Thickness(12, 4, 12, 0); servers.SelectionMode = DataGridSelectionMode.Single;
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
-        AddColumn(servers, "Название", "Name", 260); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240);
+        AddColumn(servers, "Название", "Name", 260); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
         TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank)], "Name");
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
         var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
@@ -144,12 +144,14 @@ public sealed partial class MainWindow : Window
         await App.Store.DeleteProfileAsync(row.Profile.Id); RefreshHome(); if (App.Store.LastProfileCleanupWarning is { } warning) Ui.Error(warning);
     }
     Task ConnectSelected() => viewModel.SelectedProfile is { } row ? OpenServer(row.Profile) : Task.CompletedTask;
-    void AddMenu()
+    void AddMenu() => Ui.OpenFlyout(openServerButton!, BuildAddMenu());
+    internal ContextMenu AddMenuForTests() => BuildAddMenu();
+    ContextMenu BuildAddMenu()
     {
         var menu = new ContextMenu();
         foreach (var profile in App.Store.Profiles.OrderBy(p => p.Name))
         {
-            var item = new MenuItem { Header = profile.Name + "  ·  " + profile.Endpoint };
+            var item = new MenuItem { Header = profile.Name + "  ·  " + profile.Endpoint, Icon = Ui.Icon(IconCatalog.Server, 16, false) };
             item.Items.Add(Ui.AsyncMenu("Подключиться", () => OpenServer(profile), glyph: Ui.TerminalGlyph));
             item.Items.Add(Ui.AsyncMenu("Новая независимая сессия", () => OpenServerCore(profile, null, null, null, independent: true), glyph: Ui.NewTabGlyph));
             item.Items.Add(Ui.AsyncMenu("Ввести другой пароль…", () => OpenServerCore(profile, null, null, null, forceCredentials: true), glyph: Ui.SettingsGlyph));
@@ -157,7 +159,7 @@ public sealed partial class MainWindow : Window
         }
         if (menu.Items.Count > 0) menu.Items.Add(new Separator());
         menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph));
-        Ui.OpenFlyout(openServerButton!, menu);
+        return menu;
     }
     // This overload is retained for explicit integration fixtures. The ordinary Add/Connect commands
     // below never inject a trust decision and always use the actual dialog coordinator.

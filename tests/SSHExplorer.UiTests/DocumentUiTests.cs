@@ -82,6 +82,8 @@ internal static class DocumentUiTests
             Check(transport.Writes == 1 && Encoding.UTF8.GetString(transport.Bytes) == "first saved version\n", "the actual send command confirms the resulting hash and performs exactly one replacement");
             transport.Bytes = Encoding.UTF8.GetBytes("external server change\n"); File.WriteAllText(document.WorkingPath, "local conflict version\n"); document.CheckAsync(true).GetAwaiter().GetResult(); Pump(); Capture("documents-conflict");
             Check(document.Record.State == RemoteEditState.Conflict && !Command("Отправить сейчас").IsEnabled && Command("Сохранить локально").IsEnabled, "conflict disables ordinary send while preserving local export and the selected document");
+            var conflictState = Descendants<TextBlock>(window).First(t => t.Text == "Конфликт версий" && t.IsVisible);
+            Check((conflictState.Foreground as SolidColorBrush)?.Color == (window.FindResource("ValidationInk") as SolidColorBrush)?.Color && conflictState.FontWeight == FontWeights.SemiBold, "a version conflict stands out in the documents list like a failed transfer");
             Command("Другие команды").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
             var menu = PresentationSource.CurrentSources.Cast<PresentationSource>().Select(s => s.RootVisual).Where(v => v is not null).SelectMany(v => Descendants<ContextMenu>(v!)).Single(m => m.IsOpen);
             Check(menu.Items.OfType<MenuItem>().Any(i => i.Header?.ToString() == "Заменить проверенную серверную версию…") && menu.Items.OfType<MenuItem>().Any(i => i.Header?.ToString() == "Подключить копию из «Сохранить как»…"), "the live document overflow exposes distinct conflict and external Save As actions");

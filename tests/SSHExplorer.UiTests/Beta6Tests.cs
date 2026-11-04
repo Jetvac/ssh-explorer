@@ -181,6 +181,13 @@ internal static class Beta6Tests
             Check(servers.Columns.Single(c => Equals(c.Header, "Название")).SortDirection is not null, "Home: the sorted column shows its direction indicator");
             Invoke(main, "RefreshHome"); Pump();
             Check(Names().SequenceEqual(TableSorting.CurrentDirection(servers) == System.ComponentModel.ListSortDirection.Ascending ? ascending : descending), "Home: refresh keeps the chosen order");
+            Layout(main); var homeColumns = servers.Columns.Sum(c => c.ActualWidth);
+            Check(homeColumns >= servers.ActualWidth - 24, $"Home: columns fill the table ({homeColumns:0} of {servers.ActualWidth:0} DIP), no empty filler header");
+            // Submenu headers (no own command) must align with ordinary items: the Fluent template collapses the icon column without an Icon.
+            var add = main.AddMenuForTests(); var host = new Button(); Ui.OpenFlyout(host, add); Pump();
+            var withSubmenu = add.Items.OfType<MenuItem>().Where(i => i.HasItems).ToArray();
+            Check(withSubmenu.All(i => i.Icon is not null), $"submenu headers carry an icon so their text aligns with other items ({withSubmenu.Length} submenus)");
+            add.IsOpen = false; Pump();
             evidence.Capture((FrameworkElement)main.Content, "sort-home", new { theme = "Light", fixtureOnly = true });
 
             var model = new MonitorViewModel(); var monitor = new MonitorView(model);
@@ -307,6 +314,8 @@ internal static class Beta6Tests
                     return (caption.Text, Gap: valueLeft - captionRight, Fits: caption.DesiredSize.Width <= LayoutInformation.GetLayoutSlot(caption).Width + .5);
                 }).ToArray();
                 var worst = gaps.OrderBy(g => g.Gap).FirstOrDefault();
+                var ipv6 = Descendants<TextBox>(grid).Single(t => t.Text.StartsWith("fe80::", StringComparison.Ordinal));
+                Check(ipv6.Parent is Grid { Name: "StackedFact" } && ipv6.LineCount == 1, "a long IPv6 address sits under its label on one line instead of splitting mid-token");
                 Check(factRows.Length >= 10 && gaps.All(g => g.Gap >= 8 && g.Fits), $"every server fact label fits its column and ends at least 8 DIP before its value ({factRows.Length} rows; smallest gap {worst.Gap:0} at «{worst.Text}»; overflowing: {string.Join(", ", gaps.Where(g => !g.Fits).Select(g => g.Text))})");
                 evidence.Capture(panel, "server-panel", new { theme = "Light", fixtureOnly = true, note = "fixture facts; no power command sent" });
                 Theme.Apply("Dark"); Pump(); evidence.Capture(panel, "server-panel-dark", new { theme = "Dark", fixtureOnly = true }); Theme.Apply("Light"); Pump();

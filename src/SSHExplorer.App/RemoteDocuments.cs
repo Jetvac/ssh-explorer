@@ -148,6 +148,12 @@ internal sealed class RemoteDocumentsWindow : Window
         SizeChanged += (_, _) => footer.MaxHeight = Math.Clamp(ActualHeight * .32, 100, 180);
         list.SetResourceReference(StyleProperty, "HomeTableStyle"); list.SelectionMode = DataGridSelectionMode.Single;
         MainWindow.AddColumn(list, "Сервер", "Record.ServerName", 170); MainWindow.AddColumn(list, "Удалённый путь", "Record.Location.Path", 330); MainWindow.AddColumn(list, "Состояние", "StatusText", 150);
+        // States that need the user's decision stand out like a failed transfer; a confirmed save recedes.
+        var stateColumn = (DataGridTextColumn)list.Columns[^1]; var stateStyle = new Style(typeof(TextBlock), stateColumn.ElementStyle);
+        foreach (var attention in new[] { RemoteEditState.Conflict, RemoteEditState.Error, RemoteEditState.Unknown })
+        { var trigger = new DataTrigger { Binding = new Binding("Record.State"), Value = attention }; trigger.Setters.Add(new Setter(TextBlock.ForegroundProperty, new DynamicResourceExtension("ValidationInk"))); trigger.Setters.Add(new Setter(TextBlock.FontWeightProperty, FontWeights.SemiBold)); stateStyle.Triggers.Add(trigger); }
+        var confirmed = new DataTrigger { Binding = new Binding("Record.State"), Value = RemoteEditState.Confirmed }; confirmed.Setters.Add(new Setter(TextBlock.ForegroundProperty, new DynamicResourceExtension("Muted"))); stateStyle.Triggers.Add(confirmed);
+        stateColumn.ElementStyle = stateStyle;
         list.Columns[1].Width = new DataGridLength(1, DataGridLengthUnitType.Star); list.Columns[1].MinWidth = 240; list.Columns[2].Width = 190;
         MainWindow.AddColumn(list, "Изменено", "Record.UpdatedUtc", 150, "{0:dd.MM.yyyy HH:mm}"); ((DataGridTextColumn)list.Columns[3]).Binding = new System.Windows.Data.Binding("Record.UpdatedUtc") { Converter = new LocalTimeConverter(), StringFormat = "{0:dd.MM.yyyy HH:mm}" };
         TableSorting.Attach(list, "documents", [
