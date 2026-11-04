@@ -298,12 +298,16 @@ internal static class Beta6Tests
                 Check(Descendants<TextBox>(panel).Any(t => t.Text == "Ubuntu 24.04 LTS") && Descendants<TextBox>(panel).Any(t => t.Text.Contains("Доступна: systemctl reboot", StringComparison.Ordinal)), "server panel shows OS and the single permitted power method");
                 var grid = Descendants<CardGridPanel>(panel).Single(); var cardBounds = grid.Children.OfType<Border>().Select(c => c.TransformToAncestor(grid).TransformBounds(new Rect(c.RenderSize))).ToArray();
                 Check(grid.Columns >= 3 && Math.Abs(cardBounds.Max(b => b.Right) - grid.ActualWidth) < 1, $"server cards fill the panel width in {grid.Columns} columns without a right gutter");
-                bool separated = Descendants<Grid>(grid).Where(r => r.ColumnDefinitions.Count == 2 && r.Children.Count == 2).All(r =>
+                var factRows = Descendants<Grid>(grid).Where(r => r.ColumnDefinitions.Count == 2 && r.Children.Count == 2 && r.Children[0] is TextBlock && r.Children[1] is TextBox).ToArray();
+                var gaps = factRows.Select(r =>
                 {
-                    var caption = (FrameworkElement)r.Children[0]; var value = (FrameworkElement)r.Children[1];
-                    return caption.TransformToAncestor(r).TransformBounds(new Rect(caption.RenderSize)).Right <= value.TransformToAncestor(r).TransformBounds(new Rect(value.RenderSize)).Left - 8;
-                });
-                Check(separated, "every server fact label ends at least 8 DIP before its value");
+                    var caption = (TextBlock)r.Children[0]; var value = (FrameworkElement)r.Children[1];
+                    // The caption's layout slot (column minus its margin), not its unclipped text extent.
+                    var captionRight = LayoutInformation.GetLayoutSlot(caption).Right - caption.Margin.Right; var valueLeft = LayoutInformation.GetLayoutSlot(value).Left;
+                    return (caption.Text, Gap: valueLeft - captionRight, Fits: caption.DesiredSize.Width <= LayoutInformation.GetLayoutSlot(caption).Width + .5);
+                }).ToArray();
+                var worst = gaps.OrderBy(g => g.Gap).FirstOrDefault();
+                Check(factRows.Length >= 10 && gaps.All(g => g.Gap >= 8 && g.Fits), $"every server fact label fits its column and ends at least 8 DIP before its value ({factRows.Length} rows; smallest gap {worst.Gap:0} at «{worst.Text}»; overflowing: {string.Join(", ", gaps.Where(g => !g.Fits).Select(g => g.Text))})");
                 evidence.Capture(panel, "server-panel", new { theme = "Light", fixtureOnly = true, note = "fixture facts; no power command sent" });
                 Theme.Apply("Dark"); Pump(); evidence.Capture(panel, "server-panel-dark", new { theme = "Dark", fixtureOnly = true }); Theme.Apply("Light"); Pump();
             }
