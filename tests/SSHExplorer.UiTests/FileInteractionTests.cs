@@ -213,7 +213,7 @@ internal static class FileInteractionTests
             if(visual is AdornerDecorator decorator&&decorator.IsAncestorOf(layer)&&decorator.IsAncestorOf(adorner))return decorator;
         throw new InvalidOperationException("No actual AdornerDecorator subtree contains the active production lasso.");
     }
-    sealed class Operations:IFileBrowserOperations
+    internal sealed class Operations:IFileBrowserOperations
     {
         readonly Dictionary<string,RemoteEntry> entries=CompositionFixtures.Files().ToDictionary(row=>row.FullPath,StringComparer.Ordinal);
         public bool Available=>true;

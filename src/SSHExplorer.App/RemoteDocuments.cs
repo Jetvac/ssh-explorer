@@ -123,6 +123,7 @@ internal sealed class RemoteDocumentsWindow : Window
     readonly DataGrid list = new();
     readonly TextBlock detail = Ui.Text("");
     readonly ScrollViewer detailScroller = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+    readonly ProgressBar sendingProgress = new() { Height = 3, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 7), Maximum = 100 };
     readonly Dictionary<string, Button> commands = [];
     readonly Func<RemoteEditSession, IRemoteDocumentTransport> resolve;
     readonly Func<RemoteEditSession, Task> openEditor;
@@ -142,7 +143,7 @@ internal sealed class RemoteDocumentsWindow : Window
         void Add(string key, string glyph, string title, Func<Task> action, int priority) { var b = Ui.AsyncCommandButton(glyph, title, action); commands[key] = b; bar.Add(key, b, () => Ui.AsyncMenu(title, action, glyph: glyph), priority); }
         DockPanel.SetDock(bar, Dock.Top); root.Children.Add(bar);
         var notice = Ui.Text("Ctrl+S в редакторе → обнаружение сохранённой копии → SFTP → подтверждённый хеш. Несохранённый буфер и внешнее «Сохранить как» автоматически не отправляются.", 12); notice.TextWrapping = TextWrapping.Wrap; notice.Margin = new Thickness(20, 0, 20, 8); DockPanel.SetDock(notice, Dock.Top); root.Children.Add(notice);
-        detailScroller.Content = detail;
+        var detailBody = new StackPanel(); detailBody.Children.Add(sendingProgress); detailBody.Children.Add(detail); detailScroller.Content = detailBody;
         var footer = new Border { Child = detailScroller, Padding = new Thickness(18, 12, 18, 12), MinHeight = 90, MaxHeight = 172 }; footer.SetResourceReference(StyleProperty, "StatusBarStyle"); detail.TextWrapping = TextWrapping.Wrap; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         SizeChanged += (_, _) => footer.MaxHeight = Math.Clamp(ActualHeight * .32, 100, 180);
         list.SetResourceReference(StyleProperty, "HomeTableStyle"); list.SelectionMode = DataGridSelectionMode.Single;
@@ -166,6 +167,9 @@ internal sealed class RemoteDocumentsWindow : Window
     void RefreshDetails()
     {
         var document = Selected;
+        sendingProgress.Visibility = document?.IsBusy == true ? Visibility.Visible : Visibility.Collapsed;
+        sendingProgress.IsIndeterminate = document?.IsBusy == true && document.BytesTransferred == 0 && UiMotion.Enabled;
+        sendingProgress.Value = document?.Record.SnapshotLength > 0 ? Math.Clamp(100d * document.BytesTransferred / document.Record.SnapshotLength, 0, 100) : 0;
         foreach (var (key, button) in commands) button.IsEnabled = document is not null && (!document.IsBusy || key == "local");
         if (document is null) { detail.Text = workspace.UnreadableJournals > 0 ? $"Есть непрочитанные журналы: {workspace.UnreadableJournals}. Исходные папки сохранены: {workspace.Root}" : "Нет открытых документов. Выберите текстовый файл и команду «Редактировать в Блокноте»."; return; }
         detail.Text = $"{StateName(document.Record.State)} · {document.Record.Identity.Display}\n{document.Record.Location.Path}{(document.Record.Location.Path != document.Record.Location.TargetPath ? " → " + document.Record.Location.TargetPath : "")}\n{document.Record.Message}\n{document.Record.Format.Description} · поколение {document.Record.Generation} · подтверждённый SHA-256 {document.Record.BaselineHash[..Math.Min(12, document.Record.BaselineHash.Length)]}";

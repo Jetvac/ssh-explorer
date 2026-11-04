@@ -30,7 +30,7 @@ internal static class DocumentUiTests
             typeof(App).GetProperty(nameof(App.Store))!.SetValue(null, store); store.Settings.ShowHidden = true;
             var profile = new ServerProfile { Name = "Linux · UI fixture", Host = "127.0.0.1", Username = "fixture" }; store.Profiles.Add(profile);
             var session = new ServerSession(profile, store); var main = new MainWindow { Width = 1100, Height = 760, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000 };
-            using var files = new FileBrowserView(session, main); var model = (FileBrowserViewModel)files.DataContext;
+            using var files = new FileBrowserView(session, main, new FileInteractionTests.Operations()); var model = (FileBrowserViewModel)files.DataContext;
             model.CommitNavigation(model.BeginNavigation(), "/srv/fixture", CompositionFixtures.Files(), true, [], 0); model.ApplyFilter(true, true); Invoke(files, "ApplyItems"); Invoke(files, "UpdateBreadcrumbs");
             var tree = (TreeView)Field(files, "tree"); tree.Items.Clear(); var node = (TreeViewItem)Invoke(files, "Node", "fixture", "/srv/fixture")!; node.Items.Clear(); Ui.SetIsCurrentFolder(node, true); tree.Items.Add(node);
             using var monitor = new MonitorView(new MonitorViewModel(() => CompositionFixtures.Timestamp)); var view = new SessionView(session, main, files, monitor); ((SessionViewModel)Field(view, "viewModel")).StatusText = "Данные стенда · без подключения"; view.SetActive(false);
@@ -73,7 +73,12 @@ internal static class DocumentUiTests
             Check(launches == 1 && launched == document.WorkingPath, "the real open-editor command dispatches the exact captured local working copy to the launcher boundary");
             document.AttachForReviewAsync(transport).GetAwaiter().GetResult(); File.WriteAllText(document.WorkingPath, "first saved version\n"); document.CheckAsync().GetAwaiter().GetResult(); Pump(); Capture("documents-pending");
             Check(document.Record.State == RemoteEditState.Pending && Command("Отправить сейчас").IsEnabled, "a stable saved version is visibly pending before the actual send command");
-            Command("Отправить сейчас").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); WaitFor(() => document.Record.State == RemoteEditState.Confirmed); Pump(); Capture("documents-confirmed");
+            transport.CommitGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            Command("Отправить сейчас").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); WaitFor(() => document.Record.State == RemoteEditState.Uploading && document.BytesTransferred > 0); Pump(); Capture("documents-uploading");
+            var progress = (ProgressBar)Field(window, "sendingProgress"); Command("Другие команды").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
+            var sendingMenu = PresentationSource.CurrentSources.Cast<PresentationSource>().Select(s => s.RootVisual).Where(v => v is not null).SelectMany(v => Descendants<ContextMenu>(v!)).Single(m => m.IsOpen);
+            Check(progress.IsVisible && progress.Value > 0 && progress.Value < 100 && sendingMenu.Items.OfType<MenuItem>().Single(i => i.Header?.ToString() == "Приостановить / отменить отправку").IsEnabled, "actual sending progress shows captured snapshot bytes and exposes cancellation during the in-flight operation"); sendingMenu.IsOpen = false; transport.CommitGate.TrySetResult(true);
+            WaitFor(() => document.Record.State == RemoteEditState.Confirmed); transport.CommitGate = null; Pump(); Capture("documents-confirmed");
             Check(transport.Writes == 1 && Encoding.UTF8.GetString(transport.Bytes) == "first saved version\n", "the actual send command confirms the resulting hash and performs exactly one replacement");
             transport.Bytes = Encoding.UTF8.GetBytes("external server change\n"); File.WriteAllText(document.WorkingPath, "local conflict version\n"); document.CheckAsync(true).GetAwaiter().GetResult(); Pump(); Capture("documents-conflict");
             Check(document.Record.State == RemoteEditState.Conflict && !Command("Отправить сейчас").IsEnabled && Command("Сохранить локально").IsEnabled, "conflict disables ordinary send while preserving local export and the selected document");
@@ -109,13 +114,14 @@ internal static class DocumentUiTests
     {
         public RemoteDocumentIdentity Identity { get; } = new(profile, "fixture.invalid", 22, "fixture", "offline-test-key-not-SSH-trust");
         public Guid SessionId => session; public CancellationToken Lifetime => CancellationToken.None;
-        public byte[] Bytes = Encoding.UTF8.GetBytes("#!/bin/sh\n# offline document fixture\n"); public int Writes; public bool DropAfterCommit;
+        public byte[] Bytes = Encoding.UTF8.GetBytes("#!/bin/sh\n# offline document fixture\n"); public int Writes; public bool DropAfterCommit; public TaskCompletionSource<bool>? CommitGate;
         readonly DocumentMetadata metadata = new(0, CompositionFixtures.Timestamp.UtcDateTime, 493, 1000, 1000);
         public Task<DocumentLocation> LocateAsync(string path, bool followLink, CancellationToken ct) => Task.FromResult(new DocumentLocation(path, path));
         public Task<RemoteDocumentVersion> ReadAsync(DocumentLocation location, CancellationToken ct) => Task.FromResult(new RemoteDocumentVersion(Bytes.ToArray(), metadata with { Length = Bytes.Length }));
         public async Task<RemoteDocumentVersion> ReplaceAsync(DocumentLocation location, string expectedHash, DocumentMetadata original, byte[] snapshot, Guid operation, Func<Task> beforeCommit, IProgress<long>? progress, CancellationToken ct)
         {
             if (RemoteEditSession.Hash(Bytes) != expectedHash) throw new DocumentConflictException("Внешняя версия изменена; controlled UI fixture.");
+            if (CommitGate is { } pending) { await Task.Delay(170, ct).ConfigureAwait(false); progress?.Report(snapshot.LongLength / 2); await pending.Task.WaitAsync(ct).ConfigureAwait(false); progress?.Report(snapshot.LongLength); }
             await beforeCommit().ConfigureAwait(false); Bytes = snapshot.ToArray(); Writes++; if (DropAfterCommit) throw new IOException("Controlled loss after commit."); return await ReadAsync(location, ct).ConfigureAwait(false);
         }
         public Task SaveCopyAsync(string path, byte[] bytes, short mode, CancellationToken ct) => Task.CompletedTask;

@@ -17,6 +17,7 @@ public sealed class RemoteEditRecord
     public DocumentTextFormat Format { get; set; } = null!;
     public string? ExplicitEncoding { get; set; }
     public string? PendingHash { get; set; }
+    public long SnapshotLength { get; set; }
     public long Generation { get; set; }
     public DocumentOperation? Operation { get; set; }
     public RemoteEditState State { get; set; } = RemoteEditState.Preparing;
@@ -83,6 +84,7 @@ public sealed class RemoteEditSession : IAsyncDisposable
         var result = new RemoteEditSession(directory, record);
         await AtomicWriteAsync(result.WorkingPath, version.Bytes, ct).ConfigureAwait(false);
         await AtomicWriteAsync(result.SnapshotPath, version.Bytes, ct).ConfigureAwait(false);
+        record.SnapshotLength = version.Bytes.LongLength;
         await result.Persist(ct).ConfigureAwait(false); result.Bind(transport, true); result.Watch(); return result;
     }
     public static RemoteEditSession Restore(string directory)
@@ -146,6 +148,7 @@ public sealed class RemoteEditSession : IAsyncDisposable
             if (hash == Record.BaselineHash && Record.Operation is null) { Record.PendingHash = null; Record.State = Connected ? RemoteEditState.Confirmed : RemoteEditState.Paused; Record.Message = "Локальные байты совпадают с подтверждённой версией."; await Persist().ConfigureAwait(false); return; }
             var blocked = Record.State is RemoteEditState.Conflict or RemoteEditState.Unknown or RemoteEditState.FormatConfirmation or RemoteEditState.Error;
             if (Record.PendingHash != hash) { await AtomicWriteAsync(SnapshotPath, bytes, linked.Token).ConfigureAwait(false); Record.PendingHash = hash; Record.Generation++; }
+            Record.SnapshotLength = bytes.LongLength;
             if (!blocked) { Record.State = Connected ? RemoteEditState.Pending : RemoteEditState.Paused; Record.Message = "Сохранённая локальная версия ожидает отправки."; }
             await Persist().ConfigureAwait(false);
             if (send && !blocked && Connected) await SendSnapshot(null, null, linked.Token).ConfigureAwait(false);
@@ -178,9 +181,10 @@ public sealed class RemoteEditSession : IAsyncDisposable
         Record.Operation = operation; Record.State = RemoteEditState.Uploading; Record.Message = "Отправка и проверка сохранённой версии…"; BytesTransferred = 0; await Persist(ct).ConfigureAwait(false);
         try
         {
+            var progressClock = System.Diagnostics.Stopwatch.StartNew();
             var result = await transport!.ReplaceAsync(Record.Location, operation.PreviousHash, metadata ?? Record.Metadata, bytes, operation.Id,
                 async () => { Record.Operation = operation with { FinalizationStarted = true }; await Persist().ConfigureAwait(false); },
-                new Progress<long>(n => { BytesTransferred = n; Notify(); }), ct).ConfigureAwait(false);
+                new ByteProgress(n => { BytesTransferred = n; if (progressClock.ElapsedMilliseconds >= 150 || n == bytes.LongLength) { progressClock.Restart(); Notify(); } }), ct).ConfigureAwait(false);
             if (result.Hash != operation.SnapshotHash) throw new IOException("Сервер не подтвердил отправленный хеш.");
             Record.BaselineHash = result.Hash; Record.Metadata = result.Metadata; Record.Format = format; Record.PendingHash = null; Record.Operation = null; approvedFormatHash = null;
             if (Record.ExplicitEncoding is not null) Record.ExplicitEncoding = format.Encoding;
@@ -258,4 +262,5 @@ public sealed class RemoteEditSession : IAsyncDisposable
         finally { gate.Release(); }
     }
     public async ValueTask DisposeAsync() { if (disposed) return; disposed = true; watcher?.Dispose(); lifetime.Cancel(); await DetachAsync().ConfigureAwait(false); lifetime.Dispose(); }
+    sealed class ByteProgress(Action<long> report) : IProgress<long> { public void Report(long value) => report(value); }
 }
