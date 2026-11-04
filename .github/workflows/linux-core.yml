@@ -58,6 +58,9 @@ jobs:
           python3 -m http.server 18765 --bind 127.0.0.1 > /dev/null 2>&1 & listener=$!; sleep 1
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --ports-integration 127.0.0.1 2222 "$USER" 18765 "$listener" 2>&1 | tee artifacts-ports.log
           kill "$listener" || true
+          # 0.3 G: real Docker over SSH — env through a 0600 env-file, recreate with new env, lifecycle.
+          docker pull -q busybox:1.36 > /dev/null
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --docker-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-docker.log
           # 0.3 B1: interrupted uploads/downloads continue from verified partial files.
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --resume-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-resume.log
 
@@ -95,5 +98,6 @@ jobs:
             artifacts-jump.log
             artifacts-resume.log
             artifacts-ports.log
+            artifacts-docker.log
             artifacts/collector-benchmark.json
           retention-days: 14

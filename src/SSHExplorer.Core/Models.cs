@@ -22,6 +22,8 @@ public sealed class ServerProfile
     public string ProxyJump { get; set; } = "";
     /// <summary>Optional group on the Home list (empty — ungrouped).</summary>
     public string Group { get; set; } = "";
+    /// <summary>Saved Docker run parameters for containers on this server (secret env values encrypted).</summary>
+    public List<DockerTemplate> DockerTemplates { get; set; } = [];
     public string Endpoint => $"{(Host.Contains(':') ? $"[{Host}]" : Host)}:{Port}";
     public void Validate()
     {
@@ -70,6 +72,8 @@ public sealed class AppSettings
     public int TransferParallelism { get; set; } = 2;
     /// <summary>Shared speed limit for all transfers in KiB/s; 0 — unlimited.</summary>
     public int TransferLimitKiBps { get; set; }
+    /// <summary>Optional modules shown in the server navigation.</summary>
+    public bool DockerModule { get; set; }
     public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }
 }
 public sealed class TableSortSetting

@@ -15,6 +15,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     private readonly List<string> _bookmarks;
     /// <summary>Jump host chain and Home group survive editing even before they have their own fields.</summary>
     string _proxyJump="",_group="";
+    readonly List<DockerTemplate> _dockerTemplates;
     public string ProxyJump{get=>_proxyJump;set=>Set(ref _proxyJump,value);}
     public string Group{get=>_group;set=>Set(ref _group,value);}
     public string ProxyJumpError=>Error(nameof(ProxyJump));
@@ -26,7 +27,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     public ProfileViewModel(IProfilePersistence persistence,ServerProfile? old=null)
     {
-        _persistence=persistence;_id=old?.Id??Guid.NewGuid();_bookmarks=old?.Bookmarks.ToList()??[];ProxyJump=old?.ProxyJump??"";Group=old?.Group??"";
+        _persistence=persistence;_id=old?.Id??Guid.NewGuid();_bookmarks=old?.Bookmarks.ToList()??[];ProxyJump=old?.ProxyJump??"";Group=old?.Group??"";_dockerTemplates=old?.DockerTemplates.Select(t=>t.Clone()).ToList()??[];
         _profileName=old?.Name??"";_host=old?.Host??"";_port=(old?.Port??22).ToString(CultureInfo.InvariantCulture);
         _username=old?.Username??"";_keyPath=old?.PrivateKeyPath??"";_initialPath=old?.InitialPath??"~";
         _timeout=(old?.TimeoutSeconds??20).ToString(CultureInfo.InvariantCulture);_authenticationIndex=(int)(old?.Authentication??AuthenticationKind.Password);_saveSecret=old?.SaveSecret??false;
@@ -120,7 +121,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         try
         {
             TryNormalizeHost(Host,out string host);
-            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret&&UsesSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim()};
+            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret&&UsesSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim(),DockerTemplates=_dockerTemplates.Select(t=>t.Clone()).ToList()};
             var result=deferSecretUntilAuthentication
                 ?await _persistence.SaveForConnectionAsync(profile,ct)
                 :await _persistence.SaveAsync(profile,SaveSecret&&!(secret.Length==0&&_hasStoredSecret)?secret:null,ct);
