@@ -24,6 +24,8 @@ public sealed class ServerProfile
     public string Group { get; set; } = "";
     /// <summary>Saved Docker run parameters for containers on this server (secret env values encrypted).</summary>
     public List<DockerTemplate> DockerTemplates { get; set; } = [];
+    /// <summary>Saved scripts for this server (module «Скрипты»).</summary>
+    public List<SavedScript> Scripts { get; set; } = [];
     public string Endpoint => $"{(Host.Contains(':') ? $"[{Host}]" : Host)}:{Port}";
     public void Validate()
     {
@@ -76,6 +78,7 @@ public sealed class AppSettings
     public int TransferLimitKiBps { get; set; }
     /// <summary>Optional modules shown in the server navigation.</summary>
     public bool DockerModule { get; set; }
+    public bool ScriptsModule { get; set; }
     public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }
 }
 public sealed class TableSortSetting

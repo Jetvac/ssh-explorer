@@ -9,6 +9,12 @@ if (args.Length == 2 && args[0] == "--document-edit-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real SFTP document checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 4 && args[0] == "--scripts-integration")
+{
+    await ScriptIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
+    Console.WriteLine($"RESULT: {suite.Passed} real script checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 4 && args[0] == "--docker-integration")
 {
     await DockerIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
@@ -82,6 +88,7 @@ await ExternalImportTests.RunAsync(suite);
 await TransferResumeTests.RunAsync(suite);
 await PortsTests.RunAsync(suite);
 await DockerTests.RunAsync(suite);
+await ScriptTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);
