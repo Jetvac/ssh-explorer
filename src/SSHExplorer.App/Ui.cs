@@ -203,6 +203,7 @@ public static class Ui
     public static MenuItem Menu(string text, Action action, string shortcut = "", string? glyph = null) { var m = new MenuItem { Header = text, InputGestureText = shortcut }; if (glyph is not null) m.Icon = Icon(glyph, 16, false); m.Click += (_, _) => action(); return m; }
     public static MenuItem AsyncMenu(string text, Func<Task> action, string shortcut = "", string? glyph = null) => Menu(text, async () => await Guard(action), shortcut, glyph);
     public static Border Line() { var b = new Border { Width = 1, Height = 26, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 5, 9, 5) }; b.SetResourceReference(Border.BackgroundProperty, "Edge"); return b; }
+    public static void Info(string message) => MessageBox.Show(Application.Current.MainWindow, message, "SSH Explorer", MessageBoxButton.OK, MessageBoxImage.Information);
     public static void Error(string message) => MessageBox.Show(Application.Current.MainWindow, message, "SSH Explorer", MessageBoxButton.OK, MessageBoxImage.Warning);
     public static bool Confirm(string message, string title = "SSH Explorer") => MessageBox.Show(Application.Current.MainWindow, message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
     public static string Size(long? bytes)

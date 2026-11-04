@@ -97,7 +97,9 @@ public sealed partial class MainWindow : Window
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
         AddColumn(servers, "Название", "Name", 260); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
-        TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank)], "Name");
+        TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank)], "Name",
+            group: new("Group", r => ((ServerProfileViewModel)r).GroupKey, true));
+        HomeGrouping.Attach(servers, () => viewModel.HasGroups);
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
         var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
@@ -123,7 +125,51 @@ public sealed partial class MainWindow : Window
     {
         var menu = new ContextMenu(); foreach (var entry in ImportEntries()) menu.Items.Add(entry); return menu;
     }
-    IEnumerable<MenuItem> ImportEntries() => [Ui.AsyncMenu("Из файла OpenSSH (~/.ssh/config)…", ImportSshConfig, glyph: Ui.FileGlyph)];
+    IEnumerable<MenuItem> ImportEntries() =>
+    [
+        Ui.AsyncMenu("Из файла OpenSSH (~/.ssh/config)…", ImportSshConfig, glyph: Ui.FileGlyph),
+        Ui.AsyncMenu("Из PuTTY", ImportPutty, glyph: IconCatalog.Terminal),
+        Ui.AsyncMenu("Из WinSCP…", ImportWinScp, glyph: IconCatalog.Transfers),
+    ];
+    /// <summary>Reads saved sessions under a HKCU key (read-only); empty when the program never saved any.</summary>
+    internal static IReadOnlyList<ExternalSession> RegistrySessions(string path)
+    {
+        using var root = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(path, writable: false);
+        if (root is null) return [];
+        var result = new List<ExternalSession>();
+        foreach (var name in root.GetSubKeyNames())
+        {
+            using var key = root.OpenSubKey(name, writable: false); if (key is null) continue;
+            result.Add(new ExternalSession(name, key.GetValueNames().ToDictionary(v => v, v => key.GetValue(v), StringComparer.OrdinalIgnoreCase)));
+        }
+        return result;
+    }
+    async Task ImportPutty()
+    {
+        if (profileEditorOpen || closing) return;
+        var sessions = RegistrySessions(@"Software\SimonTatham\PuTTY\Sessions");
+        if (sessions.Count == 0) { Ui.Info(@"Сохранённых сессий PuTTY не найдено (HKCU\Software\SimonTatham\PuTTY\Sessions)."); return; }
+        var (candidates, skipped) = ExternalSessionImport.FromPutty(sessions, Environment.UserName, App.Store.Profiles);
+        await ImportProfilesAsync("PuTTY · сохранённые сессии", candidates, skipped);
+    }
+    async Task ImportWinScp()
+    {
+        if (profileEditorOpen || closing) return;
+        var sessions = RegistrySessions(@"Software\Martin Prikryl\WinSCP 2\Sessions"); var source = "WinSCP · реестр";
+        if (sessions.Count == 0)
+        {
+            var ini = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WinSCP.ini");
+            if (!System.IO.File.Exists(ini))
+            {
+                var pick = new Microsoft.Win32.OpenFileDialog { Title = "Файл настроек WinSCP", Filter = "WinSCP.ini|WinSCP.ini;*.ini|Все файлы|*.*" };
+                if (pick.ShowDialog(this) != true) return;
+                ini = pick.FileName;
+            }
+            sessions = ExternalSessionImport.ParseWinScpIni(await System.IO.File.ReadAllTextAsync(ini, windowLifetime.Token)); source = ini;
+        }
+        var (candidates, skipped) = ExternalSessionImport.FromWinScp(sessions, Environment.UserName, App.Store.Profiles);
+        await ImportProfilesAsync(source, candidates, skipped);
+    }
     async Task ImportSshConfig()
     {
         if (profileEditorOpen || closing) return;

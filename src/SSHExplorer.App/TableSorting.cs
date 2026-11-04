@@ -20,8 +20,10 @@ public sealed record SortColumn(string Key, Func<object, IComparable?> Value, bo
 /// </summary>
 public static class TableSorting
 {
-    sealed class State(DataGrid grid, string table, IReadOnlyDictionary<string, SortColumn> columns, SortColumn tieBreaker)
+    sealed class State(DataGrid grid, string table, IReadOnlyDictionary<string, SortColumn> columns, SortColumn tieBreaker, SortColumn? group)
     {
+        /// <summary>Compared before the chosen column, always ascending (unknown last): keeps groups ordered.</summary>
+        public SortColumn? Group { get; } = group;
         public DataGrid Grid { get; } = grid;
         public string Table { get; } = table;
         public IReadOnlyDictionary<string, SortColumn> Columns { get; } = columns;
@@ -33,10 +35,10 @@ public static class TableSorting
     static readonly DependencyProperty StateProperty = DependencyProperty.RegisterAttached("TableSortState", typeof(State), typeof(TableSorting));
 
     /// <summary>Attach header sorting. <paramref name="columns"/> maps DataGridColumn.SortMemberPath to typed keys.</summary>
-    public static void Attach(DataGrid grid, string table, IEnumerable<SortColumn> columns, string? defaultKey = null, ListSortDirection defaultDirection = ListSortDirection.Ascending, SortColumn? tieBreaker = null)
+    public static void Attach(DataGrid grid, string table, IEnumerable<SortColumn> columns, string? defaultKey = null, ListSortDirection defaultDirection = ListSortDirection.Ascending, SortColumn? tieBreaker = null, SortColumn? group = null)
     {
         var map = columns.ToDictionary(c => c.Key, StringComparer.Ordinal);
-        var state = new State(grid, table, map, tieBreaker ?? map.Values.First());
+        var state = new State(grid, table, map, tieBreaker ?? map.Values.First(), group);
         grid.SetValue(StateProperty, state);
         grid.CanUserSortColumns = true;
         foreach (var column in grid.Columns) column.CanUserSort = map.ContainsKey(column.SortMemberPath ?? "");
@@ -86,7 +88,7 @@ public static class TableSorting
         if (state.Grid.ItemsSource is null) return;
         if (CollectionViewSource.GetDefaultView(state.Grid.ItemsSource) is not ListCollectionView view) return;
         if (state.Key is null || !state.Columns.TryGetValue(state.Key, out var column)) { if (view.CustomSort is TypedComparer) view.CustomSort = null; return; }
-        var comparer = new TypedComparer(column, state.Direction, state.TieBreaker);
+        var comparer = new TypedComparer(column, state.Direction, state.TieBreaker, state.Group);
         if (view.CustomSort is TypedComparer existing && existing.SameAs(comparer)) return;
         // Keep the selected object visible: CustomSort refreshes the view, the selected item is
         // the same instance, so the Selector keeps it; scroll it back into view afterwards.
@@ -95,7 +97,7 @@ public static class TableSorting
         if (selected is not null && state.Grid.IsLoaded) state.Grid.Dispatcher.BeginInvoke(() => { if (state.Grid.SelectedItem == selected) state.Grid.ScrollIntoView(selected); });
     }
 
-    internal sealed class TypedComparer(SortColumn column, ListSortDirection direction, SortColumn tieBreaker) : IComparer
+    internal sealed class TypedComparer(SortColumn column, ListSortDirection direction, SortColumn tieBreaker, SortColumn? group = null) : IComparer
     {
         public bool SameAs(TypedComparer other) => ReferenceEquals(column, other.Column) && direction == other.Direction;
         public SortColumn Column => column;
@@ -104,6 +106,7 @@ public static class TableSorting
         {
             if (ReferenceEquals(x, y)) return 0;
             if (x is null) return 1; if (y is null) return -1;
+            if (group is not null && CompareKeys(group, x, y, false) is var byGroup and not 0) return byGroup;
             var result = CompareKeys(column, x, y, direction == ListSortDirection.Descending);
             if (result != 0) return result;
             return ReferenceEquals(column, tieBreaker) ? 0 : CompareKeys(tieBreaker, x, y, false);

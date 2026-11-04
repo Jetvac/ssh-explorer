@@ -60,6 +60,7 @@ await CoreTests.RunAsync(suite);
 await SshConfigTests.RunAsync(suite);
 await AgentTests.RunAsync(suite);
 await ProxyJumpTests.RunAsync(suite);
+await ExternalImportTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

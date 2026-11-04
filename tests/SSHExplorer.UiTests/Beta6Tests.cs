@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -183,6 +184,22 @@ internal static class Beta6Tests
             Check(Names().SequenceEqual(TableSorting.CurrentDirection(servers) == System.ComponentModel.ListSortDirection.Ascending ? ascending : descending), "Home: refresh keeps the chosen order");
             Layout(main); var homeColumns = servers.Columns.Sum(c => c.ActualWidth);
             Check(homeColumns >= servers.ActualWidth - 24, $"Home: columns fill the table ({homeColumns:0} of {servers.ActualWidth:0} DIP), no empty filler header");
+            // 0.3 A4: groups on Home — ordered by name, «Без группы» last, collapsible, flat again without groups.
+            Check(CollectionViewSource.GetDefaultView(servers.ItemsSource).GroupDescriptions.Count == 0 && !Descendants<GroupItem>(servers).Any(), "Home without groups stays a flat list");
+            store.Profiles.Single(p => p.Name == "file2").Group = "Тест"; store.Profiles.Single(p => p.Name == "file10").Group = "Прод"; store.Profiles.Add(new ServerProfile { Name = "file3", Host = "file3.example.invalid", Username = "fixture", Group = "прод" });
+            Invoke(main, "RefreshHome"); Layout(main);
+            var groups = CollectionViewSource.GetDefaultView(servers.ItemsSource).Groups!.Cast<CollectionViewGroup>().Select(g => $"{g.Name}:{g.ItemCount}").ToArray();
+            Check(groups.SequenceEqual(["Прод:2", "Тест:1", "Без группы:1"]), "Home groups are ordered by name with «Без группы» last: " + string.Join(", ", groups));
+            var headers = Descendants<GroupItem>(servers).Select(g => Descendants<Expander>(g).First()).ToArray();
+            Check(headers.Length == groups.Length && Descendants<TextBlock>(headers[0]).Any(t => t.Text.StartsWith("Прод · ", StringComparison.Ordinal)), "group headers show the name and the number of servers");
+            var test = headers.Single(h => Descendants<TextBlock>(h).Any(t => t.Text.StartsWith("Тест", StringComparison.Ordinal))); test.IsExpanded = false; Pump();
+            Invoke(main, "RefreshHome"); Layout(main);
+            var testAgain = Descendants<GroupItem>(servers).Select(g => Descendants<Expander>(g).First()).Single(h => Descendants<TextBlock>(h).Any(t => t.Text.StartsWith("Тест", StringComparison.Ordinal)));
+            Check(!testAgain.IsExpanded && Descendants<DataGridRow>(testAgain).All(r => !r.IsVisible), "a collapsed group stays collapsed after a refresh");
+            evidence.Capture((FrameworkElement)main.Content, "home-groups", new { theme = "Light", fixtureOnly = true });
+            testAgain.IsExpanded = true; foreach (var p in store.Profiles) p.Group = ""; store.Profiles.RemoveAll(p => p.Name == "file3");
+            Invoke(main, "RefreshHome"); Layout(main);
+            Check(CollectionViewSource.GetDefaultView(servers.ItemsSource).GroupDescriptions.Count == 0, "removing every group returns Home to a flat list");
             // Submenu headers (no own command) must align with ordinary items: the Fluent template collapses the icon column without an Icon.
             Invoke(main, "AddMenu"); Pump(); Layout(main);
             var add = OpenMenu(); CheckSubmenuAlignment(add, "«+» (no checkable items)"); evidence.Capture(add, "menu-add-alignment", new { theme = "Light", fixtureOnly = true }); add.IsOpen = false; Pump();
@@ -272,6 +289,16 @@ internal static class Beta6Tests
                 window.Close(); return true;
             });
             Complete(importTask);
+            // 0.3 A5: real HKCU read of a PuTTY session (CI runner only; the unique key is removed afterwards).
+            var puttyKey = @"Software\SimonTatham\PuTTY\Sessions\SSHX%20CI%20" + Guid.NewGuid().ToString("N")[..8];
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(puttyKey)!) { key.SetValue("HostName", "putty-ci.example"); key.SetValue("PortNumber", 2201, Microsoft.Win32.RegistryValueKind.DWord); key.SetValue("UserName", "ci"); key.SetValue("Protocol", "ssh"); }
+                var read = MainWindow.RegistrySessions(@"Software\SimonTatham\PuTTY\Sessions");
+                var (puttyCandidates, _) = ExternalSessionImport.FromPutty(read, "fixture", store.Profiles);
+                Check(puttyCandidates.Any(c => c.Profile is { Host: "putty-ci.example", Port: 2201, Username: "ci" } && c.Profile.Name.StartsWith("SSHX CI ", StringComparison.Ordinal)), "PuTTY sessions are read from the real HKCU registry with decoded names and DWORD ports");
+            }
+            finally { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(puttyKey, throwOnMissingSubKey: false); }
             var imported = store.Profiles.SingleOrDefault(p => p.Name == "imported-web");
             Check(importTask.Result == 1 && store.Profiles.Count == profilesBefore + 1 && imported is { Host: "10.9.0.5", Username: "deploy", ProxyJump: "bastion", Authentication: AuthenticationKind.Password }, "import saves exactly the checked host with its jump host and no secret");
             var settings = new SettingsWindow { ShowInTaskbar = false, Left = 80, Top = 80 }; settings.Show(); Layout(settings);

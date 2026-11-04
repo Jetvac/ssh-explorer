@@ -16,6 +16,8 @@ public sealed class HomeViewModel : ObservableObject
     public ServerProfileViewModel? SelectedProfile { get => selectedProfile; set { if (Set(ref selectedProfile, value)) Raise(nameof(HasSelectedProfile)); } }
     public bool HasSelectedProfile => SelectedProfile is not null;
     public bool HasProfiles => profiles.Count > 0;
+    /// <summary>Group headers appear only once some profile has a group; otherwise Home keeps its flat list.</summary>
+    public bool HasGroups => profiles.Any(p => !string.IsNullOrWhiteSpace(p.Group));
     public bool ShowEmptyState => VisibleProfiles.Count == 0;
     public string EmptyStateTitle => HasProfiles ? "Ничего не найдено" : "Нет сохранённых серверов";
     public string EmptyStateMessage => HasProfiles ? "Попробуйте другое имя, адрес или пользователя." : "Добавьте SSH-сервер, чтобы открыть файлы, терминал и процессы.";
@@ -26,10 +28,10 @@ public sealed class HomeViewModel : ObservableObject
     void Rebuild()
     {
         var selectedId = SelectedProfile?.Profile.Id; var query = SearchQuery.Trim();
-        VisibleProfiles = profiles.Where(p => query.Length == 0 || (p.Name + " " + p.Host + " " + p.Username).Contains(query, StringComparison.CurrentCultureIgnoreCase))
+        VisibleProfiles = profiles.Where(p => query.Length == 0 || (p.Name + " " + p.Host + " " + p.Username + " " + p.Group).Contains(query, StringComparison.CurrentCultureIgnoreCase))
             .Select(p => new ServerProfileViewModel(p, sessions.Where(s => s.ProfileId == p.Id).Select(s => s.State).ToArray())).ToList();
         SelectedProfile = VisibleProfiles.FirstOrDefault(p => p.Profile.Id == selectedId);
-        Raise(nameof(HasProfiles)); Raise(nameof(ShowEmptyState)); Raise(nameof(EmptyStateTitle)); Raise(nameof(EmptyStateMessage));
+        Raise(nameof(HasProfiles)); Raise(nameof(HasGroups)); Raise(nameof(ShowEmptyState)); Raise(nameof(EmptyStateTitle)); Raise(nameof(EmptyStateMessage));
         StatusText = profiles.Count == 0 ? "Добавьте сервер, чтобы открыть файлы, терминал и диспетчер задач. Подключения идут напрямую по SSH."
             : $"Сохранено серверов: {profiles.Count}     Открыто сессий: {sessions.Length}";
     }
@@ -41,6 +43,9 @@ public sealed class ServerProfileViewModel(ServerProfile profile, SessionState[]
     public string Name => profile.Name;
     public string Endpoint => profile.Endpoint;
     public string Username => profile.Username;
+    /// <summary>Null when ungrouped: sorts after named groups and shows as «Без группы».</summary>
+    public string? GroupKey => string.IsNullOrWhiteSpace(profile.Group) ? null : profile.Group.Trim();
+    public string GroupName => GroupKey ?? "Без группы";
     public string Status => states.Length == 0 ? "Не подключён" : states.Any(s => s == SessionState.Connected) ? $"Подключён · сессий: {states.Length}"
         : states.Any(s => s is SessionState.Connecting or SessionState.AwaitingTrust) ? "Подключение…" : "Связь потеряна";
     /// <summary>Sort key for the status column: active sessions first, then connecting, lost, idle.</summary>
