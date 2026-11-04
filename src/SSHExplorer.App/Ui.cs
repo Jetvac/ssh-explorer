@@ -93,7 +93,7 @@ public static class Ui
     /// The Fluent submenu-header template has no check column and a narrower icon column. In a menu with
     /// checkable items ordinary items reserve the check column, so a submenu header's icon and text sat
     /// left of them. Measures an ordinary item's real text and icon positions and moves each submenu
-    /// header's text (Padding) and icon (Margin) until they match; already aligned menus are untouched.
+    /// header's text (Padding) and icon (render offset) until they match; already aligned menus are untouched.
     /// </summary>
     internal static void AlignSubmenuHeaders(ContextMenu menu)
     {
@@ -114,8 +114,10 @@ public static class Ui
                 bool moved = false;
                 if (textTarget is { } t && X(Text(item), item) is { } x && Math.Abs(t - x) >= 1)
                 { var p = item.Padding; item.Padding = new Thickness(Math.Max(0, p.Left + t - x), p.Top, p.Right, p.Bottom); moved = true; }
+                // The icon column is a shared size group for the whole menu: a margin would widen it for every
+                // item. A render offset moves only this icon.
                 if (iconTarget is { } i && item.Icon is FrameworkElement icon && X(icon, item) is { } ix && Math.Abs(i - ix) >= 1)
-                { var m = icon.Margin; icon.Margin = new Thickness(Math.Max(0, m.Left + i - ix), m.Top, m.Right, m.Bottom); moved = true; }
+                { var offset = icon.RenderTransform as TranslateTransform ?? new TranslateTransform(); offset.X += i - ix; icon.RenderTransform = offset; moved = true; }
                 if (!moved) break;
                 item.UpdateLayout();
             }
