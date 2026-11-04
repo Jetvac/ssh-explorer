@@ -66,6 +66,11 @@ public sealed class AppSettings
     /// <summary>Header-click order of the other tables, one entry per table.</summary>
     public List<TableSortSetting> TableSorts { get; set; } = [];
     public bool ReduceMotion { get; set; }
+    /// <summary>Transfers running at once (1–8).</summary>
+    public int TransferParallelism { get; set; } = 2;
+    /// <summary>Shared speed limit for all transfers in KiB/s; 0 — unlimited.</summary>
+    public int TransferLimitKiBps { get; set; }
+    public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }
 }
 public sealed class TableSortSetting
 {

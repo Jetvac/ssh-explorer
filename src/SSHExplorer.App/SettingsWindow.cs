@@ -42,6 +42,8 @@ public sealed class SettingsWindow : Window
     readonly NumberField pixels = new("Наибольшее разрешение изображения", "Мпикс", 1, 100, 1);
     readonly NumberField parallel = new("Одновременных запросов миниатюр", "запросов", 1, 4, 1);
     readonly NumberField cache = new("Кэш изображений на вкладку", "МБ", 16, 1024, 16);
+    readonly NumberField transfers = new("Одновременных передач", "передач", 1, 8, 1) { Name = "SettingsTransferParallelism" };
+    readonly NumberField speed = new("Ограничение скорости, 0 — без ограничения", "КБ/с", 0, 10_485_760, 256) { Name = "SettingsTransferLimit" };
     readonly TextBox editor = new() { Name = "SettingsEditorPath" };
     readonly TextBlock editorState = Ui.Text("", 12);
     public string CurrentSection { get; private set; } = "general";
@@ -60,6 +62,7 @@ public sealed class SettingsWindow : Window
         poll.Value = settings.PollIntervalSeconds; font.Value = settings.TerminalFontSize;
         maxBytes.Value = settings.PreviewMaxBytes / 1024 / 1024; pixels.Value = settings.PreviewMaxPixels / 1_000_000;
         parallel.Value = settings.PreviewParallelism; cache.Value = settings.PreviewCacheBytes / 1024 / 1024;
+        transfers.Value = Math.Clamp(settings.TransferParallelism, 1, 8); speed.Value = Math.Max(0, settings.TransferLimitKiBps);
         editor.Text = settings.ExternalEditorPath; AutomationProperties.SetName(editor, "Путь к редактору");
         BuildPages();
 
@@ -124,7 +127,8 @@ public sealed class SettingsWindow : Window
         removeTrust.IsEnabled = false; trustList.SelectionChanged += (_, _) => removeTrust.IsEnabled = trustList.SelectedItem is TrustRow;
         pages["connections"] = Page("Подключения",
             Group("Доверенные ключи серверов", Setting(null, "Ключ сервера проверяется до входа. Изменившийся ключ блокирует подключение и требует отдельного решения.", trustList), Buttons(removeTrust)),
-            Group("Локальные копии для Windows", Setting(null, "Подготовленные копии файлов для буфера обмена и перетаскивания в Проводник. Файлы на сервере не затрагиваются.", Buttons(Ui.AsyncButton("Очистить локальные копии…", Dialogs.ClearTransferCacheAsync)))));
+            Group("Локальные копии для Windows", Setting(null, "Подготовленные копии файлов для буфера обмена и перетаскивания в Проводник. Файлы на сервере не затрагиваются.", Buttons(Ui.AsyncButton("Очистить локальные копии…", Dialogs.ClearTransferCacheAsync)))),
+            Group("Передачи", transfers, speed, Note("Ограничение общее для всех передач и применяется сразу, в том числе к уже идущим. Прерванная передача продолжается кнопкой «Повторить» с проверенного места, если источник не изменился.")));
 
         editorState.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); editorState.TextWrapping = TextWrapping.Wrap;
         void UpdateEditorState() => editorState.Text = string.IsNullOrWhiteSpace(editor.Text) ? "Используется Блокнот Windows (" + System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "notepad.exe") + ")." : System.IO.File.Exists(editor.Text) ? "Будет запускаться выбранная программа; путь к рабочей копии передаётся отдельным аргументом." : "Файл не найден.";
@@ -212,10 +216,10 @@ public sealed class SettingsWindow : Window
     async Task SaveAsync()
     {
         NumberField? invalid = null;
-        foreach (var field in new[] { poll, font, maxBytes, pixels, parallel, cache }) if (!field.Validate()) invalid ??= field;
+        foreach (var field in new[] { poll, font, maxBytes, pixels, parallel, cache, transfers, speed }) if (!field.Validate()) invalid ??= field;
         if (invalid is not null)
         {
-            Show(invalid == poll ? "monitoring" : invalid == font ? "terminal" : "preview");
+            Show(invalid == poll ? "monitoring" : invalid == font ? "terminal" : invalid == transfers || invalid == speed ? "connections" : "preview");
             invalid.FocusInput(); return;
         }
         var path = editor.Text.Trim();
@@ -225,6 +229,7 @@ public sealed class SettingsWindow : Window
         settings.PollIntervalSeconds = (int)poll.Value; settings.TerminalFontSize = (int)font.Value;
         settings.PreviewMaxBytes = maxBytes.Value * 1024 * 1024; settings.PreviewMaxPixels = pixels.Value * 1_000_000;
         settings.PreviewParallelism = (int)parallel.Value; settings.PreviewCacheBytes = cache.Value * 1024 * 1024;
+        settings.TransferParallelism = (int)transfers.Value; settings.TransferLimitKiBps = (int)speed.Value; settings.ApplyTo(App.Transfers);
         settings.ShowHidden = showHidden.IsChecked == true; settings.ShowExtensions = showExtensions.IsChecked == true;
         settings.ReduceMotion = reduceMotion.IsChecked == true; UiMotion.UserReduced = settings.ReduceMotion;
         settings.Theme = theme.SelectedIndex == 1 ? "Light" : theme.SelectedIndex == 2 ? "Dark" : "System"; Theme.Apply(settings.Theme);

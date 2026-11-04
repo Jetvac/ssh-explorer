@@ -36,7 +36,7 @@ public partial class App : Application
         try
         {
             Store = new AppStore(TestSessionHarness.TryGetStoreDirectory(e.Args));
-            Theme.Apply(Store.Settings.Theme); UiMotion.UserReduced = Store.Settings.ReduceMotion;
+            Theme.Apply(Store.Settings.Theme); UiMotion.UserReduced = Store.Settings.ReduceMotion; Store.Settings.ApplyTo(Transfers);
             SystemParameters.StaticPropertyChanged += (_, _) => Dispatcher.BeginInvoke(() => Theme.Apply(Store.Settings.Theme));
             Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) => Dispatcher.BeginInvoke(() => { SystemFileIconProvider.Invalidate(); Theme.Apply(Store.Settings.Theme); });
             Transfers.ResolveConflict = conflict => Dispatcher.InvokeAsync(() => Dialogs.Conflict(conflict)).Task;
