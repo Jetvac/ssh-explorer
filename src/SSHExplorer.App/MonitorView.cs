@@ -206,7 +206,15 @@ public sealed class MonitorView : UserControl, IDisposable
         table.SetResourceReference(StyleProperty, "ProcessTableStyle"); table.ColumnHeaderHeight = 36; table.MaxHeight = 180; table.MinHeight = 76;
         table.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(source));
         foreach (var field in fields) MainWindow.AddColumn(table, field.Caption, field.Property, field.Width);
-        parent.Children.Add(table);
+        // The last column takes the remaining width: no empty filler header beside the real columns.
+        var last = table.Columns[^1]; last.MinWidth = fields[^1].Width; last.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+        // An empty table explains itself instead of showing only a header.
+        var empty = Ui.Text(caption == "Сеть" ? "Нет данных об интерфейсах: ещё нет замера или сервер их не сообщает." : "Нет данных об устройствах: ещё нет замера или сервер их не сообщает.", 12);
+        empty.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); empty.Margin = new Thickness(12, 44, 12, 8); empty.TextWrapping = TextWrapping.Wrap; empty.IsHitTestVisible = false;
+        void UpdateEmpty() => empty.Visibility = table.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ((System.Collections.Specialized.INotifyCollectionChanged)table.Items).CollectionChanged += (_, _) => UpdateEmpty(); UpdateEmpty();
+        var host = new Grid(); host.Children.Add(table); host.Children.Add(empty);
+        parent.Children.Add(host);
     }
 
     public void SetPage(MonitorPage value)

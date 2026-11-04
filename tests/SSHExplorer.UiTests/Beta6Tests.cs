@@ -197,6 +197,8 @@ internal static class Beta6Tests
                 Check(up.SequenceEqual(["eth1", "eth0", "wg0"]) && down.SequenceEqual(["eth0", "eth1", "wg0"]), "Network: 900 КБ/с < 1 МБ/с by bytes/s, unknown last in both directions");
                 model.Networks[1] = model.Networks[1] with { Receive = "950 КБ/с", ReceiveRate = 950 * 1024 }; Pump();
                 Check(Order().Last() == "wg0", "Network: an update keeps unknown values at the end");
+                Layout(window); var networkColumnsWidth = networks.Columns.Sum(c => c.ActualWidth); var disks = (DataGrid)Field(monitor, "disks");
+                Check(networkColumnsWidth >= networks.ActualWidth - 24 && disks.Items.Count == 0 && Descendants<TextBlock>((DependencyObject)VisualTreeHelper.GetParent(disks)).Any(t => t.IsVisible && t.Text.StartsWith("Нет данных об устройствах", StringComparison.Ordinal)), $"performance tables fill their width ({networkColumnsWidth:0} of {networks.ActualWidth:0} DIP) and an empty disk table explains itself");
                 evidence.Capture(monitor, "sort-network", new { theme = "Light", fixtureOnly = true });
             }
             finally { window.Close(); }
