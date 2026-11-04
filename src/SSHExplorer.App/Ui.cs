@@ -89,31 +89,36 @@ public static class Ui
             if (Keyboard.FocusedElement is null or MenuItem or ContextMenu) owner.Focus();
         });
     }
-    static readonly DependencyProperty SubmenuShiftProperty = DependencyProperty.RegisterAttached("SubmenuShift", typeof(double), typeof(Ui), new PropertyMetadata(0d));
     /// <summary>
-    /// The Fluent submenu-header template has no check column. In a menu with checkable items the
-    /// ordinary items reserve that column, so a submenu header's icon and text sat one column left.
-    /// Measures the real text offset of an ordinary item and shifts each submenu header's icon and text by it.
+    /// The Fluent submenu-header template has no check column and a narrower icon column. In a menu with
+    /// checkable items ordinary items reserve the check column, so a submenu header's icon and text sat
+    /// left of them. Measures an ordinary item's real text and icon positions and moves each submenu
+    /// header's text (Padding) and icon (Margin) until they match; already aligned menus are untouched.
     /// </summary>
     internal static void AlignSubmenuHeaders(ContextMenu menu)
     {
         var items = menu.Items.OfType<MenuItem>().Where(i => i.IsVisible).ToArray();
-        var reference = items.FirstOrDefault(i => !i.HasItems && i.Header is string); if (reference is null || !items.Any(i => i.HasItems)) return;
+        if (!items.Any(i => i.HasItems)) return;
         menu.UpdateLayout();
-        double? TextX(MenuItem item)
-        {
-            var text = FindVisual<TextBlock>(item, t => item.Header is string header && t.Text == header);
-            return text is null || !text.IsVisible ? null : text.TransformToAncestor(item).Transform(new Point()).X - (double)item.GetValue(SubmenuShiftProperty);
-        }
-        if (TextX(reference) is not { } target) return;
+        static double? X(FrameworkElement? element, MenuItem item) => element is null || !element.IsVisible ? null : element.TransformToAncestor(item).Transform(new Point()).X;
+        TextBlock? Text(MenuItem item) => FindVisual<TextBlock>(item, t => item.Header is string header && t.Text == header);
+        var textReference = items.FirstOrDefault(i => !i.HasItems && i.Header is string);
+        var iconReference = items.FirstOrDefault(i => !i.HasItems && i.Icon is FrameworkElement);
+        double? textTarget = textReference is null ? null : X(Text(textReference), textReference);
+        double? iconTarget = iconReference is null ? null : X(iconReference.Icon as FrameworkElement, iconReference);
         foreach (var item in items.Where(i => i.HasItems))
         {
-            if (TextX(item) is not { } current) continue;
-            double shift = Math.Round(target - current), applied = (double)item.GetValue(SubmenuShiftProperty);
-            if (Math.Abs(shift - applied) < 1) continue;
-            var padding = item.Padding; item.Padding = new Thickness(padding.Left - applied + shift, padding.Top, padding.Right, padding.Bottom);
-            if (item.Icon is FrameworkElement icon) { var margin = icon.Margin; icon.Margin = new Thickness(margin.Left - applied + shift, margin.Top, margin.Right, margin.Bottom); }
-            item.SetValue(SubmenuShiftProperty, shift);
+            // A centred element moves by a fraction of its margin change, so converge on the measured position.
+            for (int pass = 0; pass < 6; pass++)
+            {
+                bool moved = false;
+                if (textTarget is { } t && X(Text(item), item) is { } x && Math.Abs(t - x) >= 1)
+                { var p = item.Padding; item.Padding = new Thickness(Math.Max(0, p.Left + t - x), p.Top, p.Right, p.Bottom); moved = true; }
+                if (iconTarget is { } i && item.Icon is FrameworkElement icon && X(icon, item) is { } ix && Math.Abs(i - ix) >= 1)
+                { var m = icon.Margin; icon.Margin = new Thickness(Math.Max(0, m.Left + i - ix), m.Top, m.Right, m.Bottom); moved = true; }
+                if (!moved) break;
+                item.UpdateLayout();
+            }
         }
     }
     static T? FindVisual<T>(DependencyObject root, Func<T, bool> match) where T : DependencyObject
