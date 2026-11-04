@@ -84,7 +84,7 @@ public sealed class DockerTemplateWindow : Window
     }
 
     static TextBox Field(string name) => new() { MinHeight = 32, Name = name };
-    static TextBox Lines(string name) => new() { Name = name, AcceptsReturn = true, MinHeight = 76, MaxHeight = 140, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.NoWrap };
+    static TextBox Lines(string name) => new() { Name = name, AcceptsReturn = true, VerticalContentAlignment = VerticalAlignment.Top, MinHeight = 76, MaxHeight = 140, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.NoWrap };
     static FrameworkElement Labeled(string label, Control input, string? hint)
     {
         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) }; panel.Children.Add(Ui.Text(label, 12)); input.Margin = new Thickness(0, 4, 0, 0); panel.Children.Add(input);
