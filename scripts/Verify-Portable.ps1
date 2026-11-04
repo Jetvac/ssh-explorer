@@ -8,7 +8,14 @@ $ErrorActionPreference='Stop'
 $packageRoot=(Resolve-Path -LiteralPath $Directory).Path.TrimEnd('\')
 $build=Get-Content -LiteralPath (Join-Path $packageRoot 'build-info.json') -Raw | ConvertFrom-Json
 if($build.version -ne $ExpectedVersion -or $build.commit -ne $ExpectedCommit -or $build.dirty){throw 'Package provenance mismatch.'}
-foreach($relative in @('SSHExplorer.exe','SSHExplorer.dll','hostfxr.dll','coreclr.dll','wpfgfx_cor3.dll','WebView2Runtime\msedgewebview2.exe','Assets\Terminal\index.html')){
+$required=@('SSHExplorer.exe','SSHExplorer.dll','hostfxr.dll','coreclr.dll','wpfgfx_cor3.dll','WebView2Loader.dll','Assets\Terminal\index.html')
+$bundledRuntime=Test-Path -LiteralPath (Join-Path $packageRoot 'WebView2Runtime')
+if($build.webView2 -eq 'system-evergreen'){
+    if($bundledRuntime){throw 'Evergreen package must not contain WebView2Runtime.'}
+} elseif($build.webView2 -like 'fixed-*'){
+    $required+='WebView2Runtime\msedgewebview2.exe'
+} else {throw "Unknown WebView2 packaging mode: $($build.webView2)"}
+foreach($relative in $required){
     if(-not(Test-Path -LiteralPath (Join-Path $packageRoot $relative) -PathType Leaf)){throw "Missing package component: $relative"}
 }
 $binaryMetadata = foreach($binary in @('SSHExplorer.exe','SSHExplorer.dll','SSHExplorer.Core.dll','SSHExplorer.Monitoring.dll')){

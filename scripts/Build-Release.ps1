@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param([switch]$SkipTests, [switch]$NoZip, [switch]$RequireClean)
+# Default package uses the system Evergreen WebView2 Runtime (part of Windows 11).
+# -WithFixedRuntime adds the pinned Fixed Version runtime for managed/LTSC systems without Evergreen.
+param([switch]$SkipTests, [switch]$NoZip, [switch]$RequireClean, [switch]$WithFixedRuntime)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $root = Split-Path -Parent $PSScriptRoot
@@ -25,9 +27,10 @@ $runtimeUrl = 'https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservi
 $runtimeRoot = Join-Path $root '.tools\webview-runtime'
 $runtime = Join-Path $runtimeRoot "Microsoft.WebView2.FixedVersionRuntime.$runtimeVersion.x64"
 New-Item -ItemType Directory -Force -Path (Join-Path $root '.tools'),(Join-Path $root 'artifacts') | Out-Null
-Start-Transcript -LiteralPath (Join-Path $root 'artifacts\build-test.log') -Force | Out-Null
+$transcript = if ($WithFixedRuntime) { 'build-fixed-webview2.log' } else { 'build-test.log' }
+Start-Transcript -LiteralPath (Join-Path $root "artifacts\$transcript") -Force | Out-Null
 trap { try { Stop-Transcript | Out-Null } catch {}; throw $_ }
-if (-not (Test-Path -LiteralPath (Join-Path $runtime 'msedgewebview2.exe'))) {
+if ($WithFixedRuntime -and -not (Test-Path -LiteralPath (Join-Path $runtime 'msedgewebview2.exe'))) {
     $cab = Join-Path $root '.tools\webview.cab'
     if (-not (Test-Path -LiteralPath $cab)) { Invoke-WebRequest -Uri $runtimeUrl -OutFile $cab }
     if ((Get-FileHash -LiteralPath $cab -Algorithm SHA256).Hash -ne $runtimeHash) { throw 'WebView2 package SHA-256 mismatch.' }
@@ -61,21 +64,26 @@ if (-not $SkipTests) {
         if ($LASTEXITCODE -ne 0) { throw "$project failed." }
     }
 }
-$packageName = "SSHExplorer-$version-win-x64"
+$packageName = if ($WithFixedRuntime) { "SSHExplorer-$version-win-x64-fixed-webview2" } else { "SSHExplorer-$version-win-x64" }
 $destination = Join-Path $root "artifacts\$packageName"
 if (Test-Path -LiteralPath $destination) { throw "Output already exists; choose an unused version or move the previous test output: $destination" }
 & $sdk publish src\SSHExplorer.App\SSHExplorer.App.csproj -c Release -r win-x64 --self-contained true --no-restore -m:1 -nr:false @buildProperties -p:PublishTrimmed=false -p:PublishSingleFile=false -o $destination | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'Self-contained publish failed.' }
-$runtimeDestination = Join-Path $destination 'WebView2Runtime'
-New-Item -ItemType Directory -Force -Path $runtimeDestination | Out-Null
-Copy-Item -Path (Join-Path $runtime '*') -Destination $runtimeDestination -Recurse -Force
+if ($WithFixedRuntime) {
+    $runtimeDestination = Join-Path $destination 'WebView2Runtime'
+    New-Item -ItemType Directory -Force -Path $runtimeDestination | Out-Null
+    Copy-Item -Path (Join-Path $runtime '*') -Destination $runtimeDestination -Recurse -Force
+}
 # User package: the guide, the change log, notices and required licenses only. Developer reports,
 # acceptance matrices, CI evidence and historical screenshots stay in the source/evidence archives.
 foreach ($document in @('README.md','CHANGELOG.md','THIRD-PARTY-NOTICES.md')) {
     if (Test-Path -LiteralPath $document) { Copy-Item -LiteralPath $document -Destination $destination -Force }
 }
 Copy-Item -LiteralPath (Join-Path $root 'licenses') -Destination $destination -Recurse -Force
-[ordered]@{ version=$version; commit=$commit; dirty=$dirty; sdk=(& $sdk --version); runtime='10.0.14'; webView2=$runtimeVersion; utc=[DateTime]::UtcNow.ToString('O') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'build-info.json') -Encoding utf8
+# The Fixed Runtime license applies only when that runtime is redistributed.
+if (-not $WithFixedRuntime) { Remove-Item -LiteralPath (Join-Path $destination 'licenses\WebView2-Fixed-Runtime-LICENSE.html') -Force -ErrorAction SilentlyContinue }
+$webView2 = if ($WithFixedRuntime) { "fixed-$runtimeVersion" } else { 'system-evergreen' }
+[ordered]@{ version=$version; commit=$commit; dirty=$dirty; sdk=(& $sdk --version); runtime='10.0.14'; webView2=$webView2; utc=[DateTime]::UtcNow.ToString('O') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'build-info.json') -Encoding utf8
 $files = Get-ChildItem -LiteralPath $destination -File -Recurse | Where-Object Name -ne 'SHA256SUMS.txt'
 $manifest = foreach ($file in $files) { '{0}  {1}' -f (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $file.FullName.Substring($destination.Length + 1).Replace('\','/') }
 $manifest | Set-Content -LiteralPath (Join-Path $destination 'SHA256SUMS.txt') -Encoding utf8
@@ -86,7 +94,12 @@ if (-not $NoZip) {
     $archive = Join-Path $root "artifacts\$packageName.zip"
     Compress-Archive -LiteralPath $destination -DestinationPath $archive -CompressionLevel Optimal -Force
     Get-FileHash -LiteralPath $archive -Algorithm SHA256 | Format-List
-    '{0}  {1}' -f (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant(),[IO.Path]::GetFileName($archive) | Set-Content -LiteralPath (Join-Path $root 'artifacts\SHA256SUMS.txt') -Encoding utf8
+    # One manifest for both packages (standard and -WithFixedRuntime): replace only this archive's line.
+    $sums = Join-Path $root 'artifacts\SHA256SUMS.txt'
+    $archiveName = [IO.Path]::GetFileName($archive)
+    $lines = @(if (Test-Path -LiteralPath $sums) { Get-Content -LiteralPath $sums | Where-Object { $_ -and -not $_.EndsWith("  $archiveName") } })
+    $lines += '{0}  {1}' -f (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant(), $archiveName
+    $lines | Sort-Object { $_.Substring(66) } | Set-Content -LiteralPath $sums -Encoding utf8
 }
 Write-Output "Portable application: $destination\SSHExplorer.exe"
 Stop-Transcript | Out-Null

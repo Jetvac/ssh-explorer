@@ -8,12 +8,12 @@
 | System.Security.Cryptography.ProtectedData | 10.0.0 | MIT |
 | Microsoft.Extensions.Logging.Abstractions и зависимости | packages.lock.json | MIT |
 | Microsoft.Web.WebView2 SDK | 1.0.4314.35 | Microsoft BSD-style license, включена в licenses |
-| Microsoft Edge WebView2 Fixed Runtime | 156.0.4314.58 x64 | Microsoft Edge WebView2 Runtime Fixed Version, официальный текст в licenses/WebView2-Fixed-Runtime-LICENSE.html |
+| Microsoft Edge WebView2 Fixed Runtime | 156.0.4314.58 x64 — **только** в комплекте `…-fixed-webview2` | Microsoft Edge WebView2 Runtime Fixed Version, официальный текст в licenses/WebView2-Fixed-Runtime-LICENSE.html (в основной комплект не входит) |
 | @xterm/xterm | 6.0.0 | MIT |
 | @xterm/addon-fit | 0.11.0 | MIT |
 | @xterm/addon-search | 0.16.0 | MIT |
 
-Тексты лицензий включены в `licenses`, а также рядом с runtime. WebView2 используется только для локального терминала. Ни один компонент не загружается с CDN при работе приложения.
+Тексты лицензий включены в `licenses`, а также рядом с runtime. WebView2 используется только для локального терминала. Основной комплект не распространяет WebView2 Runtime: используется установленный в Windows Evergreen Runtime. Ни один компонент не загружается с CDN при работе приложения.
 
 QEMU, Alpine, Python и SDK являются исключительно инструментами разработки/испытаний в `.tools`; они не входят в portable-поставку и не требуются пользователю или управляемому серверу.
 

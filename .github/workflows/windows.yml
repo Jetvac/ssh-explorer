@@ -39,6 +39,19 @@ jobs:
         run: |
           ./scripts/Build-Release.ps1 -RequireClean
           ./scripts/Package-Source.ps1 -RequireClean
+      - name: System Evergreen WebView2 on the runner (terminal engine of the standard package)
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $pv = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).pv
+          if (-not $pv -or $pv -eq '0.0.0.0') { throw 'Evergreen WebView2 Runtime is not installed on the runner.' }
+          if ([version]$pv -lt [version]'120.0.0.0') { throw "Evergreen WebView2 Runtime $pv is older than the 120.0.0.0 minimum." }
+          [ordered]@{ evergreen = $pv; minimum = '120.0.0.0' } | ConvertTo-Json | Set-Content artifacts/webview2-system.json -Encoding utf8
+          Get-Content artifacts/webview2-system.json
+      - name: Optional kit with Fixed WebView2 Runtime (tags and manual runs only)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
+        run: ./scripts/Build-Release.ps1 -RequireClean -SkipTests -WithFixedRuntime
       - name: Authentication network and ordinary WPF command route
         shell: pwsh
         run: ./scripts/Test-AuthNetwork.ps1 -Python .tools/auth-ci-python/Scripts/python.exe -RunOrdinaryUi
@@ -100,6 +113,7 @@ jobs:
             artifacts/ui-beta6.log
             artifacts/ui-beta6/**
             artifacts/package-measurements.json
+            artifacts/webview2-system.json
             artifacts/exe-associated-icon.png
           if-no-files-found: warn
           retention-days: 14

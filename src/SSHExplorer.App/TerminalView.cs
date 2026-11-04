@@ -67,25 +67,20 @@ public sealed class TerminalView : UserControl, IDisposable
             using var doc = JsonDocument.Parse(json); result = doc.RootElement.Clone();
             if (result.GetProperty("marker").GetBoolean() && result.GetProperty("utf8").GetBoolean() && result.GetProperty("red").GetBoolean()) break;
         }
-        return new { EngineVersion = _web.CoreWebView2.Environment.BrowserVersionString, BundledEngine = _usesBundledEngine, Columns = result.GetProperty("cols").GetInt32(), Rows = result.GetProperty("rows").GetInt32(), RealOutput = result.GetProperty("marker").GetBoolean(), Utf8 = result.GetProperty("utf8").GetBoolean(), AnsiRed = result.GetProperty("red").GetBoolean() };
+        return new { EngineVersion = _web.CoreWebView2.Environment.BrowserVersionString, BundledEngine = _usesBundledEngine, EngineSource = _usesBundledEngine ? "bundled-fixed" : "system-evergreen", Columns = result.GetProperty("cols").GetInt32(), Rows = result.GetProperty("rows").GetInt32(), RealOutput = result.GetProperty("marker").GetBoolean(), Utf8 = result.GetProperty("utf8").GetBoolean(), AnsiRed = result.GetProperty("red").GetBoolean() };
     }
 
     private async Task InitializeAsync(string? directory)
     {
         try
         {
-            var runtime = Path.Combine(AppContext.BaseDirectory, "WebView2Runtime");
-            // Developer-only fallback is never used by the published portable distribution.
-            if (!File.Exists(Path.Combine(runtime, "msedgewebview2.exe")))
-            {
-                var development = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", ".tools", "webview-runtime"));
-                if (Directory.Exists(development)) runtime = Directory.GetDirectories(development).FirstOrDefault(d => File.Exists(Path.Combine(d, "msedgewebview2.exe"))) ?? runtime;
-            }
-            if (!File.Exists(Path.Combine(runtime, "msedgewebview2.exe"))) throw new FileNotFoundException("В комплекте отсутствует WebView2Runtime. Распакуйте весь portable ZIP, включая папки рядом с EXE.");
-            _usesBundledEngine = string.Equals(Path.GetFullPath(runtime), Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "WebView2Runtime")), StringComparison.OrdinalIgnoreCase);
+            var engine = TerminalEngine.Resolve();
+            _usesBundledEngine = engine.Bundled;
             var assets = Path.Combine(AppContext.BaseDirectory, "Assets", "Terminal");
             if (!File.Exists(Path.Combine(assets, "index.html"))) throw new FileNotFoundException("Не найдены локальные ресурсы терминала.");
-            var env = await CoreWebView2Environment.CreateAsync(runtime, Path.Combine(App.Store.DirectoryPath, "WebView2"));
+            // Separate profiles: a Chromium profile written by a newer engine must not be opened by an older one.
+            var profile = Path.Combine(App.Store.DirectoryPath, engine.Bundled ? "WebView2" : "WebView2-System");
+            var env = await CoreWebView2Environment.CreateAsync(engine.Folder, profile);
             await _web.EnsureCoreWebView2Async(env);
             _stop.Token.ThrowIfCancellationRequested();
             var core = _web.CoreWebView2;
@@ -235,4 +230,46 @@ public sealed class TerminalView : UserControl, IDisposable
         if (_web.CoreWebView2 is not null) _web.CoreWebView2.WebMessageReceived -= MessageReceived;
         _web.Dispose();
     }
+}
+
+/// <summary>Raised when no usable WebView2 engine exists; the message is shown to the user as is.</summary>
+public sealed class TerminalEngineUnavailableException(string message, Exception? inner = null) : InvalidOperationException(message, inner);
+
+/// <summary>
+/// Chooses the terminal engine. The standard package relies on the Evergreen WebView2 Runtime that ships
+/// with Windows 11 and is updated by Windows. A <c>WebView2Runtime</c> folder next to the EXE (optional
+/// Fixed Version kit for managed/LTSC systems without Evergreen) takes precedence when present.
+/// </summary>
+internal static class TerminalEngine
+{
+    /// <summary>Oldest Evergreen engine accepted. Every API used by <see cref="TerminalView"/> is older.</summary>
+    internal const string MinimumVersion = "120.0.0.0";
+    internal const string DownloadUrl = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
+
+    internal readonly record struct Choice(string? Folder, bool Bundled, string Version);
+
+    internal static Choice Resolve()
+    {
+        var bundled = Path.Combine(AppContext.BaseDirectory, "WebView2Runtime");
+        if (File.Exists(Path.Combine(bundled, "msedgewebview2.exe")))
+            return new Choice(bundled, true, SafeVersion(bundled) ?? "fixed");
+        string? version;
+        try { version = CoreWebView2Environment.GetAvailableBrowserVersionString(null); }
+        catch (WebView2RuntimeNotFoundException ex) { throw Missing(ex); }
+        if (string.IsNullOrWhiteSpace(version)) throw Missing(null);
+        if (CoreWebView2Environment.CompareBrowserVersions(version, MinimumVersion) < 0)
+            throw new TerminalEngineUnavailableException(
+                $"Системный Microsoft Edge WebView2 Runtime {version} устарел; для терминала нужна версия {MinimumVersion} или новее. " +
+                $"Обновите Windows или установите runtime: {DownloadUrl}");
+        return new Choice(null, false, version);
+    }
+
+    private static string? SafeVersion(string folder)
+    {
+        try { return CoreWebView2Environment.GetAvailableBrowserVersionString(folder); } catch { return null; }
+    }
+
+    private static TerminalEngineUnavailableException Missing(Exception? inner) => new(
+        "Для терминала нужен Microsoft Edge WebView2 Runtime. В Windows 11 он установлен по умолчанию, но на этой системе отсутствует или удалён. " +
+        $"Установите Evergreen Runtime ({DownloadUrl}) и откройте терминал снова. Файловый менеджер и мониторинг работают без него.", inner);
 }

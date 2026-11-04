@@ -24,7 +24,8 @@
 - Поставка:
   - без отчётов разработчика, лишних языковых ресурсов WPF и XML-документации пакетов;
   - [анализ размера и решение по Rust](docs/PACKAGING_AND_PERFORMANCE.md): 81,5 % объёма занимает WebView2 Fixed Runtime;
-  - изолированный [Rust-прототип](prototypes/rust-explorer/README.md) — не выпуск.
+  - изолированный [Rust-прототип](prototypes/rust-explorer/README.md) — не выпуск;
+  - терминал переведён на системный Evergreen WebView2 Runtime Windows 11 (вариант B). Основной ZIP — ожидаемо ≈ 64 МБ вместо ≈ 390 МБ. При отсутствии или устаревании runtime (< 120) терминал показывает понятное сообщение со ссылкой; остальное приложение работает. Для систем без Evergreen — отдельный комплект `…-fixed-webview2` с Fixed Runtime 156.0.4314.58. Профиль движка разделён: `WebView2-System` и `WebView2`.
 
 ## 0.2.0-beta.5 — 2026-11-04
 

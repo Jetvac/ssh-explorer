@@ -29,7 +29,7 @@
 
 ## Зафиксированные версии и границы
 
-.NET SDK 10.0.403 / runtime 10.0.14; SSH.NET 2026.0.0; WebView2 SDK 1.0.4314.35 / Fixed Runtime 156.0.4314.58 x64; xterm 6.0.0, fit 0.11.0, search 0.16.0. NuGet восстанавливается в locked mode. Все терминальные ресурсы локальны, HTTP-сервера и CDN нет. PublishTrimmed=false и PublishSingleFile=false закреплены явно; Windows App SDK не используется.
+.NET SDK 10.0.403 / runtime 10.0.14; SSH.NET 2026.0.0; WebView2 SDK 1.0.4314.35 / системный Evergreen Runtime ≥ 120 (дополнительный комплект — Fixed Runtime 156.0.4314.58 x64); xterm 6.0.0, fit 0.11.0, search 0.16.0. NuGet восстанавливается в locked mode. Все терминальные ресурсы локальны, HTTP-сервера и CDN нет. PublishTrimmed=false и PublishSingleFile=false закреплены явно; Windows App SDK не используется.
 
 Серверный вывод передаётся base64→Uint8Array, не HTML/JS. ACK после xterm parser callback ограничивает output одним 16-КиБ блоком in-flight. Resize coalesced, ввод сериализован, OSC52 перехвачен. Внешние навигации/новые окна/permissions/downloads WebView2 запрещены; IPC и ресурсы ограничены локальным terminal.local.
 
