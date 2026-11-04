@@ -52,6 +52,8 @@ public sealed class AppSettings
     public double TreeWidth { get; set; } = 244;
     public int PollIntervalSeconds { get; set; } = 2;
     public int TerminalFontSize { get; set; } = 14;
+    /// <summary>Ctrl+C/Ctrl+V copy and paste in the terminal; ^C is sent by the «Прервать» button. False — classic keys.</summary>
+    public bool TerminalCtrlCCopies { get; set; } = true;
     public bool ShowHidden { get; set; }
     public bool ShowExtensions { get; set; } = true;
     public bool DetailsPane { get; set; }

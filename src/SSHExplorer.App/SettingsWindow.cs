@@ -35,6 +35,7 @@ public sealed class SettingsWindow : Window
     readonly ComboBox theme = new() { Name = "SettingsTheme" };
     readonly CheckBox reduceMotion = new() { Name = "SettingsReduceMotion", Content = "Уменьшить анимацию" };
     readonly CheckBox showHidden = new() { Content = "Показывать скрытые файлы и папки" };
+    readonly CheckBox terminalCopyKeys = new() { Content = "Ctrl+C и Ctrl+V копируют и вставляют", Name = "SettingsTerminalCopyKeys" };
     readonly CheckBox dockerModule = new() { Content = "Docker — контейнеры, журналы и сохранённые параметры запуска", Name = "SettingsDockerModule" };
     readonly CheckBox showExtensions = new() { Content = "Показывать расширения имён файлов" };
     readonly NumberField poll = new("Интервал обновления", "с", 1, 60, 1);
@@ -59,7 +60,7 @@ public sealed class SettingsWindow : Window
         theme.ItemsSource = new[] { "Как в Windows", "Светлая", "Тёмная" };
         theme.SelectedIndex = settings.Theme == "Light" ? 1 : settings.Theme == "Dark" ? 2 : 0;
         AutomationProperties.SetName(theme, "Тема приложения");
-        reduceMotion.IsChecked = settings.ReduceMotion; showHidden.IsChecked = settings.ShowHidden; dockerModule.IsChecked = settings.DockerModule; showExtensions.IsChecked = settings.ShowExtensions;
+        reduceMotion.IsChecked = settings.ReduceMotion; showHidden.IsChecked = settings.ShowHidden; terminalCopyKeys.IsChecked = settings.TerminalCtrlCCopies; dockerModule.IsChecked = settings.DockerModule; showExtensions.IsChecked = settings.ShowExtensions;
         poll.Value = settings.PollIntervalSeconds; font.Value = settings.TerminalFontSize;
         maxBytes.Value = settings.PreviewMaxBytes / 1024 / 1024; pixels.Value = settings.PreviewMaxPixels / 1_000_000;
         parallel.Value = settings.PreviewParallelism; cache.Value = settings.PreviewCacheBytes / 1024 / 1024;
@@ -138,7 +139,7 @@ public sealed class SettingsWindow : Window
         var browse = Ui.Button("Обзор…", () => { var pick = new Microsoft.Win32.OpenFileDialog { Filter = "Программа Windows|*.exe", CheckFileExists = true, Title = "Выберите установленный текстовый редактор" }; if (pick.ShowDialog(this) == true) editor.Text = pick.FileName; });
         var notepad = Ui.Button("Блокнот Windows", () => editor.Text = "");
         pages["terminal"] = Page("Терминал и редактор",
-            Group("Терминал", font),
+            Group("Терминал", font, Setting(null, "Выполняемую команду прерывает кнопка «Прервать» в панели терминала. Без флажка — как в обычной консоли: Ctrl+C прерывает, копирование и вставка — Ctrl+Shift+C/V. Ctrl+Shift+C/V работают всегда. Применяется к новым терминалам.", terminalCopyKeys)),
             Group("Редактор текстовых файлов", Setting("Программа", null, editor), editorState, Buttons(browse, notepad),
                 Setting(null, "Документы, редактирование которых явно завершено, можно убрать из списка. Незавершённые копии не удаляются.", Buttons(Ui.AsyncButton("Очистить завершённые документы…", () => ((MainWindow)Application.Current.MainWindow).ClearCompletedDocumentsAsync())))));
 
@@ -233,6 +234,7 @@ public sealed class SettingsWindow : Window
         settings.PreviewParallelism = (int)parallel.Value; settings.PreviewCacheBytes = cache.Value * 1024 * 1024;
         settings.TransferParallelism = (int)transfers.Value; settings.TransferLimitKiBps = (int)speed.Value; settings.ApplyTo(App.Transfers);
         bool modulesChanged = settings.DockerModule != (dockerModule.IsChecked == true); settings.DockerModule = dockerModule.IsChecked == true;
+        settings.TerminalCtrlCCopies = terminalCopyKeys.IsChecked == true;
         settings.ShowHidden = showHidden.IsChecked == true; settings.ShowExtensions = showExtensions.IsChecked == true;
         settings.ReduceMotion = reduceMotion.IsChecked == true; UiMotion.UserReduced = settings.ReduceMotion;
         settings.Theme = theme.SelectedIndex == 1 ? "Light" : theme.SelectedIndex == 2 ? "Dark" : "System"; Theme.Apply(settings.Theme);

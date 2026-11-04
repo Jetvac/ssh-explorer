@@ -41,7 +41,9 @@ public sealed class TerminalView : UserControl, IDisposable
             Ui.AsyncIconButton("\uE74B", () => FindAsync(false), "Следующее совпадение"),
             Ui.AsyncIconButton("\uE738", () => ChangeFontAsync(-1), "Уменьшить шрифт"),
             Ui.AsyncIconButton(Ui.AddGlyph, () => ChangeFontAsync(1), "Увеличить шрифт"),
-            Ui.AsyncButton("Вставить", PasteAsync, "Вставить • Ctrl+Shift+V"));
+            Ui.AsyncButton("Копировать", CopyAsync, "Копировать выделение • " + (App.Store.Settings.TerminalCtrlCCopies ? "Ctrl+C" : "Ctrl+Shift+C")),
+            Ui.AsyncButton("Вставить", PasteAsync, "Вставить • " + (App.Store.Settings.TerminalCtrlCCopies ? "Ctrl+V" : "Ctrl+Shift+V")),
+            Interrupt());
         tools.Margin = new Thickness(12, 6, 12, 6); DockPanel.SetDock(tools, Dock.Top);
         root.Children.Add(tools); root.Children.Add(_web); Content = root;
         _search.KeyDown += async (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) { await FindAsync(false); e.Handled = true; } };
@@ -50,6 +52,23 @@ public sealed class TerminalView : UserControl, IDisposable
     }
 
     public Task StartAsync(string? directory = null) => _start ??= InitializeAsync(directory);
+
+    /// <summary>Sends ^C (SIGINT to the foreground program) — the button that replaces Ctrl+C when Ctrl+C copies.</summary>
+    Button Interrupt()
+    {
+        var button = Ui.AsyncButton("Прервать", InterruptAsync, "Отправить ^C (прервать выполняемую команду)" + (App.Store.Settings.TerminalCtrlCCopies ? "" : " • Ctrl+C"));
+        button.Name = "TerminalInterrupt"; return button;
+    }
+    internal Task InterruptAsync() => WriteAsync("");
+    internal async Task CopyAsync()
+    {
+        if (_disposed || _web.CoreWebView2 is null) return;
+        var json = await _web.CoreWebView2.ExecuteScriptAsync("window.sshExplorer.selection()");
+        var text = JsonSerializer.Deserialize<string>(json);
+        if (string.IsNullOrEmpty(text)) { ShowHint(); return; }
+        Clipboard.SetText(text); _status.Text = "Скопировано: " + text.Length + " симв.";
+    }
+    void ShowHint() => _status.Text = "Нечего копировать: выделите текст мышью. Прервать команду — кнопка «Прервать».";
 
     /// <summary>Explicit input, used only after creating a fresh terminal for htop/top.</summary>
     public Task SendTextAsync(string text) => WriteAsync(text);
@@ -135,7 +154,8 @@ public sealed class TerminalView : UserControl, IDisposable
             {
                 case "ready":
                     _columns = (uint)Math.Clamp(data.GetProperty("cols").GetInt32(), 2, 1000);
-                    _rows = (uint)Math.Clamp(data.GetProperty("rows").GetInt32(), 2, 1000); _ready.TrySetResult(); break;
+                    _rows = (uint)Math.Clamp(data.GetProperty("rows").GetInt32(), 2, 1000); _ready.TrySetResult();
+                    await RunScriptAsync($"window.sshExplorer.setClipboardKeys({(App.Store.Settings.TerminalCtrlCCopies ? "true" : "false")})"); break;
                 case "input": await WriteAsync(data.GetProperty("data").GetString() ?? ""); break;
                 case "resize":
                     _columns = (uint)Math.Clamp(data.GetProperty("cols").GetInt32(), 2, 1000);
@@ -143,7 +163,8 @@ public sealed class TerminalView : UserControl, IDisposable
                     await ResizeAsync();
                     break;
                 case "outputAck": if (data.GetProperty("id").GetInt32() == _outputId) _outputAck?.TrySetResult(); break;
-                case "copy": var text = data.GetProperty("data").GetString(); if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text); break;
+                case "copy": var text = data.GetProperty("data").GetString(); if (!string.IsNullOrEmpty(text)) { Clipboard.SetText(text); _status.Text = "Скопировано: " + text.Length + " симв."; } break;
+                case "copyEmpty": ShowHint(); break;
                 case "paste": await PasteAsync(); break;
                 case "search": _search.Focus(); _search.SelectAll(); break;
                 case "font": await ChangeFontAsync(Math.Clamp(data.GetProperty("delta").GetInt32(), -1, 1)); break;

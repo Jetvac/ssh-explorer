@@ -15,10 +15,18 @@
   term.open(document.getElementById('terminal'));
   term.onData(data => post({type:'input',data}));
   term.onResize(({cols,rows}) => post({type:'resize',cols,rows}));
+  // Ctrl+C/Ctrl+V copy and paste (interrupt is a toolbar button) unless the user switched back to classic keys.
+  let clipboardKeys = true;
   term.attachCustomKeyEventHandler(e => {
     if (e.type !== 'keydown') return true;
-    if (e.ctrlKey && e.shiftKey && e.code === 'KeyC') { post({type:'copy',data:term.getSelection()}); return false; }
-    if (e.ctrlKey && e.shiftKey && e.code === 'KeyV') { post({type:'paste'}); return false; }
+    const plainCtrl = e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey;
+    if ((e.ctrlKey && e.shiftKey && e.code === 'KeyC') || (clipboardKeys && plainCtrl && e.code === 'KeyC')) {
+      e.preventDefault(); const text = term.getSelection();
+      if (text) { post({type:'copy',data:text}); term.clearSelection(); } else post({type:'copyEmpty'});
+      return false;
+    }
+    // preventDefault stops the browser's own paste event, so the native confirmation runs exactly once.
+    if ((e.ctrlKey && e.shiftKey && e.code === 'KeyV') || (clipboardKeys && plainCtrl && e.code === 'KeyV')) { e.preventDefault(); post({type:'paste'}); return false; }
     if (e.ctrlKey && e.shiftKey && e.code === 'KeyF') { post({type:'search'}); return false; }
     if (e.ctrlKey && (e.code==='Equal' || e.code==='NumpadAdd')) { post({type:'font',delta:1}); return false; }
     if (e.ctrlKey && (e.code==='Minus' || e.code==='NumpadSubtract')) { post({type:'font',delta:-1}); return false; }
@@ -31,6 +39,8 @@
   window.sshExplorer = Object.freeze({
     write(base64,id) { const raw=atob(base64); const b=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++)b[i]=raw.charCodeAt(i); term.write(b,()=>post({type:'outputAck',id})); },
     paste(text) { term.paste(text); },
+    selection() { return term.getSelection(); },
+    setClipboardKeys(on) { clipboardKeys = !!on; },
     search(text,back=false) { return back?search.findPrevious(text):search.findNext(text); },
     font(size) { term.options.fontSize=size; fit.fit(); },
     focus() { term.focus(); },
