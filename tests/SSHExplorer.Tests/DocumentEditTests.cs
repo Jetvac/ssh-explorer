@@ -88,7 +88,7 @@ internal static class DocumentEditTests
             var root = Path.Combine(Environment.CurrentDirectory, ".tools", "sshx-document-tests-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
             var transport = new Fake { Bytes = Encoding.GetEncoding(1251).GetBytes("Привет\n") };
             await using var d = await RemoteEditSession.OpenAsync(root, transport, "/CON:*.conf", "fixture", false, "windows-1251");
-            TestSuite.Equal("document.conf", Path.GetFileName(d.WorkingPath)); await File.WriteAllTextAsync(d.WorkingPath, "Привет, UTF-8\n"); await d.CheckAsync(true); TestSuite.Equal(RemoteEditState.FormatConfirmation, d.Record.State);
+            TestSuite.True(Path.GetFileName(d.WorkingPath).EndsWith(".conf") && !Path.GetFileName(d.WorkingPath).Contains(':') && !Path.GetFileName(d.WorkingPath).Contains('*')); await File.WriteAllTextAsync(d.WorkingPath, "Привет, UTF-8\n"); await d.CheckAsync(true); TestSuite.Equal(RemoteEditState.FormatConfirmation, d.Record.State);
             await d.ResumeAsync(transport, true); TestSuite.Equal("utf-8", d.Record.Format.Encoding); await File.WriteAllTextAsync(d.WorkingPath, "ascii\n"); await d.CheckAsync(true); TestSuite.Equal(RemoteEditState.Confirmed, d.Record.State); TestSuite.Equal("utf-8", d.Record.Format.Encoding);
         });
         await suite.Run("workspace deduplicates the same remote target while two server identities remain independent", async () =>

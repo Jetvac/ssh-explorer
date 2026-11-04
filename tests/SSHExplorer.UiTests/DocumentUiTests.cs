@@ -20,6 +20,9 @@ internal static class DocumentUiTests
         try
         {
             var app = TestApplication.Create(); Theme.Apply("Light"); int checks = 0;
+            // Routed async commands normally start inside Application.Run's
+            // Dispatcher context. This component runner pumps manually.
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ru-RU"); CultureInfo.CurrentUICulture = CultureInfo.CurrentCulture;
             void Check(bool value, string name) { if (!value) throw new Exception(name); checks++; Console.WriteLine("PASS " + name); }
             string output = args.SkipWhile(a => a != "--render-dir").Skip(1).FirstOrDefault() ?? "artifacts/ui-beta5-documents";

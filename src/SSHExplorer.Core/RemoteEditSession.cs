@@ -75,7 +75,10 @@ public sealed class RemoteEditSession : IAsyncDisposable
         var format = await Task.Run(() => DocumentText.Decode(version.Bytes, explicitEncoding).Format, ct).ConfigureAwait(false);
         var extension = Path.GetExtension(PosixPath.Name(location.Path));
         if (extension.Length is < 2 or > 16 || extension.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '.')) extension = ".txt";
-        var record = new RemoteEditRecord { Identity = transport.Identity, Location = location, ServerName = serverName, WorkingName = "document" + extension, BaselineHash = version.Hash, Metadata = version.Metadata, Format = format, ExplicitEncoding = explicitEncoding, State = RemoteEditState.Open };
+        static string SafeLabel(string value) => new string(value.Select(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c) ? '_' : c).Take(42).ToArray()).Trim(' ', '.');
+        var basename = SafeLabel(PosixPath.Name(location.Path)); if (basename.EndsWith(extension, StringComparison.OrdinalIgnoreCase)) basename = basename[..^extension.Length];
+        var localName = "document-" + basename + "-" + SafeLabel(serverName) + extension;
+        var record = new RemoteEditRecord { Identity = transport.Identity, Location = location, ServerName = serverName, WorkingName = localName, BaselineHash = version.Hash, Metadata = version.Metadata, Format = format, ExplicitEncoding = explicitEncoding, State = RemoteEditState.Open };
         var directory = Path.Combine(root, record.Id.ToString("N")); Directory.CreateDirectory(directory);
         var result = new RemoteEditSession(directory, record);
         await AtomicWriteAsync(result.WorkingPath, version.Bytes, ct).ConfigureAwait(false);
@@ -88,7 +91,7 @@ public sealed class RemoteEditSession : IAsyncDisposable
         var manifest = new FileInfo(Path.Combine(directory, "document.json"));
         if (manifest.Length > 128 * 1024 || (manifest.Attributes & FileAttributes.ReparsePoint) != 0) throw new IOException("Недопустимый файл журнала.");
         var record = JsonSerializer.Deserialize<RemoteEditRecord>(File.ReadAllBytes(manifest.FullName), Json) ?? throw new IOException("Пустой журнал.");
-        if (record.Id != id || record.WorkingName != Path.GetFileName(record.WorkingName) || !record.WorkingName.StartsWith("document.", StringComparison.Ordinal) || record.Identity is null || record.Location is null || record.Metadata is null || record.Format is null) throw new IOException("Повреждённый журнал документа.");
+        if (record.Id != id || record.WorkingName != Path.GetFileName(record.WorkingName) || !(record.WorkingName.StartsWith("document.", StringComparison.Ordinal) || record.WorkingName.StartsWith("document-", StringComparison.Ordinal)) || record.Identity is null || record.Location is null || record.Metadata is null || record.Format is null) throw new IOException("Повреждённый журнал документа.");
         var result = new RemoteEditSession(directory, record);
         if (record.State != RemoteEditState.Completed) { record.State = record.Operation is null ? RemoteEditState.Paused : RemoteEditState.Unknown; record.Message = "Восстановленная рабочая копия. Подключитесь к исходному серверу и возобновите явно."; result.Watch(); }
         return result;

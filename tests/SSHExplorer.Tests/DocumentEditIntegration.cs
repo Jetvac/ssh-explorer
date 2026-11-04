@@ -14,6 +14,8 @@ internal static class DocumentEditIntegration
         await using var first = new ServerSession(profile, store); await using var second = new ServerSession(profile, store);
         Task<TrustDecision> Trust(HostKeyPrompt key) { TestSuite.Equal(config.ExpectedHostFingerprint, key.Fingerprint); TestSuite.True(!key.Changed); return Task.FromResult(TrustDecision.Session); }
         await first.ConnectAsync(new SessionCredentials(config.Secret), Trust); await second.ConnectAsync(new SessionCredentials(config.Secret), Trust);
+        if (config.Username == "sftpeditor")
+            await suite.Run("REAL SFTP-only document transport is available while the ordinary exec probe is rejected", () => TestSuite.True(!first.ShellAvailable && first.SftpAvailable));
         var parent = await first.Files.ResolvePathAsync(config.RemoteParent); var directory = PosixPath.Combine(parent, "sshx-edit-" + Guid.NewGuid().ToString("N")); await first.Files.CreateDirectoryAsync(directory);
         var transport = new SftpDocumentTransport(first);
         async Task Write(string path, byte[] bytes, short mode = 644, DateTime? modified = null)
@@ -81,6 +83,36 @@ internal static class DocumentEditIntegration
                 await TestSuite.ThrowsAsync<OperationCanceledException>(() => transport.ReplaceAsync(location, baseline.Hash, baseline.Metadata, Encoding.UTF8.GetBytes("new\n"), Guid.NewGuid(), () => { cancel.Cancel(); return Task.CompletedTask; }, null, cancel.Token));
                 TestSuite.Equal(baseline.Hash, (await transport.ReadAsync(location, CancellationToken.None)).Hash);
             });
+            await suite.Run("REAL SFTP permission denied during sibling creation preserves the document and local snapshot", async () =>
+            {
+                var folder = PosixPath.Combine(directory, "read-only-parent"); await first.Files.CreateDirectoryAsync(folder); var path = PosixPath.Combine(folder, "document.txt"); await Write(path, Encoding.UTF8.GetBytes("original\n"));
+                await using var document = await RemoteEditSession.OpenAsync(root, transport, path, "fixture", false);
+                using var lease = await second.LeaseSftpAsync(CancellationToken.None); lease.Client.ChangePermissions(folder, 555);
+                try { await File.WriteAllTextAsync(document.WorkingPath, "pending\n"); await document.CheckAsync(true); TestSuite.Equal(RemoteEditState.Error, document.Record.State); TestSuite.Equal("original\n", Encoding.UTF8.GetString((await document.ReadServerAsync()).Bytes)); TestSuite.True(File.Exists(document.SnapshotPath)); }
+                finally { lease.Client.ChangePermissions(folder, 755); }
+            });
+            if (config.Username == "sftpeditor")
+            {
+                await suite.Run("REAL SFTP-only FIFO is refused before document content is opened", async () => await TestSuite.ThrowsAsync<IOException>(() => transport.LocateAsync(PosixPath.Combine(parent, "fifo-fixture"), false, CancellationToken.None)));
+                await suite.Run("REAL SFTP-only inability to preserve root owner prevents replacement", async () =>
+                {
+                    var path = PosixPath.Combine(parent, "owner-root.conf"); await using var document = await RemoteEditSession.OpenAsync(root, transport, path, "fixture", false);
+                    var before = await document.ReadServerAsync(); await File.WriteAllTextAsync(document.WorkingPath, "edited\n"); await document.CheckAsync(true);
+                    TestSuite.Equal(RemoteEditState.Error, document.Record.State); TestSuite.Equal(before.Hash, (await document.ReadServerAsync()).Hash); TestSuite.True(File.Exists(document.SnapshotPath));
+                });
+                await suite.Run("REAL SFTP-only ENOSPC leaves the original intact and retains the complete local version", async () =>
+                {
+                    string folder = PosixPath.Combine(PosixPath.Combine(parent, "NoSpace"), "sshx-edit-" + Guid.NewGuid().ToString("N")); await first.Files.CreateDirectoryAsync(folder);
+                    try
+                    {
+                        string path = PosixPath.Combine(folder, "document.conf"); await Write(path, Encoding.UTF8.GetBytes("original\n"));
+                        await using var document = await RemoteEditSession.OpenAsync(root, transport, path, "fixture", false); var before = await document.ReadServerAsync();
+                        var bytes = Enumerable.Repeat((byte)'x', 2 * 1024 * 1024).ToArray(); await File.WriteAllBytesAsync(document.WorkingPath, bytes); await document.CheckAsync(true);
+                        TestSuite.Equal(RemoteEditState.Error, document.Record.State); TestSuite.Equal(before.Hash, (await document.ReadServerAsync()).Hash); TestSuite.Equal(RemoteEditSession.Hash(bytes), RemoteEditSession.Hash(await File.ReadAllBytesAsync(document.SnapshotPath)));
+                    }
+                    finally { await first.Files.DeleteAsync(folder); }
+                });
+            }
         }
         finally { if (PosixPath.Parent(directory) != parent || !PosixPath.Name(directory).StartsWith("sshx-edit-")) throw new IOException("Invalid cleanup target"); await first.Files.DeleteAsync(directory); }
     }
