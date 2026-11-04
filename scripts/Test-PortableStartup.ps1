@@ -145,7 +145,7 @@ try {
     $workingSet = 0L; $private = 0L
     foreach ($id in $tree) { try { $p = [Diagnostics.Process]::GetProcessById($id); $workingSet += $p.WorkingSet64; $private += $p.PrivateMemorySize64; $p.Dispose() } catch {} }
     $report.ProcessTreeCount = $tree.Count; $report.ProcessTreeWorkingSetBytes = $workingSet; $report.ProcessTreePrivateBytes = $private
-    $report.MemoryScope = 'Home tab idle 3 s after startup; no SSH session, terminal or WebView2 instance
+    $report.MemoryScope = 'Home tab idle 3 s after startup; no SSH session, terminal or WebView2 instance.'
     $phase = 'graceful-close'
     $report.GracefulCloseRequested = $ownedProcess.CloseMainWindow()
     if (-not $report.GracefulCloseRequested) { throw 'The owned process did not accept CloseMainWindow.' }
