@@ -45,9 +45,14 @@ public sealed class DockerService(ServerSession session)
     public async Task<DockerTemplate> TemplateFromAsync(string id, CancellationToken ct = default)
     {
         var inspect = (await RunChecked(DockerCommands.Inspect(Cli, id), ct).ConfigureAwait(false)).Output;
-        var template = DockerCommands.FromInspect(inspect, null);
-        var image = (await Exec(DockerCommands.InspectImage(Cli, template.Image), ct).ConfigureAwait(false)).Output;
-        return image.TrimStart().StartsWith('[') ? DockerCommands.FromInspect(inspect, image) : template;
+        try
+        {
+            var template = DockerCommands.FromInspect(inspect, null);
+            var image = (await Exec(DockerCommands.InspectImage(Cli, template.Image), ct).ConfigureAwait(false)).Output;
+            return image.TrimStart().StartsWith('[') ? DockerCommands.FromInspect(inspect, image) : template;
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)
+        { throw new IOException("Docker вернул неожиданный ответ на inspect: параметры контейнера не прочитаны.", ex); }
     }
 
     /// <summary>
@@ -71,7 +76,7 @@ public sealed class DockerService(ServerSession session)
                 // Create empty, restrict to the owner, then write: the values are never readable by others.
                 using (sftp.Open(envFile, FileMode.CreateNew, FileAccess.Write)) { }
                 sftp.ChangePermissions(envFile, Convert.ToInt16("600", 8));
-                using (var stream = sftp.Open(envFile, FileMode.Truncate, FileAccess.Write))
+                using (var stream = sftp.Open(envFile, FileMode.Open, FileAccess.Write)) // just created empty; SSH.NET does not support Truncate
                 using (var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false)))
                     await writer.WriteAsync(DockerCommands.EnvFile(template, DockerSecrets.ValueOf).AsMemory(), ct).ConfigureAwait(false);
             }

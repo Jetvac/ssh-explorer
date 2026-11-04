@@ -295,6 +295,7 @@ internal static class Beta6Tests
             // 0.3 G: the Docker module appears only when enabled, at once in open tabs; an unconnected session explains itself in place.
             App.Store.Settings.DockerModule = false; App.RaiseModulesChanged(); Pump();
             Check(!navigation["docker"].IsVisible, "Docker is hidden while the module is off");
+            var tabErrors = new List<string>(); Ui.ErrorOverride = tabErrors.Add;
             App.Store.Settings.DockerModule = true; App.RaiseModulesChanged(); Pump(); Layout(main);
             Check(navigation["docker"].IsVisible, "enabling the module shows Docker in an already open tab");
             navigation["docker"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
@@ -303,6 +304,7 @@ internal static class Beta6Tests
             Check(Descendants<TextBlock>(dockerInTab).Any(b => b.Name == "DockerProblem" && b.IsVisible && b.Text.StartsWith("Не удалось проверить Docker", StringComparison.Ordinal)), "opening Docker on an unconnected session explains the problem in place, without a dialog");
             App.Store.Settings.DockerModule = false; App.RaiseModulesChanged(); Pump();
             Check(!navigation["docker"].IsVisible && !Descendants<DockerView>(sessionView).Any(v => v.IsVisible), "disabling the module hides Docker and leaves its section");
+            Ui.ErrorOverride = null; Check(tabErrors.Count == 0, "opening Docker in a tab raised no error dialog" + (tabErrors.Count > 0 ? ": " + string.Join(" | ", tabErrors) : ""));
             DockerUiChecks.Run(store, evidence, Check);
             // 0.3 A1: import from an OpenSSH config — preview, duplicate unchecked, only the checked host is saved.
             var existingProfile = store.Profiles.First();

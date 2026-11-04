@@ -11,6 +11,14 @@ internal static class DockerUiChecks
 {
     public static void Run(AppStore store, CiVisualEvidence evidence, Action<bool, string> check)
     {
+        var errors = new List<string>(); Ui.ErrorOverride = message => { lock (errors) errors.Add(message); };
+        try { RunCore(store, evidence, check); }
+        finally { Ui.ErrorOverride = null; }
+        lock (errors) check(errors.Count == 0, "no error dialog was raised during the Docker checks" + (errors.Count > 0 ? ": " + string.Join(" | ", errors) : ""));
+    }
+
+    static void RunCore(AppStore store, CiVisualEvidence evidence, Action<bool, string> check)
+    {
         var profile = new ServerProfile { Name = "Docker · фикстура", Host = "docker-fixture.example.invalid", Username = "fixture" };
         Complete(store.SaveProfileAsync(profile, null));
         var service = new DockerService(new ServerSession(profile, store));
@@ -23,7 +31,9 @@ internal static class DockerUiChecks
             lock (commands) commands.Add(command);
             string output = command.StartsWith("if ! command -v docker", StringComparison.Ordinal) ? "#docker direct 27.3.1"
                 : command.Contains(" ps -a ", StringComparison.Ordinal) ? list
-                : command.Contains(" logs ", StringComparison.Ordinal) ? "2026-11-04T10:00:00Z database system is ready to accept connections\n" : "";
+                : command.Contains(" logs ", StringComparison.Ordinal) ? "2026-11-04T10:00:00Z database system is ready to accept connections\n"
+                : command.Contains(" image inspect ", StringComparison.Ordinal) ? "[]"
+                : command.Contains(" inspect ", StringComparison.Ordinal) ? Inspect : "";
             return Task.FromResult(new CommandResult(output, "", 0));
         };
         var view = new DockerView(service);
@@ -71,6 +81,7 @@ internal static class DockerUiChecks
         finally { editor.Close(); }
     }
 
+    const string Inspect = """[{"Name":"/db","Config":{"Image":"postgres:16","Env":["POSTGRES_DB=app"],"Cmd":["postgres"]},"HostConfig":{"PortBindings":{},"Binds":[],"RestartPolicy":{"Name":"always"},"NetworkMode":"bridge"}}]""";
     static void Pump() { var frame = new DispatcherFrame(); Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, () => frame.Continue = false); Dispatcher.PushFrame(frame); }
     static void Layout(Window w) { w.UpdateLayout(); Pump(); }
     static void Complete(Task task) { for (int i = 0; i < 500 && !task.IsCompleted; i++) { Pump(); Thread.Sleep(5); } task.GetAwaiter().GetResult(); }

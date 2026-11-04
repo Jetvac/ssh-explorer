@@ -98,7 +98,7 @@ public sealed class DockerView : UserControl, IDisposable
     {
         if (busy) return; busy = true; UpdateCommands();
         try { await action(); }
-        catch (Exception ex) when (ex is System.IO.IOException or InvalidOperationException or ArgumentException or Renci.SshNet.Common.SshException) { state.Text = ErrorMessages.Describe(ex); Ui.Error(ErrorMessages.Describe(ex)); }
+        catch (Exception ex) when (ex is System.IO.IOException or InvalidOperationException or ArgumentException or Renci.SshNet.Common.SshException or System.Text.Json.JsonException) { state.Text = ErrorMessages.Describe(ex); Ui.Error(ErrorMessages.Describe(ex)); }
         finally { busy = false; UpdateCommands(); }
     }
 
