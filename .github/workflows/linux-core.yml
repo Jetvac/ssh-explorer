@@ -54,6 +54,10 @@ jobs:
           # Reference: the stock OpenSSH client logs in with the same agent and keys. If this fails, the fixture is wrong, not SSH Explorer.
           ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 "$USER@127.0.0.1" 'printf reference-ok'; echo
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --agent-integration 127.0.0.1 2222 "$USER" "$empty_sock" 2>&1 | tee artifacts-agent.log
+          # 0.3 N1: real ss over SSH — our own listener must appear with its PID, process and owner.
+          python3 -m http.server 18765 --bind 127.0.0.1 > /dev/null 2>&1 & listener=$!; sleep 1
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --ports-integration 127.0.0.1 2222 "$USER" 18765 "$listener" 2>&1 | tee artifacts-ports.log
+          kill "$listener" || true
           # 0.3 B1: interrupted uploads/downloads continue from verified partial files.
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --resume-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-resume.log
 
@@ -90,5 +94,6 @@ jobs:
             artifacts-agent.log
             artifacts-jump.log
             artifacts-resume.log
+            artifacts-ports.log
             artifacts/collector-benchmark.json
           retention-days: 14

@@ -9,6 +9,12 @@ if (args.Length == 2 && args[0] == "--document-edit-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real SFTP document checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 6 && args[0] == "--ports-integration")
+{
+    await PortsIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3], int.Parse(args[4]), int.Parse(args[5]));
+    Console.WriteLine($"RESULT: {suite.Passed} real ports checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 4 && args[0] == "--resume-integration")
 {
     await ResumeIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
@@ -68,6 +74,7 @@ await AgentTests.RunAsync(suite);
 await ProxyJumpTests.RunAsync(suite);
 await ExternalImportTests.RunAsync(suite);
 await TransferResumeTests.RunAsync(suite);
+await PortsTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

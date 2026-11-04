@@ -23,6 +23,7 @@ public sealed class MonitorView : UserControl, IDisposable
     public static readonly DependencyProperty PaletteRevisionProperty = DependencyProperty.Register(nameof(PaletteRevision), typeof(int), typeof(MonitorView), new PropertyMetadata(0));
     public int PaletteRevision { get => (int)GetValue(PaletteRevisionProperty); private set => SetValue(PaletteRevisionProperty, value); }
     readonly ServerSession? session;
+    internal PortsPanel? Ports { get; private set; }
     readonly LinuxMonitor? monitor;
     readonly MonitorViewModel viewModel;
     readonly CancellationTokenSource lifetime;
@@ -186,6 +187,8 @@ public sealed class MonitorView : UserControl, IDisposable
         var body = new StackPanel { Margin = new Thickness(20, 16, 20, 16) }; body.Children.Add(resources);
         AddPerformanceTable(body, "Сеть", networks, nameof(MonitorViewModel.Networks), [("Интерфейс", "Name", 150), ("Получение", "Receive", 170), ("Отправка", "Send", 170)]);
         TableSorting.Attach(networks, "monitor.network", [new("Name", r => ((NetworkRow)r).Name, true), new("Receive", r => ((NetworkRow)r).ReceiveRate), new("Send", r => ((NetworkRow)r).SendRate)], "Name");
+        // Listening ports belong with the network: who holds which port, searchable.
+        Ports = new PortsPanel(session is { ShellAvailable: true } s ? (command, ct) => s.ExecuteAsync(command, ct) : null); body.Children.Add(Ports);
         AddPerformanceTable(body, "Дисковый ввод-вывод", disks, nameof(MonitorViewModel.Disks), [("Устройство", "Name", 150), ("Чтение", "Read", 170), ("Запись", "Write", 170)]);
         TableSorting.Attach(disks, "monitor.disks", [new("Name", r => ((DiskRow)r).Name, true), new("Read", r => ((DiskRow)r).ReadRate), new("Write", r => ((DiskRow)r).WriteRate)], "Name");
         AddPerformanceTable(body, "Хранилища", storage, nameof(MonitorViewModel.Storage), [("Файловая система", "FileSystem", 170), ("Точка монтирования", "MountPoint", 180), ("Всего", "Total", 130), ("Доступно", "Available", 130)]);

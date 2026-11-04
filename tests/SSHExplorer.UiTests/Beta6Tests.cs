@@ -227,6 +227,27 @@ internal static class Beta6Tests
                 Layout(window); var networkColumnsWidth = networks.Columns.Sum(c => c.ActualWidth); var disks = (DataGrid)Field(monitor, "disks");
                 Check(networkColumnsWidth >= networks.ActualWidth - 24 && disks.Items.Count == 0 && Descendants<TextBlock>((DependencyObject)VisualTreeHelper.GetParent(disks)).Any(t => t.IsVisible && t.Text.StartsWith("Нет данных об устройствах", StringComparison.Ordinal)), $"performance tables fill their width ({networkColumnsWidth:0} of {networks.ActualWidth:0} DIP) and an empty disk table explains itself");
                 evidence.Capture(monitor, "sort-network", new { theme = "Light", fixtureOnly = true });
+                // 0.3 N1: listening ports under Network — loaded through the session executor, searchable, honest about hidden processes.
+                var ports = monitor.Ports!;
+                var portsOutput = string.Join('\n', "#tool ss",
+                    "tcp   LISTEN 0 4096 0.0.0.0:22 0.0.0.0:* users:((\"sshd\",pid=900,fd=3))",
+                    "tcp   LISTEN 0 128 127.0.0.1:5432 0.0.0.0:* users:((\"postgres\",pid=1200,fd=5))",
+                    "tcp   LISTEN 0 511 [::]:8080 [::]:*",
+                    "udp   UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:* users:((\"systemd-resolve\",pid=600,fd=13))",
+                    "#ps", "900 root", "1200 postgres", "600 systemd-resolve", "#uid", "1000");
+                string? sent = null;
+                ports.Execute = (command, _) => { sent = command; return Task.FromResult(new CommandResult(portsOutput, "", 0)); };
+                Complete(ports.LoadAsync()); Layout(window);
+                var portsSearch = Descendants<TextBox>(ports).Single(b => b.Name == "PortsSearch"); var portsState = Descendants<TextBlock>(ports).Single(b => b.Name == "PortsState");
+                Check(sent == ListeningPorts.Command && ports.Table.Items.Count == 4 && portsState.Text.Contains("скрыты", StringComparison.Ordinal), $"ports load all listening sockets and say that other users' processes are hidden ({ports.Table.Items.Count}: {portsState.Text})");
+                portsSearch.Text = "postgres"; Pump();
+                Check(ports.Table.Items.Count == 1 && ((ListeningPort)ports.Table.Items[0]).Port == 5432 && portsState.Text.StartsWith("Найдено 1 из 4", StringComparison.Ordinal), "searching a process name finds its port");
+                portsSearch.Text = "8080"; Pump();
+                Check(ports.Table.Items.Count == 1 && ((ListeningPort)ports.Table.Items[0]).Process is null, "searching a port finds a socket even without a visible process");
+                portsSearch.Text = ""; Pump(); Layout(window);
+                var portsColumns = ports.Table.Columns.Sum(c => c.ActualWidth);
+                Check(portsColumns >= ports.Table.ActualWidth - 24, $"ports table fills its width ({portsColumns:0} of {ports.Table.ActualWidth:0} DIP)");
+                ports.BringIntoView(); Layout(window); evidence.Capture(monitor, "ports", new { theme = "Light", fixtureOnly = true });
             }
             finally { window.Close(); }
         }
