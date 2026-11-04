@@ -1,0 +1,38 @@
+{
+  "scope": "Rust prototype core (sshx-core) in the Linux development container. Not Windows, not the prototype EXE, not comparable to WPF startup/memory.",
+  "host": { "os": "linux-x86_64", "cpu": "Intel Xeon @ 2.10GHz", "logicalProcessors": 2 },
+  "toolchain": "rustc 1.97.0, release profile (opt-level s, LTO)",
+  "coreBench": {
+    "command": "cargo run --release -p sshx-core --example bench",
+    "terminalParseMBps": 75.7,
+    "terminalParseInput": "32 MiB of coloured log lines with Cyrillic, 160x48 grid, best of 3",
+    "sort100kTwoKeysMs": 173.1,
+    "sortInput": "100 000 synthetic entries, size descending then natural name, best of 5"
+  },
+  "liveSsh": {
+    "command": "cargo test -p sshx-core --release -- --test-threads=1 (SSHX_LIVE_* set)",
+    "client": "ssh2 0.9.4 / libssh2 (bundled, ef29242) / OpenSSL 3.0.13",
+    "server": "local paramiko 3.5.1 test server on 127.0.0.1 (Python crypto; limits throughput), ECDSA P-256 host key, password auth, sftp subsystem on the real filesystem",
+    "tests": { "passed": 8, "failed": 0 },
+    "verified": [
+      "unknown host key rejected: decide asked once, nothing stored, zero authentication attempts in the server log",
+      "first use stored, second connection trusted without a prompt, fingerprint equals the server key",
+      "changed host key: HostKeyChanged before authentication, stored key untouched, zero authentication attempts",
+      "wrong password rejected",
+      "SFTP listing of 10 004 entries, natural/typed sorting, realpath",
+      "exclusive upload: second upload of the same name fails, server bytes unchanged",
+      "PTY: command round trip, resize to 100x40 confirmed by stty size, clean close",
+      "exec: 16 MiB stream, exit status 0"
+    ],
+    "measurements": [
+      { "name": "sftp_list_10k_ms", "value": 299.3, "unit": "ms" },
+      { "name": "pty_command_roundtrip_ms", "value": 20.1, "unit": "ms", "note": "range 20-61 ms over two runs" },
+      { "name": "exec_16MiB_MBps", "value": 107.5, "unit": "MB/s", "note": "range 108-230 MB/s; bounded by the Python server" }
+    ]
+  },
+  "notRun": [
+    "Windows build of the prototype EXE (no Windows toolchain here; the GitHub workflow rust-prototype.yml has not run because pushing is blocked)",
+    "EXE size, startup, memory, GDI frame time, SendInput header click, OLE drop from Explorer",
+    "live tests against OpenSSH sshd (prepared in rust-prototype.yml, linux-live job)"
+  ]
+}

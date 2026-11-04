@@ -1,0 +1,16 @@
+# Isolated Rust prototype. Not part of the shipped WPF application.
+[workspace]
+resolver = "2"
+members = ["core", "app"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

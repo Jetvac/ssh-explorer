@@ -1,0 +1,140 @@
+name: Rust prototype (isolated experiment, not a release)
+on:
+  push:
+    branches: [main, 'codex/**', 'claude/**']
+    paths: ['prototypes/rust-explorer/**', 'src/SSHExplorer.App/Assets/AppIcon.ico', '.github/workflows/rust-prototype.yml']
+  pull_request:
+    paths: ['prototypes/rust-explorer/**', 'src/SSHExplorer.App/Assets/AppIcon.ico', '.github/workflows/rust-prototype.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rust-prototype-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    working-directory: prototypes/rust-explorer
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (pinned by rust-toolchain.toml)
+        shell: pwsh
+        run: |
+          rustup show active-toolchain
+          rustc -Vv
+      - name: Unit tests (core incl. libssh2/WinCNG build, window text helpers)
+        shell: pwsh
+        run: cargo test --workspace --release
+      - name: Clippy
+        shell: pwsh
+        run: cargo clippy --workspace --all-targets --release -- -D warnings
+      - name: Release build (static CRT, embedded icon and manifest)
+        shell: pwsh
+        run: cargo build --release -p sshx-explorer
+      - name: Self-test in a real window (startup, memory, 100k list, SendInput header click, captures)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Resolve-Path 'target/release/sshx-rust-prototype.exe'
+          $out = Join-Path $env:RUNNER_TEMP 'rust-prototype'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $report = Join-Path $out 'selftest.json'
+          $p = Start-Process -FilePath $exe -ArgumentList '--selftest', $report -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'self-test timed out' }
+          if ($p.ExitCode -ne 0) { throw "self-test exit code $($p.ExitCode)" }
+          $r = Get-Content $report -Raw | ConvertFrom-Json
+          $r | ConvertTo-Json -Depth 5
+          if ($r.commonControlsVersion -lt 6) { throw 'Common Controls v6 not active: manifest not embedded' }
+          if (-not $r.windowIconFromResource) { throw 'icon resource not found in the EXE' }
+          if (-not $r.dropTargetRegistered) { throw 'RegisterDragDrop failed' }
+          if ($r.reentrancyFaults -ne 0) { throw "UI state re-entrancy: $($r.reentrancyFaults)" }
+          if (-not $r.headerClick.sortedBySizeAscending) { throw "SendInput header click did not sort (foreground=$($r.headerClick.foreground), sent=$($r.headerClick.sent))" }
+          Add-Type -AssemblyName System.Drawing
+          foreach ($bmp in Get-ChildItem $out -Filter '*.bmp') {
+            $image = [System.Drawing.Image]::FromFile($bmp.FullName)
+            $image.Save([IO.Path]::ChangeExtension($bmp.FullName, '.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+            $image.Dispose()
+            Remove-Item $bmp.FullName
+          }
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
+          $icon.ToBitmap().Save((Join-Path $out 'exe-icon.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+          $size = (Get-Item $exe).Length
+          $zip = Join-Path $out 'sshx-rust-prototype.zip'
+          Compress-Archive -Path $exe -DestinationPath $zip -CompressionLevel Optimal
+          [ordered]@{ exeBytes = $size; zipBytes = (Get-Item $zip).Length; files = 1 } | ConvertTo-Json | Set-Content (Join-Path $out 'size.json')
+          Get-Content (Join-Path $out 'size.json')
+          Copy-Item Cargo.lock $out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: rust-prototype-windows
+          path: ${{ runner.temp }}/rust-prototype
+          if-no-files-found: warn
+
+  linux-live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Clippy (the Win32 app type-checks on any host)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Disposable OpenSSH server on this runner (127.0.0.1:2222, own host key and config)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q openssh-server libssl-dev
+          D="$RUNNER_TEMP/sshd"
+          mkdir -p "$D/home"
+          ssh-keygen -q -t ed25519 -N '' -f "$D/host_ed25519"
+          PW="$(openssl rand -hex 16)"
+          echo "::add-mask::$PW"
+          echo "$USER:$PW" | sudo chpasswd
+          cat > "$D/sshd_config" <<EOF
+          Port 2222
+          ListenAddress 127.0.0.1
+          HostKey $D/host_ed25519
+          PidFile $D/sshd.pid
+          AuthorizedKeysFile none
+          PasswordAuthentication yes
+          KbdInteractiveAuthentication no
+          UsePAM yes
+          AllowUsers $USER
+          Subsystem sftp internal-sftp
+          LogLevel VERBOSE
+          EOF
+          sudo mkdir -p /run/sshd
+          sudo /usr/sbin/sshd -t -f "$D/sshd_config"
+          sudo touch "$D/sshd.log"
+          sudo chmod a+r "$D/sshd.log"
+          sudo /usr/sbin/sshd -f "$D/sshd_config" -E "$D/sshd.log"
+          {
+            echo "SSHX_LIVE_HOST=127.0.0.1"
+            echo "SSHX_LIVE_PORT=2222"
+            echo "SSHX_LIVE_USER=$USER"
+            echo "SSHX_LIVE_PASSWORD=$PW"
+            echo "SSHX_LIVE_DIR=$D/home"
+            echo "SSHX_LIVE_AUTH_LOG=$D/sshd.log"
+            echo "SSHX_LIVE_AUTH_MARKERS=Accepted password,Failed password,Accepted publickey,Failed publickey"
+            echo "SSHX_LIVE_FINGERPRINT=ssh-ed25519 $(ssh-keygen -lf "$D/host_ed25519.pub" -E sha256 | awk '{print $2}')"
+            echo "SSHX_LIVE_REPORT=$RUNNER_TEMP/rust-live.jsonl"
+          } >> "$GITHUB_ENV"
+      - name: Core tests incl. live SSH (host key before auth, SFTP 10k, exclusive upload, PTY, exec)
+        run: cargo test -p sshx-core --release -- --test-threads=1
+      - name: Stop the test server
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/sshd/sshd.pid" ]; then sudo kill "$(cat "$RUNNER_TEMP/sshd/sshd.pid")" || true; fi
+          cat "$RUNNER_TEMP/rust-live.jsonl" 2>/dev/null || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: rust-prototype-linux-live
+          path: ${{ runner.temp }}/rust-live.jsonl
+          if-no-files-found: warn
