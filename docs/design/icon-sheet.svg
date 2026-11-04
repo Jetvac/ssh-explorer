@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1808" viewBox="0 0 760 1808" font-family="Segoe UI, DejaVu Sans, sans-serif">
-<rect width="760" height="1808" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1860" viewBox="0 0 760 1860" font-family="Segoe UI, DejaVu Sans, sans-serif">
+<rect width="760" height="1860" fill="#ffffff"/>
 <text x="20" y="32" font-size="18" font-weight="600" fill="#1a1a1a">SSH Explorer — командные иконки (вектор, сетка 16 DIP, штрих 1 DIP)</text>
 <text x="20" y="54" font-size="12" fill="#626262">Слева светлая поверхность, справа тёмная; размеры 16 / 20 / 24 / 32 DIP при 100 %.</text>
 <rect x="20" y="70" width="350" height="46" rx="6" fill="#f3f3f3"/>
@@ -283,120 +283,134 @@
 <text x="534" y="1078" font-size="12" fill="#f4f4f4">network</text>
 <text x="534" y="1094" font-size="10" fill="#b7b7b7">Сеть</text>
 <rect x="20" y="1110" width="350" height="46" rx="6" fill="#f3f3f3"/>
-<g transform="translate(30,1125.0) scale(1.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g transform="translate(58,1123.0) scale(1.25)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g transform="translate(90,1121.0) scale(1.5)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g transform="translate(126,1117.0) scale(2.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
-<text x="174" y="1130" font-size="12" fill="#1a1a1a">storage</text>
-<text x="174" y="1146" font-size="10" fill="#626262">Хранилища</text>
+<g transform="translate(30,1125.0) scale(1.0)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,1123.0) scale(1.25)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,1121.0) scale(1.5)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,1117.0) scale(2.0)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="1130" font-size="12" fill="#1a1a1a">settings</text>
+<text x="174" y="1146" font-size="10" fill="#626262">Параметры</text>
 <rect x="380" y="1110" width="350" height="46" rx="6" fill="#202020"/>
-<g transform="translate(390,1125.0) scale(1.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g transform="translate(418,1123.0) scale(1.25)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g transform="translate(450,1121.0) scale(1.5)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g transform="translate(486,1117.0) scale(2.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
-<text x="534" y="1130" font-size="12" fill="#f4f4f4">storage</text>
-<text x="534" y="1146" font-size="10" fill="#b7b7b7">Хранилища</text>
-<text x="20" y="1192" font-size="14" font-weight="600" fill="#1a1a1a">Системные глифы Segoe Fluent Icons (отрисовываются Windows; проверка — CI-галерея)</text>
-<text x="20" y="1214" font-size="11" fill="#1a1a1a">add — U+E710 Add</text>
-<text x="380" y="1214" font-size="11" fill="#1a1a1a">back — U+E72B Back</text>
-<text x="20" y="1232" font-size="11" fill="#1a1a1a">forward — U+E72A Forward</text>
-<text x="380" y="1232" font-size="11" fill="#1a1a1a">up — U+E74A Up</text>
-<text x="20" y="1250" font-size="11" fill="#1a1a1a">refresh — U+E72C Refresh</text>
-<text x="380" y="1250" font-size="11" fill="#1a1a1a">home — U+E80F Home</text>
-<text x="20" y="1268" font-size="11" fill="#1a1a1a">folder — U+E8B7 Folder</text>
-<text x="380" y="1268" font-size="11" fill="#1a1a1a">cut — U+E8C6 Cut</text>
-<text x="20" y="1286" font-size="11" fill="#1a1a1a">copy — U+E8C8 Copy</text>
-<text x="380" y="1286" font-size="11" fill="#1a1a1a">paste — U+E77F Paste</text>
-<text x="20" y="1304" font-size="11" fill="#1a1a1a">rename — U+E8AC Rename</text>
-<text x="380" y="1304" font-size="11" fill="#1a1a1a">delete — U+E74D Delete</text>
-<text x="20" y="1322" font-size="11" fill="#1a1a1a">upload — U+E898 Upload</text>
-<text x="380" y="1322" font-size="11" fill="#1a1a1a">download — U+E896 Download</text>
-<text x="20" y="1340" font-size="11" fill="#1a1a1a">sort — U+E8CB Sort</text>
-<text x="380" y="1340" font-size="11" fill="#1a1a1a">more — U+E712 More</text>
-<text x="20" y="1358" font-size="11" fill="#1a1a1a">settings — U+E713 Setting</text>
-<text x="380" y="1358" font-size="11" fill="#1a1a1a">close — U+E711 Cancel</text>
-<text x="20" y="1376" font-size="11" fill="#1a1a1a">search — U+E721 Search</text>
-<text x="380" y="1376" font-size="11" fill="#1a1a1a">document — U+E8A5 Document</text>
-<text x="20" y="1394" font-size="11" fill="#1a1a1a">pin — U+E718 Pin</text>
-<text x="380" y="1394" font-size="11" fill="#1a1a1a">info — U+E946 Info</text>
-<text x="20" y="1412" font-size="11" fill="#1a1a1a">undo — U+E7A7 Undo</text>
-<text x="380" y="1412" font-size="11" fill="#1a1a1a">edit — U+E70F Edit</text>
-<text x="20" y="1430" font-size="11" fill="#1a1a1a">play — U+E768 Play</text>
-<text x="380" y="1430" font-size="11" fill="#1a1a1a">pause — U+E769 Pause</text>
-<text x="20" y="1448" font-size="11" fill="#1a1a1a">remove — U+E738 Remove</text>
-<text x="380" y="1448" font-size="11" fill="#1a1a1a">check — U+E73E CheckMark</text>
-<text x="20" y="1466" font-size="11" fill="#1a1a1a">chevron-down — U+E70D ChevronDown</text>
-<text x="380" y="1466" font-size="11" fill="#1a1a1a">chevron-right — U+E76C ChevronRight</text>
-<text x="20" y="1484" font-size="11" fill="#1a1a1a">down — U+E74B Down</text>
-<text x="380" y="1484" font-size="11" fill="#1a1a1a">view — U+E890 View</text>
-<text x="20" y="1502" font-size="11" fill="#1a1a1a">command-prompt — U+E756 CommandPrompt</text>
-<text x="20" y="1528" font-size="14" font-weight="600" fill="#1a1a1a">Знак приложения: варианты 16–24 / 32–48 / 64–256</text>
-<rect x="14" y="1536" width="28" height="28" rx="6" fill="#f3f3f3"/>
-<svg x="20" y="1542" width="16" height="16" viewBox="0 0 16 16">
+<g transform="translate(390,1125.0) scale(1.0)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,1123.0) scale(1.25)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,1121.0) scale(1.5)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,1117.0) scale(2.0)"><path d="M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="1130" font-size="12" fill="#f4f4f4">settings</text>
+<text x="534" y="1146" font-size="10" fill="#b7b7b7">Параметры</text>
+<rect x="20" y="1162" width="350" height="46" rx="6" fill="#f3f3f3"/>
+<g transform="translate(30,1177.0) scale(1.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(58,1175.0) scale(1.25)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(90,1173.0) scale(1.5)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,1169.0) scale(2.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#1a1a1a" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="174" y="1182" font-size="12" fill="#1a1a1a">storage</text>
+<text x="174" y="1198" font-size="10" fill="#626262">Хранилища</text>
+<rect x="380" y="1162" width="350" height="46" rx="6" fill="#202020"/>
+<g transform="translate(390,1177.0) scale(1.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(418,1175.0) scale(1.25)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="1.0000" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(450,1173.0) scale(1.5)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="0.8333" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(486,1169.0) scale(2.0)"><path d="M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8" fill="none" stroke="#f4f4f4" stroke-width="0.6250" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="534" y="1182" font-size="12" fill="#f4f4f4">storage</text>
+<text x="534" y="1198" font-size="10" fill="#b7b7b7">Хранилища</text>
+<text x="20" y="1244" font-size="14" font-weight="600" fill="#1a1a1a">Системные глифы Segoe Fluent Icons (отрисовываются Windows; проверка — CI-галерея)</text>
+<text x="20" y="1266" font-size="11" fill="#1a1a1a">add — U+E710 Add</text>
+<text x="380" y="1266" font-size="11" fill="#1a1a1a">back — U+E72B Back</text>
+<text x="20" y="1284" font-size="11" fill="#1a1a1a">forward — U+E72A Forward</text>
+<text x="380" y="1284" font-size="11" fill="#1a1a1a">up — U+E74A Up</text>
+<text x="20" y="1302" font-size="11" fill="#1a1a1a">refresh — U+E72C Refresh</text>
+<text x="380" y="1302" font-size="11" fill="#1a1a1a">home — U+E80F Home</text>
+<text x="20" y="1320" font-size="11" fill="#1a1a1a">folder — U+E8B7 Folder</text>
+<text x="380" y="1320" font-size="11" fill="#1a1a1a">cut — U+E8C6 Cut</text>
+<text x="20" y="1338" font-size="11" fill="#1a1a1a">copy — U+E8C8 Copy</text>
+<text x="380" y="1338" font-size="11" fill="#1a1a1a">paste — U+E77F Paste</text>
+<text x="20" y="1356" font-size="11" fill="#1a1a1a">rename — U+E8AC Rename</text>
+<text x="380" y="1356" font-size="11" fill="#1a1a1a">delete — U+E74D Delete</text>
+<text x="20" y="1374" font-size="11" fill="#1a1a1a">upload — U+E898 Upload</text>
+<text x="380" y="1374" font-size="11" fill="#1a1a1a">download — U+E896 Download</text>
+<text x="20" y="1392" font-size="11" fill="#1a1a1a">sort — U+E8CB Sort</text>
+<text x="380" y="1392" font-size="11" fill="#1a1a1a">more — U+E712 More</text>
+<text x="20" y="1410" font-size="11" fill="#1a1a1a">settings — U+E713 Setting</text>
+<text x="380" y="1410" font-size="11" fill="#1a1a1a">close — U+E711 Cancel</text>
+<text x="20" y="1428" font-size="11" fill="#1a1a1a">search — U+E721 Search</text>
+<text x="380" y="1428" font-size="11" fill="#1a1a1a">document — U+E8A5 Document</text>
+<text x="20" y="1446" font-size="11" fill="#1a1a1a">pin — U+E718 Pin</text>
+<text x="380" y="1446" font-size="11" fill="#1a1a1a">info — U+E946 Info</text>
+<text x="20" y="1464" font-size="11" fill="#1a1a1a">undo — U+E7A7 Undo</text>
+<text x="380" y="1464" font-size="11" fill="#1a1a1a">edit — U+E70F Edit</text>
+<text x="20" y="1482" font-size="11" fill="#1a1a1a">play — U+E768 Play</text>
+<text x="380" y="1482" font-size="11" fill="#1a1a1a">pause — U+E769 Pause</text>
+<text x="20" y="1500" font-size="11" fill="#1a1a1a">remove — U+E738 Remove</text>
+<text x="380" y="1500" font-size="11" fill="#1a1a1a">check — U+E73E CheckMark</text>
+<text x="20" y="1518" font-size="11" fill="#1a1a1a">chevron-down — U+E70D ChevronDown</text>
+<text x="380" y="1518" font-size="11" fill="#1a1a1a">chevron-right — U+E76C ChevronRight</text>
+<text x="20" y="1536" font-size="11" fill="#1a1a1a">down — U+E74B Down</text>
+<text x="380" y="1536" font-size="11" fill="#1a1a1a">view — U+E890 View</text>
+<text x="20" y="1554" font-size="11" fill="#1a1a1a">command-prompt — U+E756 CommandPrompt</text>
+<text x="20" y="1580" font-size="14" font-weight="600" fill="#1a1a1a">Знак приложения: варианты 16–24 / 32–48 / 64–256</text>
+<rect x="14" y="1588" width="28" height="28" rx="6" fill="#f3f3f3"/>
+<svg x="20" y="1594" width="16" height="16" viewBox="0 0 16 16">
   <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
   <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
   <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
   <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
 </svg>
-<rect x="14" y="1660" width="28" height="28" rx="6" fill="#202020"/>
-<svg x="20" y="1666" width="16" height="16" viewBox="0 0 16 16">
+<rect x="14" y="1712" width="28" height="28" rx="6" fill="#202020"/>
+<svg x="20" y="1718" width="16" height="16" viewBox="0 0 16 16">
   <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
   <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
   <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
   <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
 </svg>
-<rect x="54" y="1536" width="36" height="36" rx="6" fill="#f3f3f3"/>
-<svg x="60" y="1542" width="24" height="24" viewBox="0 0 16 16">
+<rect x="54" y="1588" width="36" height="36" rx="6" fill="#f3f3f3"/>
+<svg x="60" y="1594" width="24" height="24" viewBox="0 0 16 16">
   <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
   <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
   <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
   <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
 </svg>
-<rect x="54" y="1660" width="36" height="36" rx="6" fill="#202020"/>
-<svg x="60" y="1666" width="24" height="24" viewBox="0 0 16 16">
+<rect x="54" y="1712" width="36" height="36" rx="6" fill="#202020"/>
+<svg x="60" y="1718" width="24" height="24" viewBox="0 0 16 16">
   <!-- 16-24 px variant: two flat shapes, symbol reduced to a 1-pixel chevron and bar. -->
   <path d="M1 3.5A1 1 0 0 1 2 2.5h3.6l1 1H14a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1Z" fill="#8DCCFB"/>
   <path d="M1.7 7A1 1 0 0 1 2.7 6.2H15a.6.6 0 0 1 .58.75l-1.4 6.1a1.2 1.2 0 0 1-1.17.95H1.4a.6.6 0 0 1-.58-.75Z" fill="#1F78E0"/>
   <path d="M5 8.5l2 1.5-2 1.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M8.5 11.75h2.5" fill="none" stroke="#FFFFFF" stroke-width="1.25" stroke-linecap="round"/>
 </svg>
-<rect x="102" y="1536" width="44" height="44" rx="6" fill="#f3f3f3"/>
-<svg x="108" y="1542" width="32" height="32" viewBox="0 0 32 32">
+<rect x="102" y="1588" width="44" height="44" rx="6" fill="#f3f3f3"/>
+<svg x="108" y="1594" width="32" height="32" viewBox="0 0 32 32">
   <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
   <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
   <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
   <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
 </svg>
-<rect x="102" y="1660" width="44" height="44" rx="6" fill="#202020"/>
-<svg x="108" y="1666" width="32" height="32" viewBox="0 0 32 32">
+<rect x="102" y="1712" width="44" height="44" rx="6" fill="#202020"/>
+<svg x="108" y="1718" width="32" height="32" viewBox="0 0 32 32">
   <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
   <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
   <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
   <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
 </svg>
-<rect x="158" y="1536" width="60" height="60" rx="6" fill="#f3f3f3"/>
-<svg x="164" y="1542" width="48" height="48" viewBox="0 0 32 32">
+<rect x="158" y="1588" width="60" height="60" rx="6" fill="#f3f3f3"/>
+<svg x="164" y="1594" width="48" height="48" viewBox="0 0 32 32">
   <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
   <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
   <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
   <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
 </svg>
-<rect x="158" y="1660" width="60" height="60" rx="6" fill="#202020"/>
-<svg x="164" y="1666" width="48" height="48" viewBox="0 0 32 32">
+<rect x="158" y="1712" width="60" height="60" rx="6" fill="#202020"/>
+<svg x="164" y="1718" width="48" height="48" viewBox="0 0 32 32">
   <!-- 32-48 px variant: fewer layers, symbol enlarged, edges on the pixel grid. -->
   <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H12l2 2h12.5A2.5 2.5 0 0 1 29 9.5v15a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24.5Z" fill="#8DCCFB"/>
   <path d="M4.6 13.2A2 2 0 0 1 6.5 12H29a1.5 1.5 0 0 1 1.45 1.85l-2.6 11.4A2.3 2.3 0 0 1 25.6 27H3.6a1.5 1.5 0 0 1-1.46-1.85Z" fill="#1F78E0"/>
   <path d="M10 16l3.5 3-3.5 3" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M15.5 22.5h5" fill="none" stroke="#F4FAFF" stroke-width="2.2" stroke-linecap="round"/>
 </svg>
-<rect x="230" y="1536" width="76" height="76" rx="6" fill="#f3f3f3"/>
-<svg x="236" y="1542" width="64" height="64" viewBox="0 0 256 256">
+<rect x="230" y="1588" width="76" height="76" rx="6" fill="#f3f3f3"/>
+<svg x="236" y="1594" width="64" height="64" viewBox="0 0 256 256">
   <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
   <defs>
     <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
@@ -419,8 +433,8 @@
   <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
 </svg>
-<rect x="230" y="1660" width="76" height="76" rx="6" fill="#202020"/>
-<svg x="236" y="1666" width="64" height="64" viewBox="0 0 256 256">
+<rect x="230" y="1712" width="76" height="76" rx="6" fill="#202020"/>
+<svg x="236" y="1718" width="64" height="64" viewBox="0 0 256 256">
   <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
   <defs>
     <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
@@ -443,8 +457,8 @@
   <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
 </svg>
-<rect x="318" y="1536" width="108" height="108" rx="6" fill="#f3f3f3"/>
-<svg x="324" y="1542" width="96" height="96" viewBox="0 0 256 256">
+<rect x="318" y="1588" width="108" height="108" rx="6" fill="#f3f3f3"/>
+<svg x="324" y="1594" width="96" height="96" viewBox="0 0 256 256">
   <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
   <defs>
     <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
@@ -467,8 +481,8 @@
   <path d="M84 128l30 25-30 25" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M128 184h44" fill="none" stroke="#F4FAFF" stroke-width="17" stroke-linecap="round"/>
 </svg>
-<rect x="318" y="1660" width="108" height="108" rx="6" fill="#202020"/>
-<svg x="324" y="1666" width="96" height="96" viewBox="0 0 256 256">
+<rect x="318" y="1712" width="108" height="108" rx="6" fill="#202020"/>
+<svg x="324" y="1718" width="96" height="96" viewBox="0 0 256 256">
   <!-- SSH Explorer application mark, master for 64-256 px. Original artwork, CC0 within this repository. -->
   <defs>
     <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">

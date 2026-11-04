@@ -28,7 +28,7 @@ public static class IconCatalog
         ViewList = Prefix + "view-list", ViewDetails = Prefix + "view-details", ViewTiles = Prefix + "view-tiles", ViewContent = Prefix + "view-content",
         TabList = Prefix + "tab-list", NewTab = Prefix + "new-tab", Documents = Prefix + "documents", Transfers = Prefix + "transfers",
         Server = Prefix + "server", Processes = Prefix + "processes", Performance = Prefix + "performance", Terminal = Prefix + "terminal",
-        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage";
+        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage", Settings = Prefix + "settings";
 
     public sealed record Entry(string Key, string Purpose, string Source, string? Glyph, string? PathData, string Style = "stroke");
 
@@ -93,6 +93,7 @@ public static class IconCatalog
         new("restart", "Перезагрузить", "SSH Explorer vector", null, "M13.5 8A5.5 5.5 0 1 1 11.9 4.1 M12.5 1.5V4.5H9.5"),
         new("reconnect", "Переподключиться", "SSH Explorer vector", null, "M6 1.5V4.5 M10 1.5V4.5 M4 4.5H12V7A4 4 0 0 1 4 7Z M8 11V14.5"),
         new("network", "Сеть", "SSH Explorer vector", null, "M6.5 1.5H9.5V4.5H6.5Z M2 11.5H5V14.5H2Z M11 11.5H14V14.5H11Z M8 4.5V8 M3.5 11.5V8H12.5V11.5"),
+        new("settings", "Параметры", "SSH Explorer vector", null, "M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z"),
         new("storage", "Хранилища", "SSH Explorer vector", null, "M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8"),
     ];
 
