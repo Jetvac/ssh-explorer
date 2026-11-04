@@ -31,6 +31,7 @@ internal static class CoreTests
         await t.Run("pinned SSH.NET native SFTP bindings validate before use", () => SftpProtocolAdapter.ValidateBindings());
         await t.Run("Windows names are mapped and cannot escape chosen directory", () =>
         {
+            if (!OperatingSystem.IsWindows()) { Console.WriteLine("SKIP Windows file-name boundary: not a Windows host"); return; }
             TestSuite.Equal("_CON", WindowsNames.SafeName("CON"));
             TestSuite.Equal("_nul.txt", WindowsNames.SafeName("nul.txt"));
             TestSuite.Equal("a%003Ab", WindowsNames.SafeName("a:b"));

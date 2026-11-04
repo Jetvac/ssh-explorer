@@ -1,7 +1,7 @@
 name: Windows build and regression
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main, 'codex/**', 'claude/**']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -46,6 +46,25 @@ jobs:
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/Test-UiComposition.ps1
+      - name: beta.6 user actions (tabs after Show, address input, caption, sorting, graphs, panels, icons)
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/ui-beta6 | Out-Null
+          dotnet run --project tests/SSHExplorer.UiTests/SSHExplorer.UiTests.csproj -c Release --no-build -- --beta6-ui --render-dir artifacts/ui-beta6 2>&1 | Tee-Object -FilePath artifacts/ui-beta6.log
+          if ($LASTEXITCODE) { throw 'beta.6 user-action checks failed.' }
+      - name: Package composition and EXE icon resource
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          [xml]$properties = Get-Content -LiteralPath Directory.Build.props
+          $version = [string]$properties.Project.PropertyGroup.Version
+          $folder = "artifacts/SSHExplorer-$version-win-x64"
+          ./scripts/Measure-Package.ps1 -Directory $folder -Zip "$folder.zip" -Report artifacts/package-measurements.json | Out-Host
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path "$folder/SSHExplorer.exe").Path)
+          $bitmap = $icon.ToBitmap(); $bitmap.Save((Join-Path $PWD 'artifacts/exe-associated-icon.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+          "EXE associated icon: $($bitmap.Width)x$($bitmap.Height) (taskbar/Alt+Tab use the same resource)" >> $env:GITHUB_STEP_SUMMARY
       - name: Packaged EXE startup and graceful close in isolated settings
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         shell: pwsh
@@ -78,6 +97,10 @@ jobs:
             artifacts/ui-beta5-interactions/**
             artifacts/ui-beta5-forms/**
             artifacts/ui-beta5-documents/**
+            artifacts/ui-beta6.log
+            artifacts/ui-beta6/**
+            artifacts/package-measurements.json
+            artifacts/exe-associated-icon.png
           if-no-files-found: warn
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

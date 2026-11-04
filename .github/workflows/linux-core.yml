@@ -1,0 +1,45 @@
+name: Linux core, monitoring and collector benchmark
+on:
+  push:
+    branches: [main, 'codex/**', 'claude/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: linux-core-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - name: Build Core/Monitoring tests
+        run: |
+          dotnet restore tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj --locked-mode
+          dotnet build tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-restore
+      - name: Regression tests on a real Linux /proc (protocol 2 collector, server info)
+        run: |
+          set -o pipefail
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build 2>&1 | tee artifacts-core.log
+      - name: Collector benchmark beta.5 vs protocol 2 (same runner, +300 processes)
+        run: |
+          mkdir -p artifacts
+          git show v0.2.0-beta.5:src/SSHExplorer.Monitoring/CollectorCommand.cs > artifacts/beta5-collector.cs
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --collector-benchmark artifacts/beta5-collector.cs artifacts/collector-benchmark.json
+          echo '### Collector benchmark' >> "$GITHUB_STEP_SUMMARY"; echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat artifacts/collector-benchmark.json >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: Linux-core-${{ github.sha }}
+          path: |
+            artifacts-core.log
+            artifacts/collector-benchmark.json
+          retention-days: 14

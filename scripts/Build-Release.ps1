@@ -69,11 +69,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Self-contained publish failed.' }
 $runtimeDestination = Join-Path $destination 'WebView2Runtime'
 New-Item -ItemType Directory -Force -Path $runtimeDestination | Out-Null
 Copy-Item -Path (Join-Path $runtime '*') -Destination $runtimeDestination -Recurse -Force
-foreach ($document in @('README.md','CHANGELOG.md','ACCEPTANCE.md','REQUIREMENTS.md','ARCHITECTURE.md','THIRD-PARTY-NOTICES.md')) {
+# User package: the guide, the change log, notices and required licenses only. Developer reports,
+# acceptance matrices, CI evidence and historical screenshots stay in the source/evidence archives.
+foreach ($document in @('README.md','CHANGELOG.md','THIRD-PARTY-NOTICES.md')) {
     if (Test-Path -LiteralPath $document) { Copy-Item -LiteralPath $document -Destination $destination -Force }
 }
 Copy-Item -LiteralPath (Join-Path $root 'licenses') -Destination $destination -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination $destination -Recurse -Force
 [ordered]@{ version=$version; commit=$commit; dirty=$dirty; sdk=(& $sdk --version); runtime='10.0.14'; webView2=$runtimeVersion; utc=[DateTime]::UtcNow.ToString('O') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'build-info.json') -Encoding utf8
 $files = Get-ChildItem -LiteralPath $destination -File -Recurse | Where-Object Name -ne 'SHA256SUMS.txt'
 $manifest = foreach ($file in $files) { '{0}  {1}' -f (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $file.FullName.Substring($destination.Length + 1).Replace('\','/') }

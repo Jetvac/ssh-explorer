@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)][string]$Directory,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{40}$')][string]$ExpectedCommit,
-    [Alias('Version')][string]$ExpectedVersion = '0.2.0-beta.5'
+    [Alias('Version')][string]$ExpectedVersion = '0.2.0-beta.6'
 )
 $ErrorActionPreference = 'Stop'
 
@@ -137,6 +137,15 @@ try {
         if ($report.AppStartedRecord -and $report.OwnMainWindowHandleObserved) { break }
     }
     if (-not $report.AppStartedRecord -or -not $report.OwnMainWindowHandleObserved) { throw 'Normal packaged startup was not observed within its bounded deadline.' }
+    # Startup and memory of the whole owned process tree (WebView2 starts only with a terminal).
+    $report.StartupToResponsiveHomeMilliseconds = [Math]::Round($stopwatch.Elapsed.TotalMilliseconds)
+    Start-Sleep -Seconds 3
+    $ownedProcess.Refresh()
+    $tree = @($ownedProcess.Id) + @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($ownedProcess.Id)" | ForEach-Object { [int]$_.ProcessId })
+    $workingSet = 0L; $private = 0L
+    foreach ($id in $tree) { try { $p = [Diagnostics.Process]::GetProcessById($id); $workingSet += $p.WorkingSet64; $private += $p.PrivateMemorySize64; $p.Dispose() } catch {} }
+    $report.ProcessTreeCount = $tree.Count; $report.ProcessTreeWorkingSetBytes = $workingSet; $report.ProcessTreePrivateBytes = $private
+    $report.MemoryScope = 'Home tab idle 3 s after startup; no SSH session, terminal or WebView2 instance
     $phase = 'graceful-close'
     $report.GracefulCloseRequested = $ownedProcess.CloseMainWindow()
     if (-not $report.GracefulCloseRequested) { throw 'The owned process did not accept CloseMainWindow.' }
