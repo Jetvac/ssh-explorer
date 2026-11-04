@@ -41,7 +41,7 @@ jobs:
           cat "$fixture/client_ed25519.pub" "$fixture/client_rsa.pub" >> ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
           {
             echo "Port 2222"; echo "ListenAddress 127.0.0.1"; echo "HostKey $fixture/host_ed25519"; echo "PidFile $fixture/sshd.pid"
-            echo "PasswordAuthentication no"; echo "KbdInteractiveAuthentication no"; echo "PubkeyAuthentication yes"; echo "UsePAM no"
+            echo "PasswordAuthentication no"; echo "KbdInteractiveAuthentication no"; echo "PubkeyAuthentication yes"; echo "UsePAM yes"
             echo "StrictModes no"; echo "AuthorizedKeysFile %h/.ssh/authorized_keys"
           } > "$fixture/sshd_config"
           sudo mkdir -p /run/sshd
@@ -49,6 +49,10 @@ jobs:
           eval "$(ssh-agent -s)" > /dev/null
           ssh-add -q "$fixture/client_ed25519" "$fixture/client_rsa"
           empty_sock="$RUNNER_TEMP/empty-agent.sock"; ssh-agent -a "$empty_sock" > /dev/null
+          # The sshd logs explain any refusal; printed whenever this step fails.
+          trap 'for log in "$fixture"/*.log; do echo "::group::$(basename "$log")"; sudo cat "$log" || true; echo "::endgroup::"; done' ERR
+          # Reference: the stock OpenSSH client logs in with the same agent and keys. If this fails, the fixture is wrong, not SSH Explorer.
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 "$USER@127.0.0.1" 'printf reference-ok'; echo
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --agent-integration 127.0.0.1 2222 "$USER" "$empty_sock" 2>&1 | tee artifacts-agent.log
 
           # 0.3 A3 ProxyJump: the test runs in a network namespace that reaches only the bastion (10.200.1.1:2225).
