@@ -341,6 +341,11 @@ public sealed partial class MainWindow : Window
         header.Children.Add(Ui.Icon(IconCatalog.Server,16)); Grid.SetColumn(label,1); header.Children.Add(label); Grid.SetColumn(close,2); header.Children.Add(close); tab.Header=header; WindowChrome.SetIsHitTestVisibleInChrome(header,true);
         Point? start = null;
         header.PreviewMouseLeftButtonDown += (_, e) => start = e.GetPosition(header);
+        // Middle click closes the tab, as in browsers; pressing and releasing must both happen on this tab.
+        bool middlePressed = false;
+        tab.PreviewMouseDown += (_, e) => { if (e.ChangedButton == MouseButton.Middle) { middlePressed = true; e.Handled = true; } };
+        tab.PreviewMouseUp += async (_, e) => { if (e.ChangedButton != MouseButton.Middle) return; e.Handled = true; if (!middlePressed) return; middlePressed = false; await Ui.Guard(() => CloseTab(tab)); };
+        tab.MouseLeave += (_, _) => middlePressed = false;
         header.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && start is Point a && (e.GetPosition(header) - a).Length > 12 && !close.IsMouseOver) { start = null; try { DragDrop.DoDragDrop(header, TabDragData(tab), DragDropEffects.Move); } finally { CancelDragFeedback(); } } };
         header.AllowDrop = true;
         var hover = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) }; tabHoverTimers[tab] = hover; hover.Tick += (_, _) => { hover.Stop(); if (sessions.ContainsKey(tab)) tabs.SelectedItem = tab; };
@@ -498,13 +503,15 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Clamp(App.Store.Settings.TreeWidth, 190, 420)), MinWidth = 190, MaxWidth = 420 }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 340 });
         side.Margin = new Thickness(5, 8, 5, 8); side.SetResourceReference(Panel.BackgroundProperty, "NavigationSurface");
         side.Children.Add(Nav(IconCatalog.Server, "Сервер", "server")); side.Children.Add(Nav(IconCatalog.Terminal, "Терминал", "terminal")); side.Children.Add(Nav(IconCatalog.Performance, "Диспетчер задач", "monitor"));
+
+        monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
+        monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
+        monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
+        // After the task manager and its pages, so the module never splits them.
         // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
         var dockerNav = Nav(IconCatalog.Docker, "Docker", "docker"); side.Children.Add(dockerNav);
         void ApplyModules() { dockerNav.Visibility = App.Store.Settings.DockerModule ? Visibility.Visible : Visibility.Collapsed; if (!App.Store.Settings.DockerModule && section == "docker") ShowSection("files"); }
         ApplyModules(); App.ModulesChanged += modulesChanged = (_, _) => ApplyModules();
-        monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
-        monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
-        monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
         var line = new Border { Height = 1, Margin = new Thickness(8, 10, 8, 10) }; line.SetResourceReference(Border.BackgroundProperty, "Edge"); side.Children.Add(line);
         side.Children.Add(Nav("\uE8B7", "Файлы", "files"));
         reconnect = Ui.AsyncButton("Переподключиться", () => main.Reconnect(this, files?.CurrentPath)); reconnect.Visibility = Visibility.Collapsed; reconnect.Margin = new Thickness(7, 8, 7, 4); side.Children.Add(reconnect);
