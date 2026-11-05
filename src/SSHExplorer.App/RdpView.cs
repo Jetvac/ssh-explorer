@@ -131,6 +131,13 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
                 }
             }
             else Dialed = (Profile.Host, Profile.Port);
+            // The server key is read and checked here, before the control (and the password) connect.
+            var probe = await RdpProbe.ReadKeyAsync(Dialed.Value.Host, Dialed.Value.Port, TimeSpan.FromSeconds(15), ct);
+            if (probe.PublicKey is { Length: > 0 } key)
+            {
+                if (!VerifyKey(key)) { Fail(LastError ?? "Сертификат сервера не принят. Пароль не отправлен."); return false; }
+            }
+            else _ = LocalDiagnostics.RecordAsync("rdp.probe.unavailable", new InvalidOperationException(probe.Problem ?? "no key"));
             client ??= CreateClient(clsid);
             for (int i = 0; i < 100 && !client.EnsureCreated(); i++) { await Task.Delay(50, ct); Place(); }
             if (!client.Ready) { Fail("Не удалось создать элемент удалённого рабочего стола."); return false; }
@@ -168,9 +175,8 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         Com.SetFirst(ocx, "ConnectingText", "Подключение к " + Profile.Name + "…", "");
         Com.SetFirst(ocx, "SmartSizing", !o.FitsTab, Com.Advanced);
         Com.SetFirst(ocx, "EnableCredSspSupport", o.Nla, Com.Advanced);
-        // With NLA the server key is checked here, before the password leaves (OnReceivedTSPublicKey); without NLA
-        // Windows checks the certificate itself and warns about an untrusted one.
-        Com.SetFirst(ocx, "AuthenticationLevel", o.Nla ? 0 : 2, Com.Advanced);
+        // A key checked by RdpProbe needs no second warning; otherwise Windows checks the certificate itself.
+        Com.SetFirst(ocx, "AuthenticationLevel", keyVerified ? 0 : 2, Com.Advanced);
         Com.SetFirst(ocx, "RedirectClipboard", o.Clipboard, Com.Advanced);
         Com.SetFirst(ocx, "RedirectDrives", o.Drives, Com.Advanced);
         Com.SetFirst(ocx, "RedirectPrinters", o.Printers, Com.Advanced);
@@ -205,27 +211,15 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         {
             case RdpEvent.Connecting: Update("Подключение…", null); break;
             case RdpEvent.Connected: Update("Вход…", null); break;
-            case RdpEvent.ReceivedPublicKey:
-                {
-                    bool ok = VerifyKey(e.FirstBstrBytes());
-                    e.SetBool(ok);
-                    if (!ok) { userDisconnect = true; Fail(LastError ?? "Сертификат сервера не принят. Пароль не отправлен."); }
-                    break;
-                }
+            case RdpEvent.ReceivedPublicKey: e.SetBool(true); break;
             case RdpEvent.LoginComplete:
-                if (Profile.Rdp.Nla && !keyVerified)
-                {
-                    // The server key must have been checked before sign-in; never leave an unverified session open.
-                    userDisconnect = true; TryCall("Disconnect");
-                    Fail("Сервер не предъявил ключ для проверки до входа. Отключите в профиле «Проверка подлинности на уровне сети» — тогда сертификат проверит Windows.");
-                    break;
-                }
-                password = null;
+                password = null; LastError = null;
                 SetState(SessionState.Connected, "Подключён · " + Profile.Username + "@" + Profile.Endpoint);
                 login?.TrySetResult(true); resize.Stop(); resize.Start();
                 break;
             case RdpEvent.AutoReconnecting: Update("Связь потеряна, переподключение…", null); break;
-            case RdpEvent.LogonError: LastError = "Вход не выполнен (код " + e.Int(0).ToString(CultureInfo.InvariantCulture) + ")."; break;
+            // Negative codes are winlogon arbitration notices (another session, continue logon), not failures.
+            case RdpEvent.LogonError when e.Int(0) >= 0: LastError = e.Int(0) == 0 ? "Неверное имя пользователя или пароль." : "Вход не выполнен (код " + e.Int(0).ToString(CultureInfo.InvariantCulture) + ")."; break;
             case RdpEvent.FatalError: Fail("Ошибка элемента удалённого рабочего стола (код " + e.Int(0).ToString(CultureInfo.InvariantCulture) + ")."); break;
             case RdpEvent.Disconnected:
                 {
