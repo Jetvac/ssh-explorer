@@ -120,6 +120,17 @@ internal static class FirewallUiChecks
             check(sets.Count == 1 && sets[0].Name == "Веб-сервер" && saves == 3, "rename and delete are saved");
         }
         finally { setsWindow.Close(); }
+
+        // No sets yet and no rules on the server: the window says what to do instead of showing empty space.
+        var bare = Ufw.Parse("#client 203.0.113.10 51234 22\n#status\nStatus: inactive\n#defaults\nDEFAULT_INPUT_POLICY=\"DROP\"\n#added\n#neighbours\n");
+        var emptyWindow = new FirewallRuleSetsWindow(bare, [], () => Task.CompletedTask, "пустой") { ShowInTaskbar = false, Left = 60, Top = 60 };
+        emptyWindow.Show(); Layout(emptyWindow);
+        try
+        {
+            check(emptyWindow.PlaceholderVisible && emptyWindow.EmptyText.Contains("пока нет", StringComparison.Ordinal) && emptyWindow.ActualHeight < 700, "with no sets the list and the right side explain what to do; the window fits its content: " + emptyWindow.ActualHeight);
+            evidence.Capture((FrameworkElement)emptyWindow.Content, "firewall-rule-sets-empty", new { theme = "Light", fixtureOnly = true });
+        }
+        finally { emptyWindow.Close(); }
     }
     static void Wait(Task task) { var watch = System.Diagnostics.Stopwatch.StartNew(); while (!task.IsCompleted) { if (watch.Elapsed > TimeSpan.FromSeconds(10)) throw new TimeoutException("rule set action"); Pump(); } task.GetAwaiter().GetResult(); }
 

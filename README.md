@@ -5,7 +5,7 @@ SSH/SFTP-клиент для Windows 11 с русским интерфейсом
 [![Windows](https://github.com/Jetvac/ssh-explorer/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/Jetvac/ssh-explorer/actions/workflows/windows.yml)
 [![Linux core](https://github.com/Jetvac/ssh-explorer/actions/workflows/linux-core.yml/badge.svg?branch=main)](https://github.com/Jetvac/ssh-explorer/actions/workflows/linux-core.yml)
 
-![Файлы на сервере](https://github.com/Jetvac/ssh-explorer/releases/download/v0.2.0-beta.5/files-after.png)
+![Файлы на сервере](docs/screenshots/0.4/files.png)
 
 ## Версии
 
@@ -22,10 +22,21 @@ SSH/SFTP-клиент для Windows 11 с русским интерфейсом
 
 1. Скачайте `SSHExplorer-<версия>-win-x64.zip` со страницы выпуска.
 2. Распакуйте **всю папку** и запустите `SSHExplorer.exe` внутри неё. Файлы рядом с EXE нужны: один EXE отдельно не запустится.
-3. На «Главной» нажмите «Добавить сервер» или импортируйте профили из `~/.ssh/config`, PuTTY или WinSCP.
+3. На «Главной» нажмите «Добавить сервер» или импортируйте профили из `~/.ssh/config`, PuTTY, WinSCP, mRemoteNG или файла `.sshx` с другого компьютера.
 4. При первом подключении сверьте отпечаток ключа сервера с тем, что дал администратор.
 
 .NET устанавливать не нужно — он внутри папки. Терминал использует WebView2, который уже есть в Windows 11. Приложение **не подписано**, поэтому Windows может предупредить о неизвестном издателе.
+
+## Как это выглядит
+
+Снимки сделаны автоматически в CI на текущей сборке, с тестовыми данными.
+
+| | |
+|---|---|
+| ![Главная с группами серверов](docs/screenshots/0.4/home.png)<br>Главная: группы серверов, импорт, оповещения | ![Сервер](docs/screenshots/0.4/server.png)<br>Сведения о сервере, питание, обновления пакетов |
+| ![Файервол](docs/screenshots/0.4/firewall.png)<br>Файервол ufw и доступ вашего SSH-подключения | ![Защита SSH](docs/screenshots/0.4/security.png)<br>Ключи и проверка настроек SSH-сервера |
+| ![Выполнение на нескольких серверах](docs/screenshots/0.4/group-run.png)<br>Скрипт сразу на нескольких серверах | ![Задания cron](docs/screenshots/0.4/cron.png)<br>Задания cron словами, с ближайшим запуском |
+| ![Экспорт серверов](docs/screenshots/0.4/export.png)<br>Экспорт серверов в файл .sshx | ![Настройка левой панели](docs/screenshots/0.4/sidebar-editor.png)<br>Порядок и видимость разделов — прямо в панели |
 
 ## Возможности
 
@@ -33,7 +44,7 @@ SSH/SFTP-клиент для Windows 11 с русским интерфейсом
 - Вход по паролю, ключу (в том числе с паролем к ключу) и keyboard-interactive.
 - Вход через **SSH-агент** (OpenSSH для Windows или `SSH_AUTH_SOCK`).
 - **Промежуточные узлы (ProxyJump)**, до трёх; промежуточный сервер выбирается из сохранённых. Пароль никогда не уходит другому узлу.
-- Импорт профилей из `~/.ssh/config`, PuTTY и WinSCP; группы серверов на «Главной».
+- Импорт профилей из `~/.ssh/config`, PuTTY, WinSCP и mRemoteNG; группы серверов на «Главной».
 - Каждая вкладка — отдельное подключение со своей папкой, историей и терминалом. Вкладки закрываются средней кнопкой мыши.
 
 ### Файлы

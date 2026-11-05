@@ -141,6 +141,7 @@ public sealed partial class MainWindow : Window
         Ui.AsyncMenu("Из файла OpenSSH (~/.ssh/config)…", ImportSshConfig, glyph: Ui.FileGlyph),
         Ui.AsyncMenu("Из PuTTY", ImportPutty, glyph: IconCatalog.Terminal),
         Ui.AsyncMenu("Из WinSCP…", ImportWinScp, glyph: IconCatalog.Transfers),
+        Ui.AsyncMenu("Из mRemoteNG (confCons.xml)…", ImportMRemoteNg, glyph: IconCatalog.Server),
     ];
     /// <summary>Reads saved sessions under a HKCU key (read-only); empty when the program never saved any.</summary>
     internal static IReadOnlyList<ExternalSession> RegistrySessions(string path)
@@ -180,6 +181,25 @@ public sealed partial class MainWindow : Window
         }
         var (candidates, skipped) = ExternalSessionImport.FromWinScp(sessions, Environment.UserName, App.Store.Profiles);
         await ImportProfilesAsync(source, candidates, skipped);
+    }
+    internal Func<string?>? MRemoteNgPathOverride;
+    /// <summary>mRemoteNG keeps its connections in %APPDATA%\mRemoteNG\confCons.xml; another file can be chosen.</summary>
+    async Task ImportMRemoteNg()
+    {
+        if (profileEditorOpen || closing) return;
+        var path = MRemoteNgPathOverride?.Invoke() ?? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "mRemoteNG", "confCons.xml");
+        if (MRemoteNgPathOverride is null)
+        {
+            var pick = new Microsoft.Win32.OpenFileDialog { Title = "Подключения mRemoteNG", Filter = "Подключения mRemoteNG (confCons.xml)|*.xml|Все файлы|*.*", CheckFileExists = true };
+            if (System.IO.File.Exists(path)) { pick.InitialDirectory = System.IO.Path.GetDirectoryName(path); pick.FileName = System.IO.Path.GetFileName(path); }
+            if (pick.ShowDialog(this) != true) return;
+            path = pick.FileName;
+        }
+        var info = new System.IO.FileInfo(path);
+        if (!info.Exists || info.Length > 64L * 1024 * 1024) { Ui.Error(info.Exists ? "Файл слишком большой для списка подключений." : "Файл не найден: " + path); return; }
+        var (candidates, skipped) = ExternalSessionImport.FromMRemoteNg(await System.IO.File.ReadAllTextAsync(path, windowLifetime.Token), Environment.UserName, App.Store.Profiles);
+        if (candidates.Count == 0 && skipped.Count > 0 && skipped[0].StartsWith("Файл", StringComparison.Ordinal)) { Ui.Error(skipped[0]); return; }
+        await ImportProfilesAsync("mRemoteNG · " + path, candidates, skipped);
     }
     async Task ImportSshConfig()
     {
