@@ -259,6 +259,34 @@ public sealed class HostTrustStore
         finally { _gate.Release(); }
     }
     private Task PersistAsync(CancellationToken ct) => AppStore.AtomicWriteAsync(_path, JsonSerializer.Serialize(Records, AppStore.JsonOptions), ct);
+    /// <summary>
+    /// Adds trusted keys from an export file. A key never replaces a different one already trusted for the same
+    /// host, port and algorithm: such records are returned as conflicts and the stored key stays.
+    /// </summary>
+    public async Task<(int Added, IReadOnlyList<TrustedHostKey> Conflicts)> ImportAsync(IEnumerable<TrustedHostKey> incoming, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var added = new List<TrustedHostKey>(); var conflicts = new List<TrustedHostKey>();
+            lock (_records)
+                foreach (var r in incoming)
+                {
+                    if (r.PublicKey.Length == 0 || r.Algorithm.Length == 0 || r.Port is < 1 or > 65535) continue;
+                    var host = NormalizeHost(r.Host);
+                    byte[] raw; try { raw = Convert.FromBase64String(r.PublicKey); } catch (FormatException) { continue; }
+                    var same = _records.FirstOrDefault(x => x.Host == host && x.Port == r.Port && x.Algorithm == r.Algorithm);
+                    if (same is not null) { if (same.PublicKey != r.PublicKey) conflicts.Add(r); continue; }
+                    var record = new TrustedHostKey { Host = host, Port = r.Port, Algorithm = r.Algorithm, PublicKey = r.PublicKey, Fingerprint = Fingerprint(raw), TrustedAtUtc = DateTime.UtcNow };
+                    _records.Add(record); added.Add(record);
+                }
+            if (added.Count > 0)
+                try { await PersistAsync(ct).ConfigureAwait(false); }
+                catch { lock (_records) _records.RemoveAll(added.Contains); throw; }
+            return (added.Count, conflicts);
+        }
+        finally { _gate.Release(); }
+    }
     // Calling this is an explicit trust reset. UI must show fingerprint and require a separate confirmation.
     public async Task ForgetAsync(string host, int port, string algorithm, CancellationToken ct = default)
     {

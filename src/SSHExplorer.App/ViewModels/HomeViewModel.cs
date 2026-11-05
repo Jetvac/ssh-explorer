@@ -12,6 +12,8 @@ public sealed class HomeViewModel : ObservableObject
 
     public string SearchQuery { get => searchQuery; set { if (Set(ref searchQuery, value)) Rebuild(); } }
     public string StatusText { get => statusText; private set => Set(ref statusText, value); }
+    /// <summary>A one-off message (export or import result) until the next refresh.</summary>
+    public void Announce(string text) => StatusText = text;
     public IReadOnlyList<ServerProfileViewModel> VisibleProfiles { get => visibleProfiles; private set => Set(ref visibleProfiles, value); }
     public ServerProfileViewModel? SelectedProfile { get => selectedProfile; set { if (Set(ref selectedProfile, value)) Raise(nameof(HasSelectedProfile)); } }
     public bool HasSelectedProfile => SelectedProfile is not null;

@@ -329,6 +329,7 @@ internal static class Beta6Tests
             App.Store.Settings.ScriptsModule = false; App.RaiseModulesChanged(); Pump(); Ui.ErrorOverride = null;
             Check(!navigation["scripts"].IsVisible && scriptErrors.Count == 0, "disabling «Скрипты» hides it without errors: " + string.Join(" | ", scriptErrors));
             SidebarUiChecks.Run(sessionView, navigation, evidence, Check);
+            ExchangeUiChecks.Run(main, store, evidence, Check);
             ScriptsUiChecks.Run(store, evidence, Check);
             CompareUiChecks.Run(store, evidence, Check);
             GroupCUiChecks.Run(store, evidence, Check);

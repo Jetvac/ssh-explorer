@@ -84,6 +84,8 @@ public sealed class AppSettings
     /// <summary>Server panel order and hidden non-module sections; see <see cref="Sidebar"/>.</summary>
     public List<string> SidebarOrder { get; set; } = [];
     public List<string> SidebarHidden { get; set; } = [];
+    /// <summary>Firewall rule sets saved on this computer («Файервол» → «Наборы правил»).</summary>
+    public List<FirewallRuleSet> FirewallRuleSets { get; set; } = [];
     public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }
 }
 public sealed class TableSortSetting

@@ -85,6 +85,8 @@ public sealed partial class MainWindow : Window
         commands.Add("add", Ui.AsyncCommandButton(Ui.AddGlyph, "Добавить сервер", AddProfile), () => Ui.AsyncMenu("Добавить сервер", AddProfile, glyph: Ui.AddGlyph), 100);
         var import = Ui.FlyoutButton(ImportGlyph, "Импорт", ImportMenu, "Импорт серверов из других программ"); import.Name = "HomeImport";
         commands.Add("import", import, () => { var item = new MenuItem { Header = "Импорт", Icon = Ui.Icon(ImportGlyph, 16, false) }; foreach (var entry in ImportEntries()) item.Items.Add(entry); return item; }, 20);
+        var export = Ui.AsyncCommandButton(ExportGlyph, "Экспорт", () => ExportProfilesAsync()); export.Name = "HomeExport"; export.ToolTip = "Сохранить серверы в файл для другого компьютера";
+        commands.Add("export", export, () => Ui.AsyncMenu("Экспорт…", () => ExportProfilesAsync(), glyph: ExportGlyph), 15);
         foreach (var (key,glyph,label,action,priority) in new (string,string,string,Func<Task>,int)[] { ("connect","\uE768","Подключиться",ConnectSelected,80), ("edit",Ui.RenameGlyph,"Изменить",EditSelected,50), ("remove",Ui.DeleteGlyph,"Удалить профиль",RemoveSelected,10) })
         {
             var button = Ui.AsyncCommandButton(glyph,label,action); button.SetBinding(IsEnabledProperty,new Binding(nameof(HomeViewModel.HasSelectedProfile)));
@@ -101,7 +103,7 @@ public sealed partial class MainWindow : Window
             group: new("Group", r => ((ServerProfileViewModel)r).GroupKey, true));
         HomeGrouping.Attach(servers, () => viewModel.HasGroups);
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
+        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
         var body = new Grid(); body.Children.Add(servers); var empty = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 390, Margin = new Thickness(24) }; var emptyTitle = Ui.Text("", 18, true); emptyTitle.HorizontalAlignment = HorizontalAlignment.Center; emptyTitle.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateTitle))); empty.Children.Add(emptyTitle); var emptyText = Ui.Text(""); emptyText.TextWrapping = TextWrapping.Wrap; emptyText.TextAlignment = TextAlignment.Center; emptyText.Margin = new Thickness(0, 10, 0, 16); emptyText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); emptyText.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateMessage))); empty.Children.Add(emptyText); empty.SetBinding(VisibilityProperty, new Binding(nameof(HomeViewModel.ShowEmptyState)) { Converter = new BooleanToVisibilityConverter() }); body.Children.Add(empty); p.Children.Add(body); return p;
     }
@@ -127,6 +129,7 @@ public sealed partial class MainWindow : Window
     }
     IEnumerable<MenuItem> ImportEntries() =>
     [
+        Ui.AsyncMenu("Из файла SSH Explorer (.sshx)…", () => ImportExchangeAsync(), glyph: ImportGlyph),
         Ui.AsyncMenu("Из файла OpenSSH (~/.ssh/config)…", ImportSshConfig, glyph: Ui.FileGlyph),
         Ui.AsyncMenu("Из PuTTY", ImportPutty, glyph: IconCatalog.Terminal),
         Ui.AsyncMenu("Из WinSCP…", ImportWinScp, glyph: IconCatalog.Transfers),
@@ -198,6 +201,99 @@ public sealed partial class MainWindow : Window
             RefreshHome();
             if (last is not null) { viewModel.SelectedProfile = viewModel.VisibleProfiles.FirstOrDefault(p => p.Profile.Id == last.Id); if (viewModel.SelectedProfile is not null) servers.ScrollIntoView(viewModel.SelectedProfile); }
             return window.Accepted.Count;
+        }
+        finally { profileEditorOpen = false; }
+    }
+    const string ExportGlyph = "";
+    /// <summary>Test hooks: the file to write or read instead of a file dialog, and the export/import windows' answers.</summary>
+    internal Func<string?>? ExportPathOverride, ImportPathOverride;
+    internal Func<ExportWindow, bool?>? ExportWindowOverride;
+    internal Func<ExchangeImportWindow, bool?>? ImportWindowOverride;
+    internal async Task<int> ExportProfilesAsync(IReadOnlyCollection<Guid>? preselected = null)
+    {
+        if (profileEditorOpen || closing) return 0;
+        if (App.Store.Profiles.Count == 0) { Ui.Info("Сохранённых серверов нет — экспортировать нечего."); return 0; }
+        profileEditorOpen = true;
+        try
+        {
+            var window = new ExportWindow(App.Store.Profiles, preselected ?? [], App.Store.Settings.FirewallRuleSets.Count) { Owner = this };
+            if ((ExportWindowOverride?.Invoke(window) ?? ModalRunner.Show(window, this, windowLifetime.Token)) != true) return 0;
+            string? path = ExportPathOverride?.Invoke();
+            if (path is null)
+            {
+                var pick = new Microsoft.Win32.SaveFileDialog { Title = "Экспорт серверов", Filter = "Файл SSH Explorer (*.sshx)|*.sshx", DefaultExt = ProfileExchange.Extension, FileName = $"servers-{DateTime.Now:yyyy-MM-dd}{ProfileExchange.Extension}", AddExtension = true, OverwritePrompt = true };
+                if (pick.ShowDialog(this) != true) return 0;
+                path = pick.FileName;
+            }
+            var selected = window.Selected; var options = window.Chosen;
+            var doc = await ProfileExchange.BuildAsync(selected, options, BuildInfo.DisplayVersion, id => App.Store.ReadSecretAsync(id, windowLifetime.Token), App.Store.Settings, App.Store.Trust.Records);
+            await System.IO.File.WriteAllTextAsync(path, ProfileExchange.Serialize(doc), new UTF8Encoding(false), windowLifetime.Token);
+            int secrets = doc.Servers.Count(x => x.Secret is not null);
+            viewModel.Announce($"Экспортировано серверов: {doc.Servers.Count}" + (options.IncludeSecrets ? $", паролей: {secrets}" : ", без паролей") + " — " + System.IO.Path.GetFileName(path));
+            return doc.Servers.Count;
+        }
+        finally { profileEditorOpen = false; }
+    }
+    internal async Task<int> ImportExchangeAsync()
+    {
+        if (profileEditorOpen || closing) return 0;
+        string? path = ImportPathOverride?.Invoke();
+        if (path is null)
+        {
+            var pick = new Microsoft.Win32.OpenFileDialog { Title = "Импорт из файла SSH Explorer", Filter = "Файл SSH Explorer (*.sshx)|*.sshx|Все файлы|*.*", CheckFileExists = true };
+            if (pick.ShowDialog(this) != true) return 0;
+            path = pick.FileName;
+        }
+        ExportDocument doc;
+        try { doc = ProfileExchange.Parse(await System.IO.File.ReadAllTextAsync(path, windowLifetime.Token)); }
+        catch (InvalidDataException ex) { Ui.Error(ex.Message); return 0; }
+        profileEditorOpen = true;
+        try
+        {
+            var window = new ExchangeImportWindow(path, doc, App.Store.Profiles) { Owner = this };
+            if ((ImportWindowOverride?.Invoke(window) ?? ModalRunner.Show(window, this, windowLifetime.Token)) != true) return 0;
+            int imported = 0; ServerProfile? last = null; var problems = new List<string>();
+            foreach (var row in window.Rows.Where(r => r.Imported).ToArray())
+            {
+                var profile = ProfileExchange.Resolve(row.Candidate, row.Conflict, App.Store.Profiles);
+                try
+                {
+                    try { await App.Store.SaveProfileAsync(profile, row.Candidate.Secret, windowLifetime.Token); }
+                    catch (InvalidOperationException) when (row.Candidate.Secret is null && profile.SaveSecret) { profile.SaveSecret = false; await App.Store.SaveProfileAsync(profile, null, windowLifetime.Token); }
+                }
+                catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or IOException) { problems.Add($"«{profile.Name}»: {ex.Message}"); continue; }
+                imported++; last = profile;
+            }
+            var summary = new List<string> { $"Импортировано серверов: {imported}." };
+            if (window.IncludeHostKeys && doc.HostKeys is { Count: > 0 } keys)
+            {
+                var (added, conflicts) = await App.Store.Trust.ImportAsync(keys, windowLifetime.Token);
+                summary.Add($"Доверенных ключей добавлено: {added}." + (conflicts.Count > 0 ? $" Не заменены ({conflicts.Count}): здесь уже доверен другой ключ для {string.Join(", ", conflicts.Select(c => c.Host + ":" + c.Port).Distinct())} — сверьте отпечаток при подключении." : ""));
+            }
+            bool layout = false;
+            if (window.IncludeSidebar && doc.Sidebar is { } side)
+            {
+                var settings = App.Store.Settings; settings.SidebarOrder = [.. side.Order]; settings.SidebarHidden = [.. side.Hidden]; settings.DockerModule = side.Docker; settings.ScriptsModule = side.Scripts; layout = true;
+                summary.Add("Порядок разделов панели применён.");
+            }
+            if (window.IncludeRuleSets && doc.RuleSets is { Count: > 0 } sets)
+            {
+                var mine = App.Store.Settings.FirewallRuleSets;
+                foreach (var set in sets)
+                {
+                    var copy = set.Clone(); copy.Id = Guid.NewGuid(); var name = copy.Name;
+                    for (int i = 2; mine.Any(m => string.Equals(m.Name, name, StringComparison.CurrentCultureIgnoreCase)); i++) name = $"{copy.Name} ({i})";
+                    copy.Name = name; mine.Add(copy);
+                }
+                summary.Add($"Наборов правил файервола добавлено: {sets.Count}.");
+            }
+            if (layout || window.IncludeRuleSets) await App.Store.SaveAsync(windowLifetime.Token);
+            if (layout) App.RaiseModulesChanged();
+            RefreshHome();
+            if (last is not null) { viewModel.SelectedProfile = viewModel.VisibleProfiles.FirstOrDefault(p => p.Profile.Id == last.Id); if (viewModel.SelectedProfile is not null) servers.ScrollIntoView(viewModel.SelectedProfile); }
+            viewModel.Announce(string.Join(" ", summary));
+            if (problems.Count > 0) Ui.Error("Не все серверы импортированы:\n" + string.Join("\n", problems));
+            return imported;
         }
         finally { profileEditorOpen = false; }
     }

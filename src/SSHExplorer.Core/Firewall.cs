@@ -363,3 +363,16 @@ public static partial class Ufw
     [GeneratedRegex("^[0-9]+([:,][0-9]+)*$")] private static partial Regex PortRegex();
     [GeneratedRegex("^[A-Za-z0-9_.:+-]{1,15}$")] private static partial Regex InterfaceRegex();
 }
+
+/// <summary>A named list of firewall rules saved on this computer and applied to any server with the safe apply.</summary>
+public sealed class FirewallRuleSet
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public List<RuleDraft> Rules { get; set; } = [];
+    /// <summary>Optional default policy for incoming traffic («allow», «deny», «reject»); null — unchanged.</summary>
+    public string? DefaultIncoming { get; set; }
+    public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
+    public FirewallRuleSet Clone() => new() { Id = Id, Name = Name, Description = Description, Rules = [.. Rules], DefaultIncoming = DefaultIncoming, UpdatedUtc = UpdatedUtc };
+}
