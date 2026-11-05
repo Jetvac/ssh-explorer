@@ -30,7 +30,7 @@ public sealed class ProfileDialog:Window,ICancellableModal
         _allowConnect=allowConnect;
         _model=new(persistence,old);DataContext=_model;
         SetResourceReference(StyleProperty,"DialogWindowStyle");
-        Title=old is null?"Добавить сервер":"Изменить сервер";Width=540;MinWidth=430;
+        Title=old is null?"Добавить сервер":"Изменить сервер";Width=580;MinWidth=460;
         MaxHeight=Math.Max(320,SystemParameters.WorkArea.Height-48);SizeToContent=SizeToContent.Height;
         ResizeMode=ResizeMode.CanResize;ShowInTaskbar=false;WindowStartupLocation=WindowStartupLocation.CenterScreen;
         if(owner is not null&&(owner.IsLoaded||new System.Windows.Interop.WindowInteropHelper(owner).Handle!=IntPtr.Zero)){Owner=owner;WindowStartupLocation=WindowStartupLocation.CenterOwner;}
@@ -47,7 +47,7 @@ public sealed class ProfileDialog:Window,ICancellableModal
         }
         else if(TryFindResource("PrimaryButtonStyle")is Style primary)_save.Style=primary;
         footer.Children.Add(buttons);root.Children.Add(footerSurface);
-        var panel=new StackPanel{Margin=new(24,18,24,0)};panel.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));
+        var panel=new StackPanel{Margin=new(24,18,24,16)};panel.SetBinding(IsEnabledProperty,new Binding(nameof(_model.CanEdit)));
         var title=Ui.Text(old is null?"Новый сервер":"Параметры сервера",18,true);title.SetResourceReference(StyleProperty,"DialogTitleStyle");panel.Children.Add(title);
         panel.Children.Add(Field("Название",nameof(_model.ProfileName),nameof(_model.NameError)));
         var endpoint=new Grid();endpoint.ColumnDefinitions.Add(new());endpoint.ColumnDefinitions.Add(new(){Width=new GridLength(110)});
@@ -75,23 +75,24 @@ public sealed class ProfileDialog:Window,ICancellableModal
         var agentNote=Ui.Text("Ключи и подписи предоставляет SSH-агент: агент OpenSSH для Windows или сокет из SSH_AUTH_SOCK. Приватный ключ и парольная фраза не попадают в приложение; агент может запросить подтверждение.",12);
         agentNote.Name="AgentNote";agentNote.TextWrapping=TextWrapping.Wrap;agentNote.SetResourceReference(TextBlock.ForegroundProperty,"Muted");agentNote.Margin=new(0,0,0,8);
         agentNote.SetBinding(VisibilityProperty,new Binding(nameof(_model.UsesSecret)){Converter=new InverseBooleanToVisibilityConverter()});panel.Children.Insert(panel.Children.IndexOf(secretLabel),agentNote);
-        _advanced.Header="Дополнительные параметры";_advanced.Margin=new(0,4,0,0);var advanced=new StackPanel{Margin=new(0,8,0,0)};
-        advanced.Children.Add(Field("Стартовая папка",nameof(_model.InitialPath),nameof(_model.InitialPathError)));
-        advanced.Children.Add(Field("Подключаться через (промежуточный сервер, ProxyJump)",nameof(_model.ProxyJump),nameof(_model.ProxyJumpError)));
+        // Advanced: short fields share a row; the jump-server field carries its picker on the same line, with room around it.
+        _advanced.Header="Дополнительные параметры";_advanced.Margin=new(0,8,0,0);var advanced=new StackPanel{Margin=new(0,2,0,8)};
+        advanced.Children.Add(Pair(Field("Стартовая папка",nameof(_model.InitialPath),nameof(_model.InitialPathError)),Field("Группа на «Главной»",nameof(_model.Group),nameof(_model.GroupError))));
         // Picking a saved server is the usual case; typing user@host:port or a chain stays possible.
-        var pickJump=Ui.FlyoutButton(IconCatalog.Network,"Выбрать сервер",()=>
+        Button? pickJump=null;
+        pickJump=Ui.Button("Выбрать…",()=>
         {
             var menu=new ContextMenu();menu.Items.Add(Ui.Menu("Напрямую — без промежуточного сервера",()=>_model.ProxyJump=""));
             var others=(App.Store?.Profiles??Enumerable.Empty<ServerProfile>()).Where(p=>p.Id!=old?.Id&&!p.Name.Contains(',')).OrderBy(p=>p.Name,StringComparer.CurrentCultureIgnoreCase).ToArray();
             if(others.Length>0)menu.Items.Add(new Separator());
             foreach(var p in others){var name=p.Name;menu.Items.Add(Ui.Menu(name+"   "+p.Username+"@"+p.Endpoint+(p.ProxyJump.Length>0?" (сам через "+p.ProxyJump+")":""),()=>_model.ProxyJump=name));}
             if(others.Length==0)menu.Items.Add(new MenuItem{Header="Других сохранённых серверов нет",IsEnabled=false});
-            return menu;
-        },"Подставить сохранённый сервер как промежуточный");
-        pickJump.Name="ProxyJumpPick";pickJump.HorizontalAlignment=HorizontalAlignment.Left;pickJump.Margin=new(0,-4,0,6);advanced.Children.Add(pickJump);
-        var jumpHint=Ui.Text("Выберите сохранённый сервер или введите пользователь@узел:порт; через запятую — цепочка до трёх узлов. Ключ каждого узла проверяется отдельно. Чтобы закрыть прямой SSH к этому серверу, после подключения откройте «Файервол» → «Доступ только через сервер».",12);jumpHint.TextWrapping=TextWrapping.Wrap;jumpHint.SetResourceReference(TextBlock.ForegroundProperty,"Muted");jumpHint.Margin=new(0,-6,0,10);advanced.Children.Add(jumpHint);
-        advanced.Children.Add(Field("Группа на «Главной»",nameof(_model.Group),nameof(_model.GroupError)));
-        var timeout=Field("Таймаут подключения, 3–120 секунд",nameof(_model.Timeout),nameof(_model.TimeoutError));timeout.HorizontalAlignment=HorizontalAlignment.Left;timeout.Width=245;advanced.Children.Add(timeout);_advanced.Content=advanced;panel.Children.Add(_advanced);
+            Ui.OpenFlyout(pickJump!,menu);
+        });
+        pickJump.Name="ProxyJumpPick";pickJump.MinWidth=104;pickJump.MinHeight=34;pickJump.ToolTip="Подставить сохранённый сервер как промежуточный";AutomationProperties.SetName(pickJump,"Выбрать промежуточный сервер из сохранённых");
+        advanced.Children.Add(Field("Подключаться через сервер (ProxyJump)",nameof(_model.ProxyJump),nameof(_model.ProxyJumpError),pickJump));
+        var jumpHint=Ui.Text("Сохранённый сервер или пользователь@узел:порт; цепочка — через запятую, до трёх узлов. Чтобы закрыть прямой SSH, после подключения откройте «Файервол» → «Доступ только через сервер».",12);jumpHint.TextWrapping=TextWrapping.Wrap;jumpHint.SetResourceReference(TextBlock.ForegroundProperty,"Muted");jumpHint.Margin=new(0,6,0,2);advanced.Children.Add(jumpHint);
+        var timeout=Field("Таймаут подключения, 3–120 с",nameof(_model.Timeout),nameof(_model.TimeoutError));timeout.HorizontalAlignment=HorizontalAlignment.Left;timeout.Width=200;advanced.Children.Add(timeout);_advanced.Content=advanced;panel.Children.Add(_advanced);
         // A profile that already routes through jump hosts shows that route without an extra click.
         if(_model.ProxyJump.Trim().Length>0)_advanced.IsExpanded=true;
         root.Children.Add(new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Content=root;
@@ -112,9 +113,22 @@ public sealed class ProfileDialog:Window,ICancellableModal
         Closed+=(_,_)=>{_secret.Clear();_lifetime.Dispose();};
     }
     static TextBlock Label(string text){var label=Ui.Text(text,12);label.Margin=new(0,9,0,5);label.SetResourceReference(TextBlock.ForegroundProperty,"Muted");return label;}
-    FrameworkElement Field(string title,string property,string error)
+    FrameworkElement Field(string title,string property,string error,FrameworkElement? trailing=null)
     {
-        var panel=new StackPanel();panel.Children.Add(Label(title));var input=new TextBox{MinHeight=34};input.SetBinding(TextBox.TextProperty,new Binding(property){Mode=BindingMode.TwoWay,UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged});AutomationProperties.SetName(input,title);BindError(input,error);_fields[property]=input;panel.Children.Add(input);panel.Children.Add(Error(error));return panel;
+        var panel=new StackPanel();panel.Children.Add(Label(title));var input=new TextBox{MinHeight=34};input.SetBinding(TextBox.TextProperty,new Binding(property){Mode=BindingMode.TwoWay,UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged});AutomationProperties.SetName(input,title);BindError(input,error);_fields[property]=input;
+        if(trailing is null)panel.Children.Add(input);
+        else
+        {
+            // A companion button sits beside the field, never against it.
+            var row=new Grid();row.ColumnDefinitions.Add(new());row.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+            row.Children.Add(input);trailing.Margin=new(8,0,0,0);trailing.VerticalAlignment=VerticalAlignment.Stretch;Grid.SetColumn(trailing,1);row.Children.Add(trailing);panel.Children.Add(row);
+        }
+        panel.Children.Add(Error(error));return panel;
+    }
+    static Grid Pair(FrameworkElement left,FrameworkElement right)
+    {
+        var grid=new Grid();grid.ColumnDefinitions.Add(new());grid.ColumnDefinitions.Add(new(){Width=new GridLength(12)});grid.ColumnDefinitions.Add(new());
+        grid.Children.Add(left);Grid.SetColumn(right,2);grid.Children.Add(right);return grid;
     }
     static void BindError(FrameworkElement field,string property)
     {
