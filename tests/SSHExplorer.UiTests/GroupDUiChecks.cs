@@ -81,8 +81,8 @@ internal static class GroupDUiChecks
             var rows = view.Table.Items.Cast<TunnelRow>().ToArray();
             check(rows.Length == 1 && rows[0].Route == "127.0.0.1:15432 на компьютере → 127.0.0.1:5432 со стороны сервера" && rows[0].StateText == "Закрыт" && rows[0].AutoText == "При подключении", "saved tunnels are listed with route, state and start mode");
             check(!Descendants<Button>(view).Single(b => b.Name == "TunnelsOpen").IsEnabled && view.StateText.Contains("не подключён", StringComparison.Ordinal), "opening is off while the server is not connected, and the footer says why");
-            Descendants<Button>(view).Single(b => b.Name == "TunnelsAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); for (int i = 0; i < 20 && view.Table.Items.Count < 2; i++) Pump();
-            check(view.Table.Items.Count == 2 && profile.Tunnels.Count == 2 && store.Profiles.Single(p => p.Id == profile.Id).Tunnels.Any(t => t.Name == "Web"), "a new tunnel is saved to the profile");
+            Descendants<Button>(view).Single(b => b.Name == "TunnelsAdd").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); for (int i = 0; i < 300 && (view.Table.Items.Count < 2 || profile.Tunnels.Count < 2); i++) Pump();
+            check(view.Table.Items.Count == 2 && profile.Tunnels.Count == 2 && store.Profiles.Single(p => p.Id == profile.Id).Tunnels.Any(t => t.Name == "Web"), "a new tunnel is saved to the profile: " + view.Table.Items.Count + "/" + profile.Tunnels.Count + "/" + (store.Profiles.SingleOrDefault(p => p.Id == profile.Id)?.Tunnels.Count.ToString() ?? "нет профиля") + " · " + view.StateText);
             evidence.Capture((FrameworkElement)view, "tunnels", new { theme = "Light", fixtureOnly = true });
             Descendants<Button>(view).Single(b => b.Name == "TunnelsRemove").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); for (int i = 0; i < 20 && view.Table.Items.Count > 1; i++) Pump();
             check(view.Table.Items.Count == 1 && store.Profiles.Single(p => p.Id == profile.Id).Tunnels.Count == 1, "removing a tunnel updates the saved profile");
