@@ -72,6 +72,8 @@ public sealed partial class MainWindow : Window
         Closing += OnClosing;
         RefreshHome();
         EventHandler profilesChanged = (_, _) => Dispatcher.InvokeAsync(RefreshHome); App.ProfilesChanged += profilesChanged; Closed += (_, _) => App.ProfilesChanged -= profilesChanged;
+        // Once a day: a newer release is announced on Home; nothing is downloaded.
+        Loaded += async (_, _) => { try { if (await Updates.CheckAsync(false, windowLifetime.Token) is { } newer) viewModel.Announce($"Доступна версия {newer.Version} — «Параметры» → «О приложении»."); } catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException or OperationCanceledException) { } };
         Loaded += (_, _) => { if (System.IO.Directory.Exists(System.IO.Path.Combine(App.Store.DirectoryPath, "RemoteEdits")) && EditWorkspace.Documents.Any(d => d.Record.State != RemoteEditState.Completed)) ShowDocuments(); };
         Activated += (_, _) => { if (editWorkspace is not null) _ = editWorkspace.ReconcileAsync(); };
     }
@@ -960,13 +962,17 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         workspace = new SplitWorkspace(() =>
         {
             var view = new TerminalView(Session);
+            // «Во все терминалы»: what is typed in one pane is repeated in the others, and the switch is shared.
+            view.Typed += text => { foreach (var other in workspace!.Bodies.OfType<TerminalView>()) if (!ReferenceEquals(other, view)) _ = other.TypeAsync(text); };
+            view.BroadcastChanged += on => { foreach (var other in workspace!.Bodies.OfType<TerminalView>()) other.Broadcasting = on; };
             view.PaneShortcut += key => workspace!.Shortcut(view, key);
             view.Focused += () => workspace!.FocusBody(view);
             return view;
-        }, body => ((TerminalView)body).Dispose());
-        workspace.PaneAdded += body => _ = StartPaneAsync((TerminalView)body);
+        }, body => { ((TerminalView)body).Dispose(); Dispatcher.InvokeAsync(() => UpdateBroadcast(workspace!)); });
+        workspace.PaneAdded += body => { _ = StartPaneAsync((TerminalView)body); UpdateBroadcast(workspace); };
         return workspace;
     }
+    static void UpdateBroadcast(SplitWorkspace workspace) { var all = workspace.Bodies.OfType<TerminalView>().ToArray(); bool on = all.Any(t => t.Broadcasting); foreach (var t in all) { t.SetBroadcastAvailable(all.Length > 1); if (all.Length > 1) t.Broadcasting = on; } }
     async Task StartPaneAsync(TerminalView view)
     {
         try { await view.StartAsync(); }

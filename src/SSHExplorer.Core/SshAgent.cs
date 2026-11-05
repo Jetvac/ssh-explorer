@@ -108,7 +108,9 @@ public static class SshAgentEndpoint
             if (TryPipeName(sock, out var pipe)) return Pipe(pipe, timeoutMilliseconds, $"SSH-агент ({sock})");
             return Unix(sock, $"SSH-агент ({sock})");
         }
-        if (OperatingSystem.IsWindows()) return Pipe(OpenSshPipe, timeoutMilliseconds, "Агент OpenSSH Windows");
+        // The Windows OpenSSH agent when its service runs; otherwise PuTTY's Pageant if it is open.
+        if (OperatingSystem.IsWindows())
+            return !File.Exists(@"\\.\pipe\" + OpenSshPipe) && Pageant.IsRunning ? Pageant.Client() : Pipe(OpenSshPipe, timeoutMilliseconds, "Агент OpenSSH Windows");
         throw new SshAgentException("SSH-агент не найден: переменная SSH_AUTH_SOCK не задана.");
     }
 

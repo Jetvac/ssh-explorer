@@ -91,6 +91,12 @@ public sealed class AppSettings
     public int AlertDiskPercent { get; set; } = 90;
     public int AlertIntervalMinutes { get; set; } = 5;
     public bool AlertWindowsNotifications { get; set; } = true;
+    /// <summary>Saved terminal commands («Фрагменты»), shared by all servers.</summary>
+    public List<CommandSnippet> Snippets { get; set; } = [];
+    /// <summary>Once a day at start: ask GitHub whether a newer release exists (nothing is downloaded).</summary>
+    public bool CheckUpdates { get; set; } = true;
+    public DateTime? LastUpdateCheckUtc { get; set; }
+    public string? LatestKnownVersion { get; set; }
     public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }
 }
 public sealed class TableSortSetting

@@ -98,3 +98,14 @@ public static class ScriptRules
         }
     }
 }
+
+/// <summary>A saved terminal command: typed into the terminal (Enter is the user's) or run at once.</summary>
+public sealed class CommandSnippet
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public string Command { get; set; } = "";
+    public bool RunImmediately { get; set; }
+    public CommandSnippet Clone() => (CommandSnippet)MemberwiseClone();
+    public static string? Validate(CommandSnippet s) => s.Name.Trim().Length == 0 ? "Укажите название." : s.Command.Trim().Length == 0 ? "Укажите команду." : s.Command.Contains('\0') || s.Command.Length > 4000 ? "Команда слишком длинная или содержит недопустимые символы." : !s.RunImmediately && s.Command.Trim().Contains('\n') ? "Несколько строк можно только выполнять сразу: вписанные строки начали бы выполняться по одной. Включите «Выполнять сразу» или сохраните команды как скрипт." : null;
+}

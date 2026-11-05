@@ -72,7 +72,7 @@ public sealed class ProfileDialog:Window,ICancellableModal
         // With an SSH agent there is no secret: hide every secret control and say where the keys come from.
         var usesSecret=new Binding(nameof(_model.UsesSecret)){Converter=new BooleanToVisibilityConverter()};
         foreach(var element in new FrameworkElement[]{secretLabel,_secret,remember,secretInfo,secretDetails})element.SetBinding(VisibilityProperty,usesSecret);
-        var agentNote=Ui.Text("Ключи и подписи предоставляет SSH-агент: агент OpenSSH для Windows или сокет из SSH_AUTH_SOCK. Приватный ключ и парольная фраза не попадают в приложение; агент может запросить подтверждение.",12);
+        var agentNote=Ui.Text("Ключи и подписи предоставляет SSH-агент: агент OpenSSH для Windows, сокет из SSH_AUTH_SOCK или Pageant (PuTTY), если служба OpenSSH не запущена. Приватный ключ и парольная фраза не попадают в приложение; агент может запросить подтверждение.",12);
         agentNote.Name="AgentNote";agentNote.TextWrapping=TextWrapping.Wrap;agentNote.SetResourceReference(TextBlock.ForegroundProperty,"Muted");agentNote.Margin=new(0,0,0,8);
         agentNote.SetBinding(VisibilityProperty,new Binding(nameof(_model.UsesSecret)){Converter=new InverseBooleanToVisibilityConverter()});panel.Children.Insert(panel.Children.IndexOf(secretLabel),agentNote);
         // Advanced: short fields share a row; the jump-server field carries its picker on the same line, with room around it.

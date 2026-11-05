@@ -43,13 +43,54 @@ public sealed class TerminalView : UserControl, IDisposable
             Ui.AsyncIconButton(Ui.AddGlyph, () => ChangeFontAsync(1), "Увеличить шрифт"),
             Ui.AsyncButton("Копировать", CopyAsync, "Копировать выделение • " + (App.Store.Settings.TerminalCtrlCCopies ? "Ctrl+C" : "Ctrl+Shift+C")),
             Ui.AsyncButton("Вставить", PasteAsync, "Вставить • " + (App.Store.Settings.TerminalCtrlCCopies ? "Ctrl+V" : "Ctrl+Shift+V")),
-            Interrupt());
+            Interrupt(), new Border { Width = 12 }, SnippetsButton(), _broadcast);
         tools.Margin = new Thickness(12, 6, 12, 6); DockPanel.SetDock(tools, Dock.Top);
         root.Children.Add(tools); root.Children.Add(_web); Content = root;
+        _broadcast.Click += (_, _) => BroadcastChanged?.Invoke(_broadcast.IsChecked == true);
         _search.KeyDown += async (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) { await FindAsync(false); e.Handled = true; } };
         _web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 17, 24, 32);
         _web.GotFocus += (_, _) => Focused?.Invoke();
         IsVisibleChanged += async (_, _) => { if (IsVisible && _ready.Task.IsCompletedSuccessfully && !_disposed) await RunScriptAsync("window.sshExplorer.fit()"); };
+    }
+
+    readonly System.Windows.Controls.Primitives.ToggleButton _broadcast = new() { Name = "TerminalBroadcast", Content = "Во все терминалы", Visibility = Visibility.Collapsed, Margin = new Thickness(6, 0, 0, 0), Padding = new Thickness(10, 4, 10, 4), ToolTip = "Набранное здесь уходит во все терминалы этой вкладки (разделённые). Вставка и фрагменты — тоже." };
+    /// <summary>Keyboard input while «Во все терминалы» is on: the workspace repeats it in the other panes.</summary>
+    public event Action<string>? Typed;
+    internal bool Broadcasting { get => _broadcast.IsChecked == true; set => _broadcast.IsChecked = value; }
+    /// <summary>Shown only when the tab has more than one terminal.</summary>
+    internal void SetBroadcastAvailable(bool available) { _broadcast.Visibility = available ? Visibility.Visible : Visibility.Collapsed; if (!available) _broadcast.IsChecked = false; }
+    internal event Action<bool>? BroadcastChanged;
+    internal Task TypeAsync(string text) => WriteAsync(text);
+    internal Func<SnippetsWindow, bool?>? SnippetsWindowOverride { get; set; }
+
+    Button SnippetsButton()
+    {
+        var button = Ui.FlyoutButton(IconCatalog.Documents, "Фрагменты", () =>
+        {
+            var menu = new ContextMenu(); var list = App.Store.Settings.Snippets;
+            foreach (var s in list.OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase))
+            {
+                var snippet = s;
+                var item = Ui.Menu(snippet.Name, () => _ = InsertSnippetAsync(snippet)); item.ToolTip = snippet.Command + (snippet.RunImmediately ? "\n(выполняется сразу)" : "\n(вписывается — Enter нажимаете вы)"); menu.Items.Add(item);
+            }
+            if (list.Count == 0) menu.Items.Add(new MenuItem { Header = "Сохранённых фрагментов нет", IsEnabled = false });
+            menu.Items.Add(new Separator()); menu.Items.Add(Ui.Menu("Управлять фрагментами…", ManageSnippets, glyph: Ui.RenameGlyph));
+            return menu;
+        }, "Сохранённые команды: вписать в терминал одним щелчком");
+        button.Name = "TerminalSnippets"; return button;
+    }
+
+    internal async Task InsertSnippetAsync(CommandSnippet snippet)
+    {
+        var text = snippet.Command + (snippet.RunImmediately ? "\r" : "");
+        await WriteAsync(text); if (Broadcasting) Typed?.Invoke(text);
+        await RunScriptAsync("window.sshExplorer.focus && window.sshExplorer.focus()");
+    }
+
+    void ManageSnippets()
+    {
+        var window = new SnippetsWindow(App.Store.Settings.Snippets) { Owner = Window.GetWindow(this) };
+        if ((SnippetsWindowOverride?.Invoke(window) ?? window.ShowDialog()) == true) { App.Store.Settings.Snippets = window.Result.ToList(); _ = App.Store.SaveAsync(); }
     }
 
     /// <summary>Ctrl+Shift+D/E/W pressed inside the terminal ("D", "E" or "W"): the split workspace handles them.</summary>
@@ -162,7 +203,7 @@ public sealed class TerminalView : UserControl, IDisposable
                     _columns = (uint)Math.Clamp(data.GetProperty("cols").GetInt32(), 2, 1000);
                     _rows = (uint)Math.Clamp(data.GetProperty("rows").GetInt32(), 2, 1000); _ready.TrySetResult();
                     await RunScriptAsync($"window.sshExplorer.setClipboardKeys({(App.Store.Settings.TerminalCtrlCCopies ? "true" : "false")})"); break;
-                case "input": await WriteAsync(data.GetProperty("data").GetString() ?? ""); break;
+                case "input": { var typed = data.GetProperty("data").GetString() ?? ""; await WriteAsync(typed); if (_broadcast.IsChecked == true) Typed?.Invoke(typed); break; }
                 case "resize":
                     _columns = (uint)Math.Clamp(data.GetProperty("cols").GetInt32(), 2, 1000);
                     _rows = (uint)Math.Clamp(data.GetProperty("rows").GetInt32(), 2, 1000);

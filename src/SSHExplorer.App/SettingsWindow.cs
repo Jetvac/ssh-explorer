@@ -38,6 +38,7 @@ public sealed class SettingsWindow : Window
     readonly CheckBox terminalCopyKeys = new() { Content = "Ctrl+C и Ctrl+V копируют и вставляют", Name = "SettingsTerminalCopyKeys" };
     readonly CheckBox showExtensions = new() { Content = "Показывать расширения имён файлов" };
     readonly NumberField poll = new("Интервал обновления", "с", 1, 60, 1);
+    readonly CheckBox checkUpdates = new() { Name = "SettingsCheckUpdatesDaily", Content = "Проверять обновления раз в день" };
     readonly CheckBox alerts = new() { Name = "SettingsAlerts", Content = "Проверять подключённые серверы и сообщать о проблемах" };
     readonly CheckBox alertWindows = new() { Name = "SettingsAlertWindows", Content = "Показывать уведомления Windows" };
     readonly NumberField alertDisk = new("Диск заполнен не меньше чем на", "%", 50, 99, 1) { Name = "SettingsAlertDisk" };
@@ -64,7 +65,7 @@ public sealed class SettingsWindow : Window
         theme.SelectedIndex = settings.Theme == "Light" ? 1 : settings.Theme == "Dark" ? 2 : 0;
         AutomationProperties.SetName(theme, "Тема приложения");
         reduceMotion.IsChecked = settings.ReduceMotion; showHidden.IsChecked = settings.ShowHidden; terminalCopyKeys.IsChecked = settings.TerminalCtrlCCopies; showExtensions.IsChecked = settings.ShowExtensions;
-        poll.Value = settings.PollIntervalSeconds; alerts.IsChecked = settings.AlertsEnabled; alertWindows.IsChecked = settings.AlertWindowsNotifications; alertDisk.Value = Math.Clamp(settings.AlertDiskPercent, 50, 99); alertInterval.Value = Math.Clamp(settings.AlertIntervalMinutes, 1, 120); font.Value = settings.TerminalFontSize;
+        poll.Value = settings.PollIntervalSeconds; checkUpdates.IsChecked = settings.CheckUpdates; alerts.IsChecked = settings.AlertsEnabled; alertWindows.IsChecked = settings.AlertWindowsNotifications; alertDisk.Value = Math.Clamp(settings.AlertDiskPercent, 50, 99); alertInterval.Value = Math.Clamp(settings.AlertIntervalMinutes, 1, 120); font.Value = settings.TerminalFontSize;
         maxBytes.Value = settings.PreviewMaxBytes / 1024 / 1024; pixels.Value = settings.PreviewMaxPixels / 1_000_000;
         parallel.Value = settings.PreviewParallelism; cache.Value = settings.PreviewCacheBytes / 1024 / 1024;
         transfers.Value = Math.Clamp(settings.TransferParallelism, 1, 8); speed.Value = Math.Max(0, settings.TransferLimitKiBps);
@@ -164,8 +165,19 @@ public sealed class SettingsWindow : Window
         var openData = Ui.Button("Открыть папку", () => OpenFolder(App.Store.DirectoryPath));
         var copyLogs = Ui.Button("Скопировать путь к диагностике", () => Clipboard.SetText(System.IO.Path.Combine(App.Store.DirectoryPath, "Logs")));
         var notices = Ui.Button("Сторонние компоненты и лицензии", () => OpenFolder(System.IO.Path.Combine(AppContext.BaseDirectory, "licenses")));
+        var updateState = Ui.Text(Updates.Latest is { } known ? Describe(known) : settings.LastUpdateCheckUtc is { } at ? $"Последняя проверка: {at.ToLocalTime():dd.MM.yyyy HH:mm}." : "Проверка ещё не выполнялась.", 12);
+        updateState.Name = "SettingsUpdateState"; updateState.TextWrapping = TextWrapping.Wrap; updateState.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        var openRelease = Ui.Button("Открыть страницу выпуска", () => { if (Updates.Latest is { } r) Updates.OpenPage(r); }); openRelease.Name = "SettingsOpenRelease"; openRelease.IsEnabled = Updates.Latest is not null && UpdateCheck.IsNewer(Updates.Latest, BuildInfo.DisplayVersion);
+        var checkNow = Ui.AsyncButton("Проверить сейчас", async () =>
+        {
+            updateState.Text = "Проверка…";
+            try { var newer = await Updates.CheckAsync(true); updateState.Text = Updates.Latest is { } r ? Describe(r) : "Не удалось прочитать ответ GitHub."; openRelease.IsEnabled = newer is not null; }
+            catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException) { updateState.Text = "GitHub недоступен: " + ex.Message; }
+        }); checkNow.Name = "SettingsCheckUpdates";
+        static string Describe(ReleaseInfo r) => UpdateCheck.IsNewer(r, BuildInfo.DisplayVersion) ? $"Доступна версия {r.Version}" + (r.Published is { } d ? $" от {d.ToLocalTime():dd.MM.yyyy}" : "") + ". Скачайте её со страницы выпуска — приложение ничего не загружает само." : $"Установлена последняя версия (на GitHub — {r.Version}).";
         pages["about"] = Page("О приложении", header,
             Group("Сборка", Buttons(copyVersion)),
+            Group("Обновления", Setting(null, "Раз в день при запуске приложение спрашивает GitHub о последнем выпуске. Ничего не скачивается и не устанавливается; личные данные не передаются.", checkUpdates), updateState, Buttons(checkNow, openRelease)),
             Group("Настройки и диагностика", Setting("Папка данных", "Профили, доверенные ключи, защищённые секреты (DPAPI текущего пользователя) и журналы диагностики без паролей и содержимого файлов.", data), Buttons(openData, copyLogs)),
             Group("Лицензии", Note("SSH.NET, xterm.js, Microsoft Edge WebView2 Runtime и .NET распространяются по своим лицензиям; тексты включены в папку licenses рядом с программой."), Buttons(notices)));
     }
@@ -233,7 +245,7 @@ public sealed class SettingsWindow : Window
         if (path.Length > 0 && (!System.IO.Path.IsPathFullyQualified(path) || path.StartsWith(@"\\", StringComparison.Ordinal) || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !System.IO.File.Exists(path)))
         { Show("terminal"); Ui.SetValidationMessage(editor, "Выберите существующую программу (.exe) на этом компьютере или вернитесь к Блокноту."); editor.Focus(); return; }
         settings.ExternalEditorPath = path;
-        settings.PollIntervalSeconds = (int)poll.Value; settings.AlertsEnabled = alerts.IsChecked == true; settings.AlertWindowsNotifications = alertWindows.IsChecked == true; settings.AlertDiskPercent = (int)alertDisk.Value; settings.AlertIntervalMinutes = (int)alertInterval.Value; settings.TerminalFontSize = (int)font.Value;
+        settings.PollIntervalSeconds = (int)poll.Value; settings.CheckUpdates = checkUpdates.IsChecked == true; settings.AlertsEnabled = alerts.IsChecked == true; settings.AlertWindowsNotifications = alertWindows.IsChecked == true; settings.AlertDiskPercent = (int)alertDisk.Value; settings.AlertIntervalMinutes = (int)alertInterval.Value; settings.TerminalFontSize = (int)font.Value;
         settings.PreviewMaxBytes = maxBytes.Value * 1024 * 1024; settings.PreviewMaxPixels = pixels.Value * 1_000_000;
         settings.PreviewParallelism = (int)parallel.Value; settings.PreviewCacheBytes = cache.Value * 1024 * 1024;
         settings.TransferParallelism = (int)transfers.Value; settings.TransferLimitKiBps = (int)speed.Value; settings.ApplyTo(App.Transfers);
