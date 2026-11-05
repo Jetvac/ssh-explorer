@@ -5,7 +5,7 @@ namespace SSHExplorer.Monitoring;
 public sealed record NetworkAddress(string Interface, string Family, string Address);
 
 /// <summary>How a power action would be sent. Exactly one method is chosen; nothing is tried blindly.</summary>
-public enum PowerMethod { None, SystemctlAsRoot, SystemctlViaLogind, SystemctlViaSudo, SysVAsRoot, SysVViaSudo }
+public enum PowerMethod { None, SystemctlAsRoot, SystemctlViaLogind, SystemctlViaSudo, SysVAsRoot, SysVViaSudo, WindowsShutdown }
 public enum PowerAction { Reboot, PowerOff }
 
 public sealed record PowerCapability(PowerAction Action, PowerMethod Method, string Command, string Explanation)

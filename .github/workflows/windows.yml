@@ -59,6 +59,33 @@ jobs:
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/Test-UiComposition.ps1
+      - name: OpenSSH Server on the runner with a throwaway local administrator (Windows servers over SSH)
+        id: winssh
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $cap = Get-WindowsCapability -Online -Name 'OpenSSH.Server*' | Select-Object -First 1
+          Write-Output "OpenSSH Server capability: $($cap.Name) $($cap.State)"
+          if ($cap.State -ne 'Installed') { Add-WindowsCapability -Online -Name $cap.Name | Out-Null }
+          Start-Service sshd
+          $user = 'sshx-ssh'
+          $bytes = [byte[]]::new(24); [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          $password = 'Bb2!' + ([Convert]::ToBase64String($bytes) -replace '[/+=]', 'x')
+          Write-Output "::add-mask::$password"
+          New-LocalUser -Name $user -Password (ConvertTo-SecureString $password -AsPlainText -Force) -PasswordNeverExpires -AccountNeverExpires | Out-Null
+          Add-LocalGroupMember -SID 'S-1-5-32-544' -Member $user
+          "WIN_SSH_USER=$user" >> $env:GITHUB_ENV
+          "WIN_SSH_PASSWORD=$password" >> $env:GITHUB_ENV
+          $ok = (Test-NetConnection 127.0.0.1 -Port 22 -WarningAction SilentlyContinue).TcpTestSucceeded
+          Write-Output "sshd on 127.0.0.1:22 reachable: $ok"
+          if (-not $ok) { throw 'sshd is not listening.' }
+      - name: Windows server over SSH (detection, drive paths, PowerShell, task manager, server page)
+        if: ${{ !cancelled() && steps.winssh.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --windows-host-integration 127.0.0.1 22 $env:WIN_SSH_USER 2>&1 | Tee-Object -FilePath artifacts/windows-host.log
+          if ($LASTEXITCODE) { throw 'Windows server checks failed.' }
       - name: Remote Desktop on the runner with a throwaway local account (live RDP sign-in to itself)
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         continue-on-error: true

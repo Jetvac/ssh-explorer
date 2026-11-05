@@ -32,6 +32,8 @@ public sealed partial class ServerSession : IAsyncDisposable
     public bool ShellAvailable { get; private set; }
     /// <summary>The server runs Windows (OpenSSH Server): commands go through PowerShell, paths look like /C:/….</summary>
     public bool IsWindows { get; private set; }
+    /// <summary>Windows: the server's SSH shell is cmd.exe (the default); terminals then start PowerShell in it.</summary>
+    public bool WindowsShellIsCmd { get; private set; }
     public bool SftpAvailable => Files.Available;
     public RemoteFileService Files { get; }
     public CancellationToken Lifetime => _lifetime.Token;
@@ -98,6 +100,9 @@ public sealed partial class ServerSession : IAsyncDisposable
                 if (windows is not null && WindowsHost.LooksLikeWindows(windows))
                 {
                     IsWindows = true; ShellAvailable = true;
+                    // cmd.exe expands %COMSPEC%; PowerShell prints it as it is.
+                    try { WindowsShellIsCmd = (await ExecuteAsync("echo %COMSPEC%", linked.Token).ConfigureAwait(false)).Output.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase); }
+                    catch (Exception shell) when (shell is not OperationCanceledException and not HostKeyChangedException) { }
                     Report(operation, null, ConnectionStage.ExecProbe, ConnectionStageOutcome.Succeeded);
                 }
                 else { Report(operation, null, ConnectionStage.ExecProbe, Outcome(ex), ex); ShellError = ErrorMessages.Describe(ex); }
@@ -366,7 +371,12 @@ public sealed partial class ServerSession : IAsyncDisposable
                 {
                     // «cd "C:/path"» works in cmd.exe and PowerShell alike.
                     var target = WindowsHost.ToDisplay(directory).Replace(((char)34).ToString(), "");
-                    var data = Encoding.UTF8.GetBytes("cd " + (char)34 + target + (char)34 + (char)13);
+                    var data = Encoding.UTF8.GetBytes((WindowsShellIsCmd ? "cd /d " : "cd ") + (char)34 + target + (char)34 + (char)13 + (WindowsShellIsCmd ? "powershell -NoLogo" + (char)13 : ""));
+                    shell.Write(data, 0, data.Length); shell.Flush();
+                }
+                else if (IsWindows && WindowsShellIsCmd)
+                {
+                    var data = Encoding.UTF8.GetBytes("powershell -NoLogo" + (char)13);
                     shell.Write(data, 0, data.Length); shell.Flush();
                 }
                 else if (!string.IsNullOrWhiteSpace(directory))

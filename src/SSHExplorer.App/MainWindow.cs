@@ -754,7 +754,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var settings = App.Store.Settings;
         if (healthBusy || disposed || !settings.AlertsEnabled || Session.State != SessionState.Connected || !Session.ShellAvailable) return;
         healthBusy = true;
-        try { AlertCenter.Report(Session.Profile.Id, Session.Profile.Name, ServerHealth.Parse((await Session.ExecuteAsync(ServerHealth.Command, Session.Lifetime)).Output, Math.Clamp(settings.AlertDiskPercent, 50, 99))); }
+        try { AlertCenter.Report(Session.Profile.Id, Session.Profile.Name, ServerHealth.Parse((await Session.ExecuteAsync(Session.IsWindows ? ServerHealth.WindowsCommand : ServerHealth.Command, Session.Lifetime)).Output, Math.Clamp(settings.AlertDiskPercent, 50, 99))); }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or OperationCanceledException or Renci.SshNet.Common.SshException) { }
         finally { healthBusy = false; }
     }
@@ -840,8 +840,10 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             {
                 if (item.Key == Sidebar.Home && anyBefore) side.Children.Add(divider);
                 foreach (var element in sideEntries[item.Key]) side.Children.Add(element);
-                sideEntries[item.Key][0].Visibility = item.Visible ? Visibility.Visible : Visibility.Collapsed;
-                anyBefore |= item.Visible;
+                // Sections built on Linux tools (crontab, sshd, Docker, bash scripts) are not offered for a Windows server.
+                bool visible = item.Visible && !(Session.IsWindows && LinuxOnly.Contains(item.Key));
+                sideEntries[item.Key][0].Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                anyBefore |= visible;
             }
             // With «Файлы» first there is no divider above it: it closes the list instead.
             if (divider.Parent is null) side.Children.Add(divider);
@@ -850,6 +852,8 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var current = section is "services" ? "monitor" : section;
         if (SidebarCatalog.Entries.ContainsKey(current) && !Sidebar.IsVisible(settings, current)) ShowSection(Sidebar.Home);
     }
+    static readonly HashSet<string> LinuxOnly = new(StringComparer.Ordinal) { "cron", "security", "docker", "scripts" };
+    bool windowsLayout;
     void ToggleSidebarEditor()
     {
         if (sidebarEditor is null) { bool keyboard = InputManager.Current.MostRecentInputDevice is KeyboardDevice; sidebarEditor = new SidebarEditor(() => { bool byKeyboard = InputManager.Current.MostRecentInputDevice is KeyboardDevice; sidebarEditor = null; ApplySidebar(); if (byKeyboard) customize.Focus(); }); ApplySidebar(); if (keyboard) sidebarEditor.FocusFirst(); }
@@ -907,7 +911,12 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             if (disposed || failed) return;
             viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected); UpdateConnectionStatusVisibility();
             // Scheduled scripts run while this server is connected, whether or not their section is open.
-            if (Session.State == SessionState.Connected && !presentationOnly) { EnsureScriptRunner(); _ = AutoStartTunnelsAsync(); StartHealthChecks(); }
+            if (Session.State == SessionState.Connected && !presentationOnly)
+            {
+                if (!Session.IsWindows) EnsureScriptRunner();
+                _ = AutoStartTunnelsAsync(); StartHealthChecks();
+                if (Session.IsWindows && !windowsLayout) { windowsLayout = true; ApplySidebar(); }
+            }
         });
     }
     TunnelManager EnsureTunnelManager() => tunnelManager ??= new TunnelManager(Session);

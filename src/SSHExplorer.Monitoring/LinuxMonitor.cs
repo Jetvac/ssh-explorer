@@ -72,6 +72,8 @@ public sealed class LinuxMonitor
     /// <summary>Last executed command (diagnostics/tests). Contains no user data.</summary>
     public string? LastCommand { get; private set; }
     public MonitorSnapshot? LastSnapshot { get; private set; }
+    /// <summary>The server runs Windows: samples come from <see cref="WindowsCollector"/> instead of /proc.</summary>
+    public bool Windows { get; init; }
 
     public LinuxMonitor(Func<string, CancellationToken, Task<ExecResult>> execute,
         int maxProcesses = 2048, int historyCapacity = 3600, Func<DateTimeOffset>? clock = null)
@@ -102,9 +104,10 @@ public sealed class LinuxMonitor
         try
         {
             if (Interlocked.Exchange(ref _resetBeforeSample,0) != 0) _calculator.Reset("После паузы или ошибки накапливается новая база измерений.");
-            var command = CollectorCommand.Create(NextRequest()); LastCommand = command;
+            var command = Windows ? WindowsCollector.Command(Scope == MonitorScope.Processes) : CollectorCommand.Create(NextRequest()); LastCommand = command;
             var r = await _execute(command, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
+            if (Windows && r.ExitStatus != 0) throw new MonitoringUnavailableException($"PowerShell на сервере Windows не выполнил запрос мониторинга (код {r.ExitStatus}). {r.Error.Split((char)10).FirstOrDefault()?.Trim()}");
             if (r.ExitStatus != 0)
             {
                 if (r.Output.StartsWith("SSHXERROR:missing:", StringComparison.Ordinal))
@@ -115,8 +118,8 @@ public sealed class LinuxMonitor
             }
             MonitorSnapshot snapshot;
             var ended = _clock();
-            try { snapshot = _calculator.Calculate(r.Output, ended) with { CollectionDuration = MaxZero(ended - started) }; }
-            catch (FormatException) { throw new MonitoringUnavailableException("Ответ мониторинга повреждён или прерван."); }
+            try { snapshot = (Windows ? WindowsCollector.Parse(r.Output, ended) : _calculator.Calculate(r.Output, ended)) with { CollectionDuration = MaxZero(ended - started) }; }
+            catch (Exception ex) when (ex is FormatException or System.Text.Json.JsonException) { throw new MonitoringUnavailableException("Ответ мониторинга повреждён или прерван."); }
             double? receive = SumMeasured(snapshot.Networks.Select(x => x.ReceiveBytesPerSecond));
             double? send = SumMeasured(snapshot.Networks.Select(x => x.SendBytesPerSecond));
             lock (_historyLock)
@@ -163,6 +166,7 @@ public sealed class LinuxMonitor
 
     public async Task<MonitorCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
     {
+        if (Windows) return new MonitorCapabilities(false, false);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -178,6 +182,19 @@ public sealed class LinuxMonitor
     {
         if (ProcessSignalPolicy.DisabledReason(identity) is { } reason) throw new InvalidOperationException(reason);
         if (signal is not (9 or 15)) throw new ArgumentOutOfRangeException(nameof(signal));
+        if (Windows)
+        {
+            if (WindowsCollector.ProtectedReason(identity) is { } windowsReason) throw new InvalidOperationException(windowsReason);
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var w = await _execute(WindowsCollector.StopCommand(identity, signal == 9), cancellationToken).ConfigureAwait(false);
+                if (w.ExitStatus == 74) throw new ProcessChangedException("Процесс завершился или его PID и время запуска изменились. Процесс не остановлен.");
+                if (w.ExitStatus != 0) throw new InvalidOperationException("Windows отказал в остановке процесса: недостаточно прав (нужен администратор) либо процесс уже завершён.");
+                return;
+            }
+            finally { _gate.Release(); }
+        }
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {

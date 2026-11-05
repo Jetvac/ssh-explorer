@@ -345,14 +345,16 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     }
     void UpdateBreadcrumbs()
     {
-        breadcrumbs.Children.Clear(); breadcrumbs.Children.Add(Ui.AsyncCommandButton(Ui.FolderGlyph, "/", () => NavigateAsync("/"), "Корень")); var path = "";
+        breadcrumbs.Children.Clear(); breadcrumbs.Children.Add(Ui.AsyncCommandButton(Ui.FolderGlyph, session.IsWindows ? "Этот компьютер" : "/", () => NavigateAsync("/"), session.IsWindows ? "Диски сервера" : "Корень")); var path = "";
         foreach (var part in CurrentPath.Split('/', StringSplitOptions.RemoveEmptyEntries)) { path += "/" + part; var target = path; var separator = Ui.Icon("\uE76C", 10, false); separator.Margin = new Thickness(2, 0, 2, 0); breadcrumbs.Children.Add(separator); var b = Ui.AsyncButton(part, () => NavigateAsync(target)); b.SetResourceReference(StyleProperty, "CommandButtonStyle"); b.Padding = new Thickness(7, 3, 7, 3); breadcrumbs.Children.Add(b); }
-        if (address.Visibility != Visibility.Visible) address.Text = CurrentPath;
+        if (address.Visibility != Visibility.Visible) address.Text = Display(CurrentPath);
     }
+    /// <summary>Windows servers: the address bar shows Windows paths (drive letter first) for SFTP paths like /C:/Users.</summary>
+    string Display(string path) => session.IsWindows ? WindowsHost.ToDisplay(path) : path;
     internal bool IsEditingAddress => address.Visibility == Visibility.Visible;
     internal void EditAddress()
     {
-        if (address.Visibility != Visibility.Visible) { address.Text = CurrentPath; address.Visibility = Visibility.Visible; }
+        if (address.Visibility != Visibility.Visible) { address.Text = Display(CurrentPath); address.Visibility = Visibility.Visible; }
         // The TextBox becomes focusable only after it is visible in layout; focus now and once more
         // at input priority so a click on the crumbs never leaves the caret elsewhere.
         void Activate() { if (address.Visibility != Visibility.Visible) return; address.Focus(); Keyboard.Focus(address); address.SelectAll(); }
@@ -373,14 +375,14 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         addressPending = true; address.IsReadOnly = true;
         try
         {
-            var success = await Navigate(address.Text, true);
+            var success = await Navigate(session.IsWindows ? WindowsHost.FromDisplay(address.Text) : address.Text, true);
             if (attempt != addressRequest) return;
             if (success) { address.Visibility = Visibility.Collapsed; FocusFileList(); }
             else if (!disposed && address.Visibility == Visibility.Visible) { address.ToolTip = viewModel.Message; Ui.SetValidationMessage(address, viewModel.Message); address.Focus(); }
         }
         finally { if (attempt == addressRequest) { addressPending = false; address.IsReadOnly = false; } }
     }
-    void CancelAddress() { addressRequest++; addressPending = false; address.IsReadOnly = false; navigationCts.Cancel(); address.Text = CurrentPath; address.ToolTip = null; Ui.SetValidationMessage(address, ""); address.Visibility = Visibility.Collapsed; FocusFileList(); }
+    void CancelAddress() { addressRequest++; addressPending = false; address.IsReadOnly = false; navigationCts.Cancel(); address.Text = Display(CurrentPath); address.ToolTip = null; Ui.SetValidationMessage(address, ""); address.Visibility = Visibility.Collapsed; FocusFileList(); }
     void FocusFileList() { if (!IsLoaded || !IsVisible) return; if (mode == "Details") table.Focus(); else tiles.Focus(); }
     public async Task NavigateAsync(string path) { FileNavigationRequested?.Invoke(); await Navigate(path, true); }
     public Task InitializeAsync(string path, CancellationToken ct) => Navigate(path, true, requestToken: ct, throwOnFailure: true);
@@ -401,7 +403,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             if (!viewModel.CommitNavigation(version, normalized, entries, addHistory, oldSelected, oldOffset, targetHistoryIndex)) { if (throwOnFailure) throw new OperationCanceledException("Начальная навигация заменена новым запросом.", ct); return false; }
             ApplyItems(); RestoreSelection(viewModel.SelectedPaths.ToList());
             if (restore is not null) _ = Dispatcher.BeginInvoke(() => FindVisualChild<ScrollViewer>(mode == "Details" ? table : tiles)?.ScrollToVerticalOffset(restore.Offset));
-            UpdateBreadcrumbs(); address.Text = normalized; address.ToolTip = null; Ui.SetValidationMessage(address, ""); address.Visibility = Visibility.Collapsed; UpdateCurrentTree();
+            UpdateBreadcrumbs(); address.Text = Display(normalized); address.ToolTip = null; Ui.SetValidationMessage(address, ""); address.Visibility = Visibility.Collapsed; UpdateCurrentTree();
             _ = SyncTree(normalized, version); UpdateStatus(); NavigationCommitted?.Invoke(); return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { viewModel.FailNavigation(version, path, "Операция отменена."); if (throwOnFailure) throw; }

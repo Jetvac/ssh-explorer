@@ -21,6 +21,12 @@ if (args.Length == 4 && args[0] == "--firewall-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real ufw checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 4 && args[0] == "--windows-host-integration")
+{
+    await WindowsHostIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
+    Console.WriteLine($"RESULT: {suite.Passed} real Windows server checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 4 && args[0] == "--security-integration")
 {
     await SecurityIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
