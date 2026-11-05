@@ -387,7 +387,7 @@ internal static class Beta6Tests
                 theme = Descendants<ComboBox>(settings).Single(c => c.Name == "SettingsTheme");
                 var label = Descendants<TextBlock>((DependencyObject)VisualTreeHelper.GetParent(theme)).FirstOrDefault(t => t.Text == "Тема приложения");
                 Check(label is not null, "«Тема приложения» label sits in the same group directly above its list");
-                settings.Show("monitoring"); Layout(settings); var poll = Descendants<NumberField>(settings).Single(); poll.Input.Text = "0";
+                settings.Show("monitoring"); Layout(settings); var poll = Descendants<NumberField>(settings).Single(f => f.Label == "Интервал обновления"); poll.Input.Text = "0";
                 var save = Descendants<Button>(settings).Single(b => b.Name == "SettingsSave"); save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
                 Check(settings.IsVisible && settings.CurrentSection == "monitoring" && !poll.Validate(), "an out-of-range interval keeps the window open on its section with an error");
                 evidence.Capture((FrameworkElement)settings.Content, "settings-validation", new { theme = "Light", fixtureOnly = true });
