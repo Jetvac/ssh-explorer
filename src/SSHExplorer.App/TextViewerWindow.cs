@@ -62,7 +62,23 @@ public sealed class TextViewerWindow : Window
             int lines = content.Length == 0 ? 0 : content.Count(c => c == '\n') + (content.EndsWith('\n') ? 0 : 1);
             state.Text = $"{Ui.Size(bytes.LongLength)} · строк: {lines} · {format.Description} · только просмотр";
         }
-        catch (System.IO.IOException ex) { text.Text = ""; state.Text = ex.Message + (encoding.SelectedIndex <= 0 ? " Можно выбрать кодировку вручную." : ""); }
+        catch (System.IO.IOException ex)
+        {
+            text.Text = "";
+            // NUL bytes outside UTF-16 mean binary data: offering another encoding would only mislead.
+            state.Text = LooksBinary(bytes) ? "Содержимое похоже на двоичные данные: просмотр как текст невозможен. Скачайте файл отдельно."
+                : ex.Message + (encoding.SelectedIndex <= 0 ? " Можно выбрать кодировку вручную." : "");
+        }
+    }
+
+    internal static bool LooksBinary(byte[] data)
+    {
+        if (data.AsSpan().StartsWith(new byte[] { 0xff, 0xfe }) || data.AsSpan().StartsWith(new byte[] { 0xfe, 0xff })) return false;
+        var sample = data.AsSpan(0, Math.Min(data.Length, 8192)); int zeros = 0, even = 0;
+        for (int i = 0; i < sample.Length; i++) if (sample[i] == 0) { zeros++; if (i % 2 == 0) even++; }
+        // UTF-16 without BOM has zeros almost only in one byte position; binary data has them anywhere.
+        bool utf16Like = zeros > sample.Length / 5 && (even < zeros / 10 || even > zeros * 9 / 10);
+        return zeros > 0 && !utf16Like;
     }
 
     /// <summary>Finds the search text after (or before) the caret, case-insensitive, and selects it.</summary>
