@@ -83,6 +83,12 @@ internal static class SecurityIntegration
                 await Sh("crontab -r 2>/dev/null; rm -f ~/.cache/sshexplorer/crontab-*.bak; true");
             });
 
+            await t.Run("packages integration: the runner's apt reports its pending updates without root", async () =>
+            {
+                var report = Packages.Parse(await Sh(Packages.ReadCommand));
+                TestSuite.True(report.Manager == "apt" && report.Problem is null && report.ListsAgeHours is >= 0 && report.Updates.All(u => u.Name.Length > 0 && u.Version.Length > 0), $"{report.Manager} {report.Summary} age={report.ListsAgeHours}");
+            });
+
             var sshd = new SshdService(session);
             await sshd.ProbeAsync();
             var first = await sshd.ReadAsync();

@@ -36,6 +36,16 @@ public sealed class ServerPanelView : UserControl
     internal Func<ServerInfo, PowerCapability, bool>? ConfirmOverride { get; set; }
     internal Func<CancellationToken, Task<bool>>? ServiceProbeOverride { get; set; }
 
+    readonly Button updatesButton;
+    /// <summary>Types a command into this server's terminal without running it (set by the tab).</summary>
+    internal Func<string, Task>? TypeInTerminal { get; set; }
+    internal Func<PackagesWindow, bool?>? UpdatesWindowOverride { get; set; }
+    async Task ShowUpdatesAsync()
+    {
+        var window = new PackagesWindow(session.Profile.Name, async ct => (await session.ExecuteLongAsync(Packages.ReadCommand, TimeSpan.FromSeconds(90), ct)).Output, TypeInTerminal) { Owner = Window.GetWindow(this) };
+        if (UpdatesWindowOverride is not null) UpdatesWindowOverride(window); else window.ShowDialog();
+        await Task.CompletedTask;
+    }
     public ServerPanelView(ServerSession session, Func<Task>? reconnect, Action? openTerminal, Func<(int Transfers, int Documents)> pendingWork)
     {
         this.session = session; this.reconnect = reconnect; this.openTerminal = openTerminal; this.pendingWork = pendingWork;
@@ -47,12 +57,14 @@ public sealed class ServerPanelView : UserControl
         terminalButton.IsEnabled = openTerminal is not null && session.ShellAvailable;
         powerButton = Ui.FlyoutButton(IconCatalog.Power, "Питание", BuildPowerMenu, "Перезагрузка и выключение сервера");
         powerButton.Name = "ServerPowerButton";
+        updatesButton = Ui.AsyncCommandButton(IconCatalog.Restart, "Обновления…", ShowUpdatesAsync, "Обновления пакетов: сколько, какие из них — безопасности, нужна ли перезагрузка");
+        updatesButton.Name = "ServerUpdatesButton"; updatesButton.IsEnabled = session.ShellAvailable;
 
         var title = Ui.Text("Сервер", 18, true);
         subtitle.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); subtitle.TextTrimming = TextTrimming.CharacterEllipsis;
         subtitle.Text = $"{session.Profile.Name} · {session.Profile.Username}@{session.Profile.Endpoint}";
         var heading = new StackPanel { Margin = new Thickness(4, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center }; heading.Children.Add(title); heading.Children.Add(subtitle);
-        var commands = Ui.Row(heading, Ui.Line(), refresh, reconnectButton, terminalButton, Ui.Line(), powerButton);
+        var commands = Ui.Row(heading, Ui.Line(), refresh, reconnectButton, terminalButton, updatesButton, Ui.Line(), powerButton);
         var bar = new Border { Child = new ScrollViewer { Content = commands, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false }, Padding = new Thickness(10, 4, 10, 4) };
         bar.SetResourceReference(StyleProperty, "CommandBarStyle");
 

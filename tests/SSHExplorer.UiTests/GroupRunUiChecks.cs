@@ -89,6 +89,22 @@ internal static class GroupRunUiChecks
             evidence.Capture((FrameworkElement)job.Content, "cron-job", new { theme = "Light", fixtureOnly = true });
         }
         finally { job.Close(); }
+
+        // «Обновления пакетов»: security first, stale lists and a pending reboot are said; installing is typed into the terminal.
+        string? typed = null;
+        var packages = new PackagesWindow("web-1", _ => Task.FromResult("#mgr apt\n#age 180000\ncurl/jammy-updates 7.81.0-1ubuntu1.16 amd64 [upgradable from: 7.81.0-1ubuntu1.15]\nopenssl/jammy-security 3.0.2-0ubuntu1.15 amd64 [upgradable from: 3.0.2-0ubuntu1.14]\n#reboot\n#end\n"),
+            text => { typed = text; return Task.CompletedTask; }) { ShowInTaskbar = false, Left = 60, Top = 60 };
+        packages.Show(); Pump();
+        try
+        {
+            for (int i = 0; i < 50 && packages.Report is null; i++) Pump();
+            check(packages.SummaryText == "Обновлений: 2, безопасности: 1 · требуется перезагрузка" && packages.NoteText.Contains("2 дн.", StringComparison.Ordinal) && packages.NoteText.Contains("перезагрузки", StringComparison.Ordinal) && packages.SecurityButton.IsEnabled,
+                "updates, stale lists and a pending reboot are reported: " + packages.NoteText);
+            evidence.Capture((FrameworkElement)packages.Content, "packages", new { theme = "Light", fixtureOnly = true });
+            packages.SecurityButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
+            check(typed == "sudo apt-get update && sudo apt-get install --only-upgrade 'openssl'" && packages.Typed == typed, "the security-only command is typed into the terminal, not run: " + typed);
+        }
+        finally { if (packages.IsVisible) packages.Close(); }
     }
 
     static void Wait(Task task) { var watch = System.Diagnostics.Stopwatch.StartNew(); while (!task.IsCompleted) { if (watch.Elapsed > TimeSpan.FromSeconds(20)) throw new TimeoutException("group run"); Pump(); } task.GetAwaiter().GetResult(); Pump(); }

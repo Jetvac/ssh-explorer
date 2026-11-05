@@ -592,6 +592,14 @@ public sealed partial class MainWindow : Window
 public sealed class SessionView : UserControl, IAsyncDisposable
 {
     public ServerSession Session { get; }
+    /// <summary>Opens the terminal and types <paramref name="text"/> without pressing Enter: the user reads and runs it.</summary>
+    internal async Task TypeInTerminalAsync(string text)
+    {
+        ShowSection("terminal");
+        for (int i = 0; i < 100 && terminals?.ActiveBody is not TerminalView; i++) await Task.Delay(100);
+        if (terminals?.ActiveBody is not TerminalView terminal) return;
+        await terminal.StartAsync(); await terminal.SendTextAsync(text); terminal.Focus();
+    }
     /// <summary>The folder open in this tab's file manager, if any.</summary>
     internal string? CurrentFolder => files?.CurrentPath;
     readonly MainWindow main; readonly Grid host = new(); readonly TextBlock state = Ui.Text("Подключение…");
@@ -889,7 +897,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         }
         if (key == "server")
         {
-            serverPanel ??= new ServerPanelView(Session, presentationOnly ? null : () => main.Reconnect(this, files?.CurrentPath), Session.ShellAvailable ? () => ShowSection("terminal") : null, PendingWork);
+            serverPanel ??= new ServerPanelView(Session, presentationOnly ? null : () => main.Reconnect(this, files?.CurrentPath), Session.ShellAvailable ? () => ShowSection("terminal") : null, PendingWork) { TypeInTerminal = Session.ShellAvailable ? TypeInTerminalAsync : null };
             screen.Content = serverPanel;
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
             return;
