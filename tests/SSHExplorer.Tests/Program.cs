@@ -96,6 +96,8 @@ await PortsTests.RunAsync(suite);
 await DockerTests.RunAsync(suite);
 await ScriptTests.RunAsync(suite);
 await FolderCompareTests.RunAsync(suite);
+await OwnershipTests.RunAsync(suite);
+await BatchRenameTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

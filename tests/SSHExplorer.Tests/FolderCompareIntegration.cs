@@ -32,6 +32,28 @@ internal static class FolderCompareIntegration
                     && !deep.ContainsKey("link") && !deep.ContainsKey("pipe") && report.Skipped.Count(s => s.StartsWith("Сервер:", StringComparison.Ordinal)) == 2, string.Join(" | ", report.Skipped)));
         }
         finally { await session.ExecuteAsync("rm -rf " + PosixPath.Quote(remote)); Directory.Delete(local, true); }
+        await t.Run("rename integration: a swap and a chain over real SFTP keep every file's content and overwrite nothing", async () =>
+        {
+            var dir = "/tmp/sshx-rename-" + Guid.NewGuid().ToString("N")[..8];
+            await session.ExecuteAsync($"mkdir -p {dir} && cd {dir} && printf A > a && printf B > b && printf 1 > 1 && printf 2 > 2 && printf 3 > 3");
+            var swap = new[] { new RenamePlanItem(dir, "a", "b", RenameStatus.Ok, ""), new RenamePlanItem(dir, "b", "a", RenameStatus.Ok, "") };
+            var chain = BatchRename.Plan([(dir, "1", false), (dir, "2", false), (dir, "3", false)], new BatchRenameOptions { Pattern = "{n}", Start = 2 }, _ => new HashSet<string> { "1", "2", "3", "a", "b" });
+            foreach (var (from, to) in BatchRename.Operations([.. swap, .. chain], _ => ".sshexplorer-rename-" + Guid.NewGuid().ToString("N")[..12])) await session.Files.RenameAsync(from, to);
+            var listing = (await session.ExecuteAsync($"cd {dir} && for f in $(ls -A | sort); do printf '%s=%s ' \"$f\" \"$(cat \"$f\")\"; done")).Output.Trim();
+            await session.ExecuteAsync("rm -rf " + dir);
+            TestSuite.Equal("2=1 3=2 4=3 a=B b=A", listing);
+        });
+        await t.Run("ownership integration: getent names the account's UID/GID both ways; a recursive count sees the whole tree", async () =>
+        {
+            var ids = (await session.ExecuteAsync("id -u; id -g; id -un; id -gn")).Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var (name, group) = Ownership.ParseNames((await session.ExecuteAsync(Ownership.NamesCommand(int.Parse(ids[0]), int.Parse(ids[1])))).Output);
+            var back = (await session.ExecuteAsync(Ownership.IdCommand(ids[2], group: false)!)).Output.Trim();
+            var tree = "/tmp/sshx-own-" + Guid.NewGuid().ToString("N")[..8];
+            await session.ExecuteAsync($"mkdir -p {tree}/a/b && touch {tree}/a/b/f {tree}/g");
+            var count = (await session.ExecuteAsync(Ownership.CountCommand(tree))).Output.Trim();
+            await session.ExecuteAsync("rm -rf " + tree);
+            TestSuite.True(name == ids[2] && group == ids[3] && back == ids[0] && count == "5", $"{name}/{group} back={back} count={count}");
+        });
     }
 }
 #endif

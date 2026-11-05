@@ -52,6 +52,21 @@ internal static class CompareUiChecks
             evidence.Capture((FrameworkElement)window.Content, "compare", new { theme = "Light", fixtureOnly = true });
         }
         finally { window.Close(); }
+
+        // 0.3 F2: batch rename preview — problems block applying, a valid pattern enables it.
+        var rename = new BatchRenameWindow([("/p", "IMG_1.JPG", false), ("/p", "IMG_2.JPG", false)], _ => new HashSet<string> { "IMG_1.JPG", "IMG_2.JPG", "photo.jpg" }) { ShowInTaskbar = false, Left = 80, Top = 60 };
+        rename.Show(); Layout(rename);
+        try
+        {
+            TextBox Box(string name) => Descendants<TextBox>(rename).Single(b => b.Name == name);
+            var apply = Descendants<Button>(rename).Single(b => b.Name == "RenameApply");
+            Box("RenamePattern").Text = "photo{ext}"; Pump(); Box("RenameFind").Text = "JPG"; Box("RenameReplace").Text = "jpg"; Pump();
+            check(!apply.IsEnabled && rename.Plan.All(p => p.Status == RenameStatus.Duplicate), "duplicate new names block renaming");
+            Box("RenamePattern").Text = "photo-{n}{ext}"; Box("RenameDigits").Text = "2"; Pump(); Layout(rename);
+            check(apply.IsEnabled && rename.Plan.Select(p => p.NewName).SequenceEqual(["photo-01.jpg", "photo-02.jpg"]), "a valid pattern shows the new names and enables renaming: " + string.Join(",", rename.Plan.Select(p => p.NewName)));
+            evidence.Capture((FrameworkElement)rename.Content, "batch-rename", new { theme = "Light", fixtureOnly = true });
+        }
+        finally { rename.Close(); }
     }
 
     static void Pump() { var frame = new DispatcherFrame(); Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, () => frame.Continue = false); Dispatcher.PushFrame(frame); }

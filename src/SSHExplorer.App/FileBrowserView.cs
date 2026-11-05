@@ -46,6 +46,28 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     long generation => viewModel.NavigationGeneration;
     bool disposed, restoringSelection;
     public string CurrentPath => viewModel.CurrentPath;
+    /// <summary>
+    /// Renames the selection by pattern after a checked preview. Blocked sources go through temporary names first, so a swap or
+    /// chain never overwrites. Stops at the first failure and says exactly what was renamed and what is left.
+    /// </summary>
+    async Task BatchRenameAsync()
+    {
+        var chosen = Selected(); if (chosen.Count == 0) return;
+        var names = viewModel.Entries.Select(e => e.Entry.Name).ToHashSet(StringComparer.Ordinal);
+        var directory = viewModel.CurrentPath;
+        var window = new BatchRenameWindow(chosen.Select(r => (directory, r.Entry.Name, r.Entry.IsDirectory)).ToArray(), _ => names) { Owner = Window.GetWindow(this) };
+        if (window.ShowDialog() != true) return;
+        var operations = BatchRename.Operations(window.Plan, _ => ".sshexplorer-rename-" + Guid.NewGuid().ToString("N")[..12]);
+        var done = new List<(string From, string To)>();
+        try { foreach (var (from, to) in operations) { await session.Files.RenameAsync(from, to, lifetime.Token); done.Add((from, to)); } }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var temporary = done.Where(d => d.To.Contains("/.sshexplorer-rename-", StringComparison.Ordinal) && !done.Any(x => x.From == d.To)).Select(d => $"{PosixPath.Name(d.From)} → {PosixPath.Name(d.To)}").ToArray();
+            Ui.Error($"Переименование остановлено на шаге {done.Count + 1} из {operations.Count}: {ErrorMessages.Describe(ex)}" + (temporary.Length > 0 ? "\n\nВо временных именах остались:\n" + string.Join("\n", temporary) : ""));
+        }
+        finally { await RefreshAsync(); }
+    }
+
     /// <summary>Opens the comparison of this folder with a chosen Windows folder (non-modal, so transfers stay visible).</summary>
     Task CompareWithLocal()
     {
@@ -189,6 +211,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         Action("Upload", Ui.UploadGlyph, "Загрузить файлы…", Upload, nameof(FileBrowserViewModel.CanCreate), 10);
         Action("Download", Ui.DownloadGlyph, "Скачать…", Download, nameof(FileBrowserViewModel.HasSelection), 20);
         Action("Compare", "", "Сравнить с папкой Windows…", CompareWithLocal, nameof(FileBrowserViewModel.CanCreate), 5);
+        Action("BatchRename", Ui.RenameGlyph, "Переименовать несколько…", BatchRenameAsync, nameof(FileBrowserViewModel.HasSelection), 6);
         commands.Add("Sort", Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu), () => Submenu("Сортировать", Ui.SortGlyph, BuildSortMenu), 40);
         var viewButton = Ui.FlyoutButton(CommandGlyphs.View(mode), "Просмотреть", BuildViewMenu);
         viewModeRow = (Panel)viewButton.Content;
@@ -630,10 +653,37 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         var text = Ui.Text($"{entry.Name}\n\nПуть: {entry.FullPath}\nТип: {entry.TypeName}\nРазмер: {entry.SizeText}\nИзменён (местное время): {TimeText(entry.LastWriteTimeUtc)}\nДоступ (местное время): {TimeText(entry.LastAccessTimeUtc)}\nUID: {IdText(entry.UserId)}   GID: {IdText(entry.GroupId)}" + (entry.IsSymbolicLink ? "\nЦель ссылки: " + (entry.LinkTarget ?? "Недоступно") : "")); text.TextWrapping = TextWrapping.Wrap; panel.Children.Add(text);
         var modeText = new TextBox { Text = entry.PermissionsText, Margin = new Thickness(0, 14, 0, 6), ToolTip = "POSIX-права в восьмеричной записи, например 0755" }; panel.Children.Add(Ui.Text("Права (восьмеричные)")); panel.Children.Add(modeText);
         var rwx = new UniformGrid { Columns = 3 }; var boxes = new List<CheckBox>(); foreach (var label in new[] { "Владелец: чтение", "Запись", "Выполнение", "Группа: чтение", "Запись", "Выполнение", "Остальные: чтение", "Запись", "Выполнение" }) { var b = new CheckBox { Content = label }; boxes.Add(b); rwx.Children.Add(b); } panel.Children.Add(rwx);
+        // Special bits as their own boxes (setuid 4000, setgid 2000, sticky 1000), kept in sync with the octal field.
+        var special = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) }; var specialBoxes = new List<(CheckBox Box, int Bit)>();
+        foreach (var (bit, label) in Ownership.SpecialBits) { var b = new CheckBox { Content = label, Margin = new Thickness(0, 0, 16, 0), Name = "Mode" + label }; specialBoxes.Add((b, bit)); special.Children.Add(b); }
+        panel.Children.Add(special);
         bool updating = false;
-        void SyncChecks() { if (updating) return; if (!short.TryParse(ConvertOctal(modeText.Text), out var bits)) return; updating = true; for (var i = 0; i < 9; i++) boxes[i].IsChecked = (bits & (1 << (8 - i))) != 0; updating = false; }
-        foreach (var box in boxes) box.Click += (_, _) => { if (updating) return; updating = true; var bits = short.TryParse(ConvertOctal(modeText.Text), out var previous) ? previous & 0xE00 : 0; for (var i = 0; i < 9; i++) if (boxes[i].IsChecked == true) bits |= 1 << (8 - i); modeText.Text = Convert.ToString(bits, 8).PadLeft(4, '0'); updating = false; }; modeText.TextChanged += (_, _) => SyncChecks(); SyncChecks();
-        var uid = new TextBox { Text = entry.UserId.ToString() }; var gid = new TextBox { Text = entry.GroupId.ToString() }; panel.Children.Add(Ui.Text("Владелец UID / группа GID")); panel.Children.Add(Ui.Row(uid, gid));
+        void SyncChecks() { if (updating) return; if (!short.TryParse(ConvertOctal(modeText.Text), out var bits)) return; updating = true; for (var i = 0; i < 9; i++) boxes[i].IsChecked = (bits & (1 << (8 - i))) != 0; foreach (var (box, bit) in specialBoxes) box.IsChecked = (bits & bit) != 0; updating = false; }
+        void FromChecks() { if (updating) return; updating = true; var bits = 0; for (var i = 0; i < 9; i++) if (boxes[i].IsChecked == true) bits |= 1 << (8 - i); foreach (var (box, bit) in specialBoxes) if (box.IsChecked == true) bits |= bit; modeText.Text = Convert.ToString(bits, 8).PadLeft(4, '0'); updating = false; }
+        foreach (var box in boxes.Concat(specialBoxes.Select(s => s.Box))) box.Click += (_, _) => FromChecks(); modeText.TextChanged += (_, _) => SyncChecks(); SyncChecks();
+        var uid = new TextBox { Text = entry.UserId.ToString(), MinWidth = 140 }; var gid = new TextBox { Text = entry.GroupId.ToString(), MinWidth = 140 };
+        panel.Children.Add(Ui.Text("Владелец / группа: имя или число (UID / GID)")); panel.Children.Add(Ui.Row(uid, gid));
+        var names = Ui.Text("", 12); names.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); names.Name = "OwnerNames"; panel.Children.Add(names);
+        if (session.ShellAvailable) _ = Task.Run(async () =>
+        {
+            try { var (user, group) = Ownership.ParseNames((await session.ExecuteAsync(Ownership.NamesCommand(entry.UserId, entry.GroupId), lifetime.Token)).Output); await Dispatcher.InvokeAsync(() => names.Text = $"Сейчас: {user ?? "без имени"} ({entry.UserId}) / {group ?? "без имени"} ({entry.GroupId})"); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { await Dispatcher.InvokeAsync(() => names.Text = "Имена владельца не получены: " + ErrorMessages.Describe(ex)); }
+        });
+        // Names are resolved on the server (getent); a number is used as is.
+        async Task<int> ResolveId(TextBox field, bool group)
+        {
+            var text = field.Text.Trim();
+            if (int.TryParse(text, out var number)) return number >= 0 ? number : throw new ArgumentException("UID и GID должны быть неотрицательными.");
+            if (!Ownership.IsValidName(text)) throw new ArgumentException($"«{text}» — не число и не допустимое имя {(group ? "группы" : "пользователя")}.");
+            if (!session.ShellAvailable) throw new InvalidOperationException("Имя можно указать только при доступном SSH exec; введите число.");
+            var found = (await session.ExecuteAsync(Ownership.IdCommand(text, group)!, lifetime.Token)).Output.Trim();
+            return int.TryParse(found, out var id) ? id : throw new ArgumentException($"{(group ? "Группа" : "Пользователь")} «{text}» не найден(а) на сервере.");
+        }
+        async Task<bool> ConfirmRecursive(string what)
+        {
+            var count = session.ShellAvailable ? (await session.ExecuteAsync(Ownership.CountCommand(entry.FullPath), lifetime.Token)).Output.Trim() : "все";
+            return Ui.Confirm($"Рекурсивно изменить {what} у {count} объектов в «{entry.FullPath}» (без перехода на другие файловые системы)?\n\nОтменить это действие нельзя.");
+        }
         var recursive = new CheckBox { Content = "Рекурсивно изменить вложенные объекты (отдельное действие)", IsEnabled = entry.IsDirectory && !entry.IsSymbolicLink, Margin = new Thickness(0, 12, 0, 6) }; panel.Children.Add(recursive);
         var error = Ui.Text(""); error.SetResourceReference(StyleProperty, "ValidationMessageStyle"); bool propertyBusy = false;
         async Task ApplyProperty(Func<Task<bool>> action, Control field)
@@ -644,8 +694,8 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             finally { propertyBusy = false; panel.IsEnabled = true; if (Ui.GetHasValidationError(field) && w.IsVisible) field.Focus(); }
         }
         System.Windows.Automation.AutomationProperties.SetName(modeText, "Права в восьмеричной записи"); System.Windows.Automation.AutomationProperties.SetName(uid, "Владелец UID"); System.Windows.Automation.AutomationProperties.SetName(gid, "Группа GID");
-        panel.Children.Add(Ui.AsyncButton("Применить права", () => ApplyProperty(async () => { var bits = Convert.ToInt16(modeText.Text, 8); if (bits < 0 || bits > 4095) throw new ArgumentException("Права должны быть 0000–7777."); if (recursive.IsChecked == true && !Ui.Confirm("Рекурсивно изменить права всего доступного дерева этой папки?")) return false; await session.Files.SetPermissionsAsync(entry.FullPath, short.Parse(modeText.Text), recursive.IsChecked == true, lifetime.Token); await RefreshAsync(); return true; }, modeText)));
-        panel.Children.Add(Ui.AsyncButton("Применить владельца / группу", () => ApplyProperty(async () => { var owner = int.Parse(uid.Text); var group = int.Parse(gid.Text); if (owner < 0 || group < 0) throw new ArgumentException("UID и GID должны быть неотрицательными."); if (recursive.IsChecked == true && !Ui.Confirm("Рекурсивно изменить владельца и группу?")) return false; await session.Files.SetOwnerAsync(entry.FullPath, owner, group, recursive.IsChecked == true, lifetime.Token); await RefreshAsync(); return true; }, uid)));
+        panel.Children.Add(Ui.AsyncButton("Применить права", () => ApplyProperty(async () => { var bits = Convert.ToInt16(modeText.Text, 8); if (bits < 0 || bits > 4095) throw new ArgumentException("Права должны быть 0000–7777."); if (recursive.IsChecked == true && !await ConfirmRecursive("права")) return false; await session.Files.SetPermissionsAsync(entry.FullPath, short.Parse(modeText.Text), recursive.IsChecked == true, lifetime.Token); await RefreshAsync(); return true; }, modeText)));
+        panel.Children.Add(Ui.AsyncButton("Применить владельца / группу", () => ApplyProperty(async () => { var owner = await ResolveId(uid, false); var group = await ResolveId(gid, true); if (recursive.IsChecked == true && !await ConfirmRecursive("владельца и группу")) return false; await session.Files.SetOwnerAsync(entry.FullPath, owner, group, recursive.IsChecked == true, lifetime.Token); await RefreshAsync(); return true; }, uid)));
         panel.Children.Add(error);
         var sizeCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); var sizeLabel = Ui.Text(""); if (entry.IsDirectory) { panel.Children.Add(Ui.AsyncButton("Рассчитать размер дерева", async () => { sizeLabel.Text = "Подсчёт…"; sizeLabel.Text = Ui.Size(await session.Files.CalculateSizeAsync(entry.FullPath, sizeCts.Token)); })); panel.Children.Add(Ui.Button("Отменить подсчёт", () => sizeCts.Cancel())); panel.Children.Add(sizeLabel); }
         var note = Ui.Text("Доступ ограничен правами SSH-учётной записи. sudo в терминале не повышает права SFTP.", 12); note.TextWrapping = TextWrapping.Wrap; panel.Children.Add(new Expander { Header = "О доступе", Content = note, Margin = new Thickness(0, 12, 0, 0) }); var close = Ui.Button("Закрыть", w.Close); close.IsCancel = true; w.Content = Ui.DialogSurface(panel, close); w.Closed += (_, _) => { sizeCts.Cancel(); sizeCts.Dispose(); }; TrackWindow(w); w.Show();
