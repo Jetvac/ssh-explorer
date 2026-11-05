@@ -85,6 +85,7 @@ public sealed class KeyLoginWindow : Window
     readonly TextBlock log = Ui.Text("", 12), problem = Ui.Text("", 12);
     readonly Button run, close;
     bool finished;
+    string? failure;
     public string? KeyPath { get; private set; }
     public bool Switched { get; private set; }
     internal string Log => log.Text;
@@ -146,7 +147,8 @@ public sealed class KeyLoginWindow : Window
             ? LocalKeys.ValidateFileName(fileName.Text) ?? SshKeys.ValidateComment(comment.Text) ?? (passphrase.Password != repeat.Password ? "Парольные фразы не совпадают." : passphrase.Password.Length is > 0 and < 6 ? "Парольная фраза — не короче 6 символов." : null)
             : existingPath.Text.Trim().Length == 0 ? "Выберите файл закрытого ключа." : null;
         bool quiet = error is not null && (create.IsChecked == true ? passphrase.Password.Length > 0 && repeat.Password.Length == 0 : existingPath.Text.Length == 0);
-        problem.Text = error is null || quiet ? "" : error; run.IsEnabled = error is null;
+        // A failed run keeps its explanation until the next attempt.
+        problem.Text = error is not null && !quiet ? error : failure ?? ""; run.IsEnabled = error is null;
     }
 
     void Step(string text) => log.Text += (log.Text.Length > 0 ? "\n" : "") + text;
@@ -154,7 +156,7 @@ public sealed class KeyLoginWindow : Window
     /// <summary>Creates or reads the key, installs it, verifies a new key login and switches the profile.</summary>
     internal async Task RunAsync()
     {
-        problem.Text = ""; log.Text = ""; run.IsEnabled = false; create.IsEnabled = existing.IsEnabled = false;
+        failure = null; problem.Text = ""; log.Text = ""; run.IsEnabled = false; create.IsEnabled = existing.IsEnabled = false;
         var phrase = Phrase.Length > 0 ? Phrase : null;
         try
         {
@@ -168,7 +170,7 @@ public sealed class KeyLoginWindow : Window
             if (await service.VerifyAsync(path, phrase) is { } failure)
             {
                 Step("✗ Вход по ключу не прошёл: " + failure);
-                problem.Text = "Профиль не изменён. Частые причины: на сервере запрещён вход по ключу (PubkeyAuthentication no) или неверные права ~/.ssh. Ключ на сервере остался — его можно удалить в списке.";
+                problem.Text = failure = "Профиль не изменён. Частые причины: на сервере запрещён вход по ключу (PubkeyAuthentication no) или неверные права ~/.ssh. Ключ на сервере остался — его можно удалить в списке.";
                 return;
             }
             Step("✓ Вход по ключу работает.");
@@ -182,7 +184,7 @@ public sealed class KeyLoginWindow : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
-            problem.Text = ErrorMessages.Describe(ex);
+            problem.Text = failure = ErrorMessages.Describe(ex);
         }
         finally { run.IsEnabled = true; if (!finished) { create.IsEnabled = existing.IsEnabled = true; Update(); } }
     }
