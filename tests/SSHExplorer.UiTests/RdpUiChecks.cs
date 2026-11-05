@@ -76,24 +76,27 @@ internal static class RdpUiChecks
         bool required = Environment.GetEnvironmentVariable("RDP_LIVE_REQUIRED") == "1";
         Action<bool, string> live = (ok, text) => { if (required) check(ok, text); else Console.WriteLine((ok ? "PASS " : "INFO (not required) ") + text); };
         var prompts = new List<HostKeyPrompt>(); main.DesktopCloseConfirmOverride = _ => true;
+        // A native control that blocks the UI thread would otherwise hold the whole step until its time limit.
+        string stage = "start";
+        using var watchdog = new System.Threading.Timer(_ => { Console.WriteLine("FAIL live RDP blocked the UI thread at stage: " + stage); Environment.Exit(3); }, null, TimeSpan.FromMinutes(5), Timeout.InfiniteTimeSpan);
         Dialogs.RdpCertificateOverride = p => { prompts.Add(p); return TrustDecision.Permanent; };
         try
         {
             var profile = new ServerProfile { Name = "Этот компьютер по RDP", Host = Environment.GetEnvironmentVariable("RDP_TEST_HOST") ?? "127.0.0.2", Port = 3389, Username = user, Protocol = ConnectionProtocol.Rdp, Rdp = new RdpOptions { Domain = Environment.MachineName } };
             var view = main.AddDesktopForTest(profile); Pump(); Layout(main);
-            var connect = view.ConnectAsync(password, CancellationToken.None);
+            stage = "connect"; var connect = view.ConnectAsync(password, CancellationToken.None);
             var watch = Stopwatch.StartNew(); while (!connect.IsCompleted && watch.Elapsed < TimeSpan.FromSeconds(120)) Pump();
             live(connect.IsCompleted && connect.Result && view.State == SessionState.Connected, $"live: signed in to the runner over RDP in {watch.Elapsed.TotalSeconds:0} s: " + (view.LastError ?? view.StatusText));
             live(prompts.Count == 1 && prompts[0].Fingerprint.StartsWith("SHA256:", StringComparison.Ordinal) && store.Trust.Records.Any(r => r.Algorithm == RdpTrust.Algorithm), "live: the server key was confirmed before sign-in and saved");
             for (int i = 0; i < 20; i++) Pump();
-            var disconnect = view.DisconnectAsync(); watch.Restart();
+            stage = "disconnect"; var disconnect = view.DisconnectAsync(); watch.Restart();
             while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
             live(view.State == SessionState.Disconnected && view.MessageText == "Подключение завершено.", "live: «Отключить» ends the session: " + view.MessageText);
             // A second sign-in reuses the saved key without asking.
-            var again = view.ConnectAsync(password, CancellationToken.None); watch.Restart(); while (!again.IsCompleted && watch.Elapsed < TimeSpan.FromSeconds(120)) Pump();
+            stage = "reconnect"; var again = view.ConnectAsync(password, CancellationToken.None); watch.Restart(); while (!again.IsCompleted && watch.Elapsed < TimeSpan.FromSeconds(120)) Pump();
             live(again.IsCompleted && again.Result && prompts.Count == 1, "live: the saved key is accepted next time without a prompt");
-            var disconnectAgain = view.DisconnectAsync(); watch.Restart(); while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
-            live(Close(main, view), "live: the tab closes");
+            stage = "disconnect again"; var disconnectAgain = view.DisconnectAsync(); watch.Restart(); while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
+            stage = "close"; live(Close(main, view), "live: the tab closes"); stage = "done";
         }
         finally { Dialogs.RdpCertificateOverride = null; main.DesktopCloseConfirmOverride = null; }
     }
