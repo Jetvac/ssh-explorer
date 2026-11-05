@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)][string]$Directory,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{40}$')][string]$ExpectedCommit,
-    [Alias('Version')][string]$ExpectedVersion = '0.2.0-beta.6'
+    [Alias('Version')][string]$ExpectedVersion = '0.3.0-preview.1'
 )
 $ErrorActionPreference = 'Stop'
 

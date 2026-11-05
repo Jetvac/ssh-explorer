@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$Directory,
     [Parameter(Mandatory)][string]$ExpectedCommit,
-    [string]$ExpectedVersion='0.2.0-beta.6',
+    [string]$ExpectedVersion='0.3.0-preview.1',
     [string]$Report
 )
 $ErrorActionPreference='Stop'
