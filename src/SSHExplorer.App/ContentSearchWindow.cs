@@ -96,7 +96,7 @@ public sealed class ContentSearchWindow : Window
             if (results.Count > 0) Table.SelectedIndex = 0;
         }
         catch (OperationCanceledException) { state.Text = lifetime.IsCancellationRequested ? "" : $"Поиск остановлен. Найдено до остановки: {results.Count}."; }
-        catch (Exception ex) when (ex is IOException or Renci.SshNet.Common.SshException or InvalidOperationException) { state.Text = "Поиск не выполнен: " + ErrorMessages.Describe(ex); }
+        catch (Exception ex) when (ex is System.IO.IOException or Renci.SshNet.Common.SshException or InvalidOperationException) { state.Text = "Поиск не выполнен: " + ErrorMessages.Describe(ex); }
         finally { if (ReferenceEquals(searching, cts)) searching = null; cts.Dispose(); run.IsEnabled = true; cancel.IsEnabled = false; }
     }
 
