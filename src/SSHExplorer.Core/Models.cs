@@ -86,6 +86,11 @@ public sealed class AppSettings
     public List<string> SidebarHidden { get; set; } = [];
     /// <summary>Firewall rule sets saved on this computer («Файервол» → «Наборы правил»).</summary>
     public List<FirewallRuleSet> FirewallRuleSets { get; set; } = [];
+    /// <summary>Notifications while the app is open: a nearly full disk, a failed service, a failed automatic script.</summary>
+    public bool AlertsEnabled { get; set; } = true;
+    public int AlertDiskPercent { get; set; } = 90;
+    public int AlertIntervalMinutes { get; set; } = 5;
+    public bool AlertWindowsNotifications { get; set; } = true;
     public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }
 }
 public sealed class TableSortSetting

@@ -88,6 +88,9 @@ public sealed partial class MainWindow : Window
         commands.Add("import", import, () => { var item = new MenuItem { Header = "Импорт", Icon = Ui.Icon(ImportGlyph, 16, false) }; foreach (var entry in ImportEntries()) item.Items.Add(entry); return item; }, 20);
         var export = Ui.AsyncCommandButton(ExportGlyph, "Экспорт", () => ExportProfilesAsync()); export.Name = "HomeExport"; export.ToolTip = "Сохранить серверы в файл для другого компьютера";
         commands.Add("export", export, () => Ui.AsyncMenu("Экспорт…", () => ExportProfilesAsync(), glyph: ExportGlyph), 15);
+        alertsButton = Ui.FlyoutButton(IconCatalog.Performance, "Оповещения", AlertsMenu, "Заполненные диски, упавшие службы и ошибки скриптов на подключённых серверах"); alertsButton.Name = "HomeAlerts";
+        commands.Add("alerts", alertsButton, () => Ui.Menu(AlertCenter.ActiveCount > 0 ? $"Оповещения ({AlertCenter.ActiveCount})…" : "Оповещения…", ShowAlerts), 25);
+        AlertCenter.Changed += (_, _) => Dispatcher.InvokeAsync(UpdateAlertsButton); UpdateAlertsButton();
         var group = Ui.AsyncCommandButton(IconCatalog.Terminal, "Выполнить на нескольких…", () => RunOnGroupAsync()); group.Name = "HomeGroupRun"; group.ToolTip = "Выполнить команды или скрипт сразу на нескольких серверах";
         commands.Add("group", group, () => Ui.AsyncMenu("Выполнить на нескольких…", () => RunOnGroupAsync(), glyph: IconCatalog.Terminal), 30);
         foreach (var (key,glyph,label,action,priority) in new (string,string,string,Func<Task>,int)[] { ("connect","\uE768","Подключиться",ConnectSelected,80), ("edit",Ui.RenameGlyph,"Изменить",EditSelected,50), ("remove",Ui.DeleteGlyph,"Удалить профиль",RemoveSelected,10) })
@@ -301,6 +304,23 @@ public sealed partial class MainWindow : Window
         finally { profileEditorOpen = false; }
     }
     internal Func<GroupRunWindow, bool?>? GroupRunWindowOverride;
+    Button alertsButton = null!;
+    void UpdateAlertsButton()
+    {
+        int n = AlertCenter.ActiveCount;
+        if (alertsButton.Content is Panel p) foreach (var t in p.Children.OfType<TextBlock>()) if (t.Text.StartsWith("Оповещения", StringComparison.Ordinal)) t.Text = n > 0 ? $"Оповещения ({n})" : "Оповещения";
+        TaskbarItemInfo ??= new TaskbarItemInfo(); TaskbarItemInfo.Description = n > 0 ? $"SSH Explorer — оповещений: {n}" : "SSH Explorer";
+    }
+    internal ContextMenu AlertsMenu()
+    {
+        var menu = new ContextMenu();
+        if (AlertCenter.Items.Count == 0) menu.Items.Add(new MenuItem { Header = App.Store.Settings.AlertsEnabled ? "Оповещений нет. Проверяются подключённые серверы." : "Оповещения выключены в «Параметры» → «Мониторинг».", IsEnabled = false });
+        foreach (var item in AlertCenter.Items.Take(30)) menu.Items.Add(new MenuItem { Header = item.Display, IsEnabled = !item.Resolved, Tag = item.Server });
+        if (AlertCenter.Items.Count > 0) { menu.Items.Add(new Separator()); menu.Items.Add(Ui.Menu("Очистить решённые и события", AlertCenter.ClearAll)); }
+        return menu;
+    }
+    /// <summary>Shows Home with the alerts list open (a click on the Windows notification).</summary>
+    internal void ShowAlerts() { tabs.SelectedItem = home; Dispatcher.InvokeAsync(() => Ui.OpenFlyout(alertsButton, AlertsMenu()), System.Windows.Threading.DispatcherPriority.Input); }
     /// <summary>Other open server tabs whose files can receive a copy.</summary>
     internal IReadOnlyList<CopyTarget> CopyTargets(ServerSession except) => sessions.Where(p => !ReferenceEquals(p.Value.Session, except) && p.Value.Session.State == SessionState.Connected && p.Value.Session.SftpAvailable)
         .Select(p => new CopyTarget(SessionTabInfo.GetTitle(p.Key), p.Value.Session, p.Value.CurrentFolder ?? p.Value.Session.Files.HomeDirectory)).ToArray();
@@ -592,6 +612,26 @@ public sealed partial class MainWindow : Window
 public sealed class SessionView : UserControl, IAsyncDisposable
 {
     public ServerSession Session { get; }
+    System.Windows.Threading.DispatcherTimer? healthTimer; bool healthBusy;
+    /// <summary>Every few minutes while connected: nearly full disks and failed services become notifications.</summary>
+    void StartHealthChecks()
+    {
+        if (healthTimer is not null) return;
+        var minutes = Math.Clamp(App.Store.Settings.AlertIntervalMinutes, 1, 120);
+        healthTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(minutes) };
+        healthTimer.Tick += async (_, _) => await CheckHealthAsync();
+        healthTimer.Start();
+        _ = Dispatcher.InvokeAsync(async () => { await Task.Delay(TimeSpan.FromSeconds(15)); await CheckHealthAsync(); });
+    }
+    internal async Task CheckHealthAsync()
+    {
+        var settings = App.Store.Settings;
+        if (healthBusy || disposed || !settings.AlertsEnabled || Session.State != SessionState.Connected || !Session.ShellAvailable) return;
+        healthBusy = true;
+        try { AlertCenter.Report(Session.Profile.Id, Session.Profile.Name, ServerHealth.Parse((await Session.ExecuteAsync(ServerHealth.Command, Session.Lifetime)).Output, Math.Clamp(settings.AlertDiskPercent, 50, 99))); }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or OperationCanceledException or Renci.SshNet.Common.SshException) { }
+        finally { healthBusy = false; }
+    }
     /// <summary>Opens the terminal and types <paramref name="text"/> without pressing Enter: the user reads and runs it.</summary>
     internal async Task TypeInTerminalAsync(string text)
     {
@@ -741,7 +781,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             if (disposed || failed) return;
             viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected); UpdateConnectionStatusVisibility();
             // Scheduled scripts run while this server is connected, whether or not their section is open.
-            if (Session.State == SessionState.Connected && !presentationOnly) { EnsureScriptRunner(); _ = AutoStartTunnelsAsync(); }
+            if (Session.State == SessionState.Connected && !presentationOnly) { EnsureScriptRunner(); _ = AutoStartTunnelsAsync(); StartHealthChecks(); }
         });
     }
     TunnelManager EnsureTunnelManager() => tunnelManager ??= new TunnelManager(Session);
@@ -765,6 +805,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             if (disposed) return;
             try { await App.Store.SaveAsync(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { await LocalDiagnostics.RecordAsync("scripts.save.failed", ex); }
+            if (!run.Succeeded && run.Reason != "Вручную") AlertCenter.Raise(Session.Profile.Id, Session.Profile.Name, $"Скрипт «{run.ScriptName}» завершился с ошибкой ({(run.TimedOut ? "таймаут" : "код " + run.ExitCode)})");
             if (!run.Succeeded && run.Reason != "Вручную") SetNotice($"Скрипт «{run.ScriptName}» ({run.Reason.ToLowerInvariant()}) завершился с ошибкой: {(run.TimedOut ? "таймаут" : "код " + run.ExitCode)}. Подробности — в разделе «Скрипты».");
         });
         if (!presentationOnly) scriptRunner.StartSchedule();
@@ -966,7 +1007,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); securityView?.Dispose(); cronView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; healthTimer?.Stop(); AlertCenter.Forget(Session.Profile.Id); if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); securityView?.Dispose(); cronView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminals?.Dispose();
         try { await Session.DisposeAsync(); }

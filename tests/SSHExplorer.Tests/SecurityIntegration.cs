@@ -89,6 +89,13 @@ internal static class SecurityIntegration
                 TestSuite.True(report.Manager == "apt" && report.Problem is null && report.ListsAgeHours is >= 0 && report.Updates.All(u => u.Name.Length > 0 && u.Version.Length > 0), $"{report.Manager} {report.Summary} age={report.ListsAgeHours}");
             });
 
+            await t.Run("health integration: df and systemctl on the runner are read; a threshold of 1% reports the root disk", async () =>
+            {
+                var output = await Sh(ServerHealth.Command);
+                var strict = ServerHealth.Parse(output, 1); var normal = ServerHealth.Parse(output, 99);
+                TestSuite.True(output.Contains("#end", StringComparison.Ordinal) && strict.Any(i => i.Key == "disk:/") && strict.Count >= normal.Count, string.Join(" | ", strict.Select(i => i.Text)));
+            });
+
             var sshd = new SshdService(session);
             await sshd.ProbeAsync();
             var first = await sshd.ReadAsync();

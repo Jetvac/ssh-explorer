@@ -38,6 +38,10 @@ public sealed class SettingsWindow : Window
     readonly CheckBox terminalCopyKeys = new() { Content = "Ctrl+C и Ctrl+V копируют и вставляют", Name = "SettingsTerminalCopyKeys" };
     readonly CheckBox showExtensions = new() { Content = "Показывать расширения имён файлов" };
     readonly NumberField poll = new("Интервал обновления", "с", 1, 60, 1);
+    readonly CheckBox alerts = new() { Name = "SettingsAlerts", Content = "Проверять подключённые серверы и сообщать о проблемах" };
+    readonly CheckBox alertWindows = new() { Name = "SettingsAlertWindows", Content = "Показывать уведомления Windows" };
+    readonly NumberField alertDisk = new("Диск заполнен не меньше чем на", "%", 50, 99, 1) { Name = "SettingsAlertDisk" };
+    readonly NumberField alertInterval = new("Проверять каждые", "мин", 1, 120, 1) { Name = "SettingsAlertInterval" };
     readonly NumberField font = new("Размер шрифта терминала", "пт", 8, 36, 1);
     readonly NumberField maxBytes = new("Наибольший размер изображения для предпросмотра", "МБ", 1, 200, 1);
     readonly NumberField pixels = new("Наибольшее разрешение изображения", "Мпикс", 1, 100, 1);
@@ -60,7 +64,7 @@ public sealed class SettingsWindow : Window
         theme.SelectedIndex = settings.Theme == "Light" ? 1 : settings.Theme == "Dark" ? 2 : 0;
         AutomationProperties.SetName(theme, "Тема приложения");
         reduceMotion.IsChecked = settings.ReduceMotion; showHidden.IsChecked = settings.ShowHidden; terminalCopyKeys.IsChecked = settings.TerminalCtrlCCopies; showExtensions.IsChecked = settings.ShowExtensions;
-        poll.Value = settings.PollIntervalSeconds; font.Value = settings.TerminalFontSize;
+        poll.Value = settings.PollIntervalSeconds; alerts.IsChecked = settings.AlertsEnabled; alertWindows.IsChecked = settings.AlertWindowsNotifications; alertDisk.Value = Math.Clamp(settings.AlertDiskPercent, 50, 99); alertInterval.Value = Math.Clamp(settings.AlertIntervalMinutes, 1, 120); font.Value = settings.TerminalFontSize;
         maxBytes.Value = settings.PreviewMaxBytes / 1024 / 1024; pixels.Value = settings.PreviewMaxPixels / 1_000_000;
         parallel.Value = settings.PreviewParallelism; cache.Value = settings.PreviewCacheBytes / 1024 / 1024;
         transfers.Value = Math.Clamp(settings.TransferParallelism, 1, 8); speed.Value = Math.Max(0, settings.TransferLimitKiBps);
@@ -143,7 +147,8 @@ public sealed class SettingsWindow : Window
                 Setting(null, "Документы, редактирование которых явно завершено, можно убрать из списка. Незавершённые копии не удаляются.", Buttons(Ui.AsyncButton("Очистить завершённые документы…", () => ((MainWindow)Application.Current.MainWindow).ClearCompletedDocumentsAsync())))));
 
         pages["monitoring"] = Page("Мониторинг",
-            Group("Диспетчер задач", poll, Note("Новый замер начинается не раньше окончания предыдущего. Если сервер собирает данные дольше интервала, графики остаются непрерывными, а фактическое время сбора видно в «Сведениях». Скрытые разделы не опрашиваются.")));
+            Group("Диспетчер задач", poll, Note("Новый замер начинается не раньше окончания предыдущего. Если сервер собирает данные дольше интервала, графики остаются непрерывными, а фактическое время сбора видно в «Сведениях». Скрытые разделы не опрашиваются.")),
+            Group("Оповещения", Setting(null, "Пока приложение открыто: почти заполненный диск, служба в состоянии failed и ошибка автоматического скрипта на подключённых серверах. Сообщается только о новых проблемах.", alerts), alertDisk, alertInterval, Setting(null, "Иначе мигает значок на панели задач. Список — «Главная» → «Оповещения».", alertWindows)));
 
         pages["preview"] = Page("Предпросмотр и кэш",
             Group("Изображения", maxBytes, pixels, Note("Большие файлы не скачиваются для миниатюры; их можно открыть отдельно.")),
@@ -218,17 +223,17 @@ public sealed class SettingsWindow : Window
     async Task SaveAsync()
     {
         NumberField? invalid = null;
-        foreach (var field in new[] { poll, font, maxBytes, pixels, parallel, cache, transfers, speed }) if (!field.Validate()) invalid ??= field;
+        foreach (var field in new[] { poll, alertDisk, alertInterval, font, maxBytes, pixels, parallel, cache, transfers, speed }) if (!field.Validate()) invalid ??= field;
         if (invalid is not null)
         {
-            Show(invalid == poll ? "monitoring" : invalid == font ? "terminal" : invalid == transfers || invalid == speed ? "connections" : "preview");
+            Show(invalid == poll || invalid == alertDisk || invalid == alertInterval ? "monitoring" : invalid == font ? "terminal" : invalid == transfers || invalid == speed ? "connections" : "preview");
             invalid.FocusInput(); return;
         }
         var path = editor.Text.Trim();
         if (path.Length > 0 && (!System.IO.Path.IsPathFullyQualified(path) || path.StartsWith(@"\\", StringComparison.Ordinal) || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !System.IO.File.Exists(path)))
         { Show("terminal"); Ui.SetValidationMessage(editor, "Выберите существующую программу (.exe) на этом компьютере или вернитесь к Блокноту."); editor.Focus(); return; }
         settings.ExternalEditorPath = path;
-        settings.PollIntervalSeconds = (int)poll.Value; settings.TerminalFontSize = (int)font.Value;
+        settings.PollIntervalSeconds = (int)poll.Value; settings.AlertsEnabled = alerts.IsChecked == true; settings.AlertWindowsNotifications = alertWindows.IsChecked == true; settings.AlertDiskPercent = (int)alertDisk.Value; settings.AlertIntervalMinutes = (int)alertInterval.Value; settings.TerminalFontSize = (int)font.Value;
         settings.PreviewMaxBytes = maxBytes.Value * 1024 * 1024; settings.PreviewMaxPixels = pixels.Value * 1_000_000;
         settings.PreviewParallelism = (int)parallel.Value; settings.PreviewCacheBytes = cache.Value * 1024 * 1024;
         settings.TransferParallelism = (int)transfers.Value; settings.TransferLimitKiBps = (int)speed.Value; settings.ApplyTo(App.Transfers);

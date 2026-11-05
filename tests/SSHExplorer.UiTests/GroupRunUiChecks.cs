@@ -105,6 +105,21 @@ internal static class GroupRunUiChecks
             check(typed == "sudo apt-get update && sudo apt-get install --only-upgrade 'openssl'" && packages.Typed == typed, "the security-only command is typed into the terminal, not run: " + typed);
         }
         finally { if (packages.IsVisible) packages.Close(); }
+
+        // Alerts: a new issue notifies once; the same issue again does not; a gone issue is resolved.
+        var notified = new List<string>(); AlertCenter.Reset(); AlertCenter.NotifyOverride = (title, text) => notified.Add(title + ": " + text);
+        try
+        {
+            var server = Guid.NewGuid();
+            AlertCenter.Report(server, "web-1", [new HealthIssue("disk:/", "Диск / заполнен на 96%"), new HealthIssue("unit:nginx.service", "Служба nginx.service в состоянии failed")]);
+            AlertCenter.Report(server, "web-1", [new HealthIssue("disk:/", "Диск / заполнен на 96%")]);
+            AlertCenter.Raise(server, "web-1", "Скрипт «бэкап» завершился с ошибкой (код 2)");
+            check(notified.Count == 2 && notified[0].Contains("и ещё 1", StringComparison.Ordinal) && AlertCenter.Items.Count == 3 && AlertCenter.ActiveCount == 2 && AlertCenter.Items.Single(i => i.Key == "unit:nginx.service").Resolved,
+                "new issues notify once, repeats do not, gone ones are resolved: " + string.Join(" | ", notified));
+            AlertCenter.ClearAll();
+            check(AlertCenter.Items.Count == 1 && AlertCenter.Items[0].Key == "disk:/", "clearing keeps the active issue");
+        }
+        finally { AlertCenter.NotifyOverride = null; AlertCenter.Reset(); }
     }
 
     static void Wait(Task task) { var watch = System.Diagnostics.Stopwatch.StartNew(); while (!task.IsCompleted) { if (watch.Elapsed > TimeSpan.FromSeconds(20)) throw new TimeoutException("group run"); Pump(); } task.GetAwaiter().GetResult(); Pump(); }
