@@ -13,8 +13,8 @@ public sealed class ImportRow(ImportCandidate candidate) : ViewModels.Observable
     public ImportCandidate Candidate => candidate;
     public bool Selected { get => selected; set => Set(ref selected, value); }
     public string Name => candidate.Profile.Name;
-    public string Address => candidate.Profile.Username + "@" + candidate.Profile.Endpoint;
-    public string Authentication => candidate.Profile.Authentication switch { AuthenticationKind.PrivateKey => "Ключ: " + System.IO.Path.GetFileName(candidate.Profile.PrivateKeyPath), AuthenticationKind.KeyboardInteractive => "Интерактивный", _ => "Пароль" };
+    public string Address => (candidate.Profile.IsRdp && candidate.Profile.Rdp.Domain.Length > 0 ? candidate.Profile.Rdp.Domain + "\\" : "") + candidate.Profile.Username + "@" + candidate.Profile.Endpoint;
+    public string Authentication => candidate.Profile.IsRdp ? "RDP" + (candidate.Profile.Inherit != InheritFlags.None ? " · из папки" : "") : candidate.Profile.Authentication switch { AuthenticationKind.PrivateKey => "Ключ: " + System.IO.Path.GetFileName(candidate.Profile.PrivateKeyPath), AuthenticationKind.KeyboardInteractive => "Интерактивный", _ => "Пароль" };
     public string Notes => (candidate.DuplicateOf is { } d ? $"Уже есть профиль «{d}». " : "") + string.Join(" ", candidate.Notes);
 }
 
@@ -27,18 +27,19 @@ public sealed class ImportProfilesWindow : Window
     public ObservableCollection<ImportRow> Rows { get; }
     internal DataGrid Table { get; }
     internal Button ImportButton { get; }
+    internal IReadOnlyList<string> Warnings { get; }
     public IReadOnlyList<ServerProfile> Accepted => Rows.Where(r => r.Selected).Select(r => r.Candidate.Profile).ToArray();
 
     public ImportProfilesWindow(string source, IReadOnlyList<ImportCandidate> candidates, IReadOnlyList<string> warnings)
     {
         Title = "Импорт серверов"; Width = 900; Height = 560; MinWidth = 640; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterOwner; ShowInTaskbar = false;
         Style = (Style)FindResource(typeof(Window));
-        Rows = new(candidates.Select(c => new ImportRow(c)));
+        Rows = new(candidates.Select(c => new ImportRow(c))); Warnings = warnings;
         var body = new DockPanel { Margin = new Thickness(24, 20, 24, 12) };
         var heading = new StackPanel(); DockPanel.SetDock(heading, Dock.Top);
         heading.Children.Add(Ui.DialogHeading("Импорт серверов"));
         var origin = Ui.Text(source, 12); origin.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); origin.TextTrimming = TextTrimming.CharacterEllipsis; origin.Margin = new Thickness(0, 2, 0, 8); heading.Children.Add(origin);
-        var explanation = Ui.Text(candidates.Count == 0 ? "Подходящих хостов не найдено: импортируются только конкретные имена Host, без шаблонов." : "Отмеченные хосты станут профилями. Пароли не переносятся; ключи используются из их текущего расположения. Совпадения с существующими профилями и записи с ошибками не отмечены.", 13);
+        var explanation = Ui.Text(candidates.Count == 0 ? "Подходящих хостов не найдено: импортируются только конкретные имена Host, без шаблонов." : "Отмеченные записи станут профилями. Пароли переносятся, только если вы это выбрали; ключи используются из их текущего расположения. Совпадения с существующими профилями и записи с ошибками не отмечены.", 13);
         explanation.TextWrapping = TextWrapping.Wrap; explanation.Margin = new Thickness(0, 0, 0, 10); heading.Children.Add(explanation);
         body.Children.Add(heading);
         if (warnings.Count > 0)

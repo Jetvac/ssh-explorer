@@ -208,6 +208,25 @@ public static class RdpFile
         return Candidate(name, host, port, user, o, null, localUser, existing, notes);
     }
 
+    /// <summary>
+    /// The servers «Подключение к удалённому рабочему столу» remembers (HKCU\…\Terminal Server Client: «Default» MRU
+    /// entries and «Servers» with the last user name). Only addresses and user names exist there — no passwords.
+    /// </summary>
+    public static IReadOnlyList<ImportCandidate> FromHistory(IEnumerable<string> recent, IReadOnlyDictionary<string, string?> serverUsers, string localUser, IReadOnlyCollection<ServerProfile> existing)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase); var result = new List<ImportCandidate>();
+        foreach (var address in recent.Concat(serverUsers.Keys))
+        {
+            if (string.IsNullOrWhiteSpace(address) || !seen.Add(address.Trim())) continue;
+            var (host, port) = SplitAddress(address);
+            if (host.Length == 0) continue;
+            var user = serverUsers.FirstOrDefault(p => string.Equals(p.Key, address.Trim(), StringComparison.OrdinalIgnoreCase) || string.Equals(p.Key, host, StringComparison.OrdinalIgnoreCase)).Value ?? "";
+            var domain = ""; SplitUser(ref user, ref domain);
+            result.Add(Candidate(host, host, port, user, new RdpOptions { Domain = domain }, null, localUser, existing, []));
+        }
+        return result;
+    }
+
     /// <summary>«CORP\user» and «user@corp.local» keep the user and the domain apart.</summary>
     public static void SplitUser(ref string user, ref string domain)
     {

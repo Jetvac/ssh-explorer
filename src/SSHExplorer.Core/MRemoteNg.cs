@@ -150,7 +150,7 @@ public static class MRemoteNg
             {
                 // InheritRedirectDiskDrives etc.; mRemoteNG names the port flag InheritPort.
                 bool inherit = Inherits(node, name);
-                child.values[name] = inherit ? values.GetValueOrDefault(name) : A(node, name) ?? (node.Attribute(name) is null ? values.GetValueOrDefault(name) : null);
+                child.values[name] = inherit ? values.GetValueOrDefault(name) : A(node, name);
             }
             return child;
         }

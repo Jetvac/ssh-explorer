@@ -114,7 +114,7 @@ public sealed partial class MainWindow : Window
             group: new("Group", r => ((ServerProfileViewModel)r).GroupKey, true));
         HomeGrouping.Attach(servers, () => viewModel.HasGroups);
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Открыть по RDP", () => viewModel.SelectedProfile is { } chosen ? OpenDesktopAsync(chosen.Profile, asDesktop: true) : Task.CompletedTask, glyph: IconCatalog.RemoteDesktop), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Выполнить на группе…", () => RunOnGroupAsync(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.Terminal), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
+        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Открыть по RDP", () => viewModel.SelectedProfile is { } chosen ? OpenDesktopAsync(chosen.Profile, asDesktop: true) : Task.CompletedTask, glyph: IconCatalog.RemoteDesktop), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Выполнить на группе…", () => RunOnGroupAsync(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.Terminal), Ui.AsyncMenu("Параметры папки…", () => EditFolderAsync(viewModel.SelectedProfile?.Profile.Group ?? ""), glyph: Ui.SettingsGlyph), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
         var body = new Grid(); body.Children.Add(servers); var empty = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 390, Margin = new Thickness(24) }; var emptyTitle = Ui.Text("", 18, true); emptyTitle.HorizontalAlignment = HorizontalAlignment.Center; emptyTitle.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateTitle))); empty.Children.Add(emptyTitle); var emptyText = Ui.Text(""); emptyText.TextWrapping = TextWrapping.Wrap; emptyText.TextAlignment = TextAlignment.Center; emptyText.Margin = new Thickness(0, 10, 0, 16); emptyText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); emptyText.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateMessage))); empty.Children.Add(emptyText); empty.SetBinding(VisibilityProperty, new Binding(nameof(HomeViewModel.ShowEmptyState)) { Converter = new BooleanToVisibilityConverter() }); body.Children.Add(empty); p.Children.Add(body); return p;
     }
@@ -144,7 +144,9 @@ public sealed partial class MainWindow : Window
         Ui.AsyncMenu("Из файла OpenSSH (~/.ssh/config)…", ImportSshConfig, glyph: Ui.FileGlyph),
         Ui.AsyncMenu("Из PuTTY", ImportPutty, glyph: IconCatalog.Terminal),
         Ui.AsyncMenu("Из WinSCP…", ImportWinScp, glyph: IconCatalog.Transfers),
-        Ui.AsyncMenu("Из mRemoteNG (confCons.xml)…", ImportMRemoteNg, glyph: IconCatalog.Server),
+        Ui.AsyncMenu("Из mRemoteNG (confCons.xml)…", ImportMRemoteNgAsync, glyph: IconCatalog.Server),
+        Ui.AsyncMenu("Из файлов удалённого рабочего стола (.rdp)…", ImportRdpFilesAsync, glyph: IconCatalog.RemoteDesktop),
+        Ui.AsyncMenu("Из истории «Подключения к удалённому рабочему столу»", ImportRdpHistoryAsync, glyph: IconCatalog.RemoteDesktop),
     ];
     /// <summary>Reads saved sessions under a HKCU key (read-only); empty when the program never saved any.</summary>
     internal static IReadOnlyList<ExternalSession> RegistrySessions(string path)
@@ -186,24 +188,8 @@ public sealed partial class MainWindow : Window
         await ImportProfilesAsync(source, candidates, skipped);
     }
     internal Func<string?>? MRemoteNgPathOverride;
-    /// <summary>mRemoteNG keeps its connections in %APPDATA%\mRemoteNG\confCons.xml; another file can be chosen.</summary>
-    async Task ImportMRemoteNg()
-    {
-        if (profileEditorOpen || closing) return;
-        var path = MRemoteNgPathOverride?.Invoke() ?? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "mRemoteNG", "confCons.xml");
-        if (MRemoteNgPathOverride is null)
-        {
-            var pick = new Microsoft.Win32.OpenFileDialog { Title = "Подключения mRemoteNG", Filter = "Подключения mRemoteNG (confCons.xml)|*.xml|Все файлы|*.*", CheckFileExists = true };
-            if (System.IO.File.Exists(path)) { pick.InitialDirectory = System.IO.Path.GetDirectoryName(path); pick.FileName = System.IO.Path.GetFileName(path); }
-            if (pick.ShowDialog(this) != true) return;
-            path = pick.FileName;
-        }
-        var info = new System.IO.FileInfo(path);
-        if (!info.Exists || info.Length > 64L * 1024 * 1024) { Ui.Error(info.Exists ? "Файл слишком большой для списка подключений." : "Файл не найден: " + path); return; }
-        var (candidates, skipped) = ExternalSessionImport.FromMRemoteNg(await System.IO.File.ReadAllTextAsync(path, windowLifetime.Token), Environment.UserName, App.Store.Profiles);
-        if (candidates.Count == 0 && skipped.Count > 0 && skipped[0].StartsWith("Файл", StringComparison.Ordinal)) { Ui.Error(skipped[0]); return; }
-        await ImportProfilesAsync("mRemoteNG · " + path, candidates, skipped);
-    }
+    /// <summary>Test hook: answers the import preview of any import that does not pass its own.</summary>
+    internal Func<ImportProfilesWindow, bool?>? ImportPreviewOverride;
     async Task ImportSshConfig()
     {
         if (profileEditorOpen || closing) return;
@@ -220,15 +206,17 @@ public sealed partial class MainWindow : Window
         var candidates = ProfileImport.FromSshConfig(config, Environment.UserName, home, App.Store.Profiles);
         await ImportProfilesAsync(path, candidates, config.Warnings);
     }
-    internal async Task<int> ImportProfilesAsync(string source, IReadOnlyList<ImportCandidate> candidates, IReadOnlyList<string> warnings, Func<ImportProfilesWindow, bool?>? show = null)
+    internal async Task<int> ImportProfilesAsync(string source, IReadOnlyList<ImportCandidate> candidates, IReadOnlyList<string> warnings, Func<ImportProfilesWindow, bool?>? show = null,
+        IReadOnlyDictionary<Guid, string>? secrets = null, IReadOnlyList<FolderDefaults>? folders = null, IReadOnlyDictionary<Guid, string>? folderSecrets = null)
     {
         profileEditorOpen = true;
         try
         {
             var window = new ImportProfilesWindow(source, candidates, warnings) { Owner = this };
-            if ((show?.Invoke(window) ?? ModalRunner.Show(window, this, windowLifetime.Token)) != true) return 0;
+            if (((show ?? ImportPreviewOverride)?.Invoke(window) ?? ModalRunner.Show(window, this, windowLifetime.Token)) != true) return 0;
             ServerProfile? last = null;
-            foreach (var profile in window.Accepted) { await App.Store.SaveProfileAsync(profile, null, windowLifetime.Token); last = profile; }
+            foreach (var profile in window.Accepted) { var secret = secrets?.GetValueOrDefault(profile.Id); if (secret is null) profile.SaveSecret = false; await App.Store.SaveProfileAsync(profile, secret, windowLifetime.Token); last = profile; }
+            if (folders is { Count: > 0 }) await SaveImportedFoldersAsync(folders, folderSecrets ?? new Dictionary<Guid, string>(), window.Accepted);
             RefreshHome();
             if (last is not null) { viewModel.SelectedProfile = viewModel.VisibleProfiles.FirstOrDefault(p => p.Profile.Id == last.Id); if (viewModel.SelectedProfile is not null) servers.ScrollIntoView(viewModel.SelectedProfile); }
             return window.Accepted.Count;

@@ -28,7 +28,7 @@ internal static class MRemoteNgTests
             var web1 = c.Single(x => x.Profile.Name == "web-1").Profile; var web2 = c.Single(x => x.Profile.Name == "web-2").Profile;
             var db = c.Single(x => x.Profile.Name == "db"); var old = c.Single(x => x.Profile.Name == "old");
             var win = c.Single(x => x.Profile.Name == "win").Profile;
-            TestSuite.True(win is { IsRdp: true, Host: "win.example.net", Port: 3389, Username: "deploy", Group: "Прод" } && win.Inherit == InheritFlags.None, $"rdp: {win.Username} {win.Port} {win.Inherit}");
+            TestSuite.True(win is { IsRdp: true, Host: "win.example.net", Port: 3389, Username: "deploy", Group: "Прод" } && win.Inherit == InheritFlags.Username, $"rdp: {win.Username} {win.Port} {win.Inherit}");
             TestSuite.True(c.Count == 5 && web1 is { Host: "web1.example.net", Port: 2222, Username: "deploy", Group: "Прод/Web" } && web2 is { Host: "web2.example.net", Username: "ops" }
                 && db.Profile is { Port: 22, Username: "postgres", Group: "Прод" } && db.Notes.Any(n => n.Contains("«keys»", StringComparison.Ordinal)) && old.Profile.Group == "" && old.Notes.Any(n => n.Contains("SSH1", StringComparison.Ordinal))
                 && c.Single(x => x.Profile.Name == "web-1").Notes.Any(n => n.Contains("Пароль из mRemoteNG", StringComparison.Ordinal)) && skipped.Single() == "Прод/vnc: протокол VNC — не SSH и не RDP",
