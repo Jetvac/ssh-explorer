@@ -63,6 +63,26 @@ internal static class SecurityIntegration
                 TestSuite.True(failing[trusted.Id] is { State: GroupRunState.Failed, ExitCode: 1, Retryable: true } f && f.Output.Contains("before", StringComparison.Ordinal) && !f.Output.Contains("after", StringComparison.Ordinal), failing[trusted.Id].Output);
             });
 
+            await t.Run("cron integration: a job is added, switched off and on, and a crontab changed meanwhile is not overwritten", async () =>
+            {
+                await Sh("crontab -r 2>/dev/null; true");
+                var cron = new CronService(session);
+                var empty = await cron.ReadAsync();
+                var saved = await cron.SaveAsync(empty, Cron.Edit(empty, -1, Cron.JobLine("*/10 * * * *", "echo sshx-cron >/dev/null"), "проверка"));
+                var one = await cron.ReadAsync();
+                var job = one.Jobs.Single();
+                var off = await cron.SaveAsync(one, Cron.Edit(one, job.Index, Cron.Toggle(job)));
+                var two = await cron.ReadAsync();
+                await Sh("(crontab -l; echo '0 1 * * * echo someone-else') | crontab -");
+                var stale = await cron.SaveAsync(two, Cron.Edit(two, -1, Cron.JobLine("@daily", "echo lost")));
+                var three = await cron.ReadAsync();
+                var backups = (await Sh("ls ~/.cache/sshexplorer/crontab-user-*.bak 2>/dev/null | wc -l")).Trim();
+                TestSuite.True(empty.Problem is null && empty.Lines.Count == 0 && saved == CronSaveOutcome.Saved && job is { Schedule: "*/10 * * * *", Enabled: true } && one.Lines.Any(l => l.Raw == "# проверка")
+                    && off == CronSaveOutcome.Saved && two.Jobs.Single().Enabled == false && stale == CronSaveOutcome.Changed && three.Jobs.Count() == 2 && !three.Text.Contains("echo lost", StringComparison.Ordinal) && int.Parse(backups) >= 2,
+                    $"saved={saved} off={off} stale={stale} jobs={three.Jobs.Count()} backups={backups} problem={empty.Problem}");
+                await Sh("crontab -r 2>/dev/null; rm -f ~/.cache/sshexplorer/crontab-*.bak; true");
+            });
+
             var sshd = new SshdService(session);
             await sshd.ProbeAsync();
             var first = await sshd.ReadAsync();

@@ -301,6 +301,9 @@ public sealed partial class MainWindow : Window
         finally { profileEditorOpen = false; }
     }
     internal Func<GroupRunWindow, bool?>? GroupRunWindowOverride;
+    /// <summary>Other open server tabs whose files can receive a copy.</summary>
+    internal IReadOnlyList<CopyTarget> CopyTargets(ServerSession except) => sessions.Where(p => !ReferenceEquals(p.Value.Session, except) && p.Value.Session.State == SessionState.Connected && p.Value.Session.SftpAvailable)
+        .Select(p => new CopyTarget(SessionTabInfo.GetTitle(p.Key), p.Value.Session, p.Value.CurrentFolder ?? p.Value.Session.Files.HomeDirectory)).ToArray();
     /// <summary>Opens the group run with the chosen server's group ticked (or every server when it has none).</summary>
     internal Task RunOnGroupAsync(ServerProfile? around = null)
     {
@@ -589,6 +592,8 @@ public sealed partial class MainWindow : Window
 public sealed class SessionView : UserControl, IAsyncDisposable
 {
     public ServerSession Session { get; }
+    /// <summary>The folder open in this tab's file manager, if any.</summary>
+    internal string? CurrentFolder => files?.CurrentPath;
     readonly MainWindow main; readonly Grid host = new(); readonly TextBlock state = Ui.Text("Подключение…");
     readonly StackPanel side = new(), monitorNavigation = new();
     readonly ContentControl fileNavigationHost = new() { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
@@ -605,7 +610,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     SidebarEditor? sidebarEditor;
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; SecurityView? securityView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
+    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; SecurityView? securityView; CronView? cronView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -817,7 +822,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         if (disposed) return;
         if (section == key && key != "monitor" && screen.Content is not null &&
-            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminals) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView) || key == "services" && services is not null && ReferenceEquals(screen.Content, services) || key == "tunnels" && tunnelsView is not null && ReferenceEquals(screen.Content, tunnelsView) || key == "firewall" && firewallView is not null && ReferenceEquals(screen.Content, firewallView) || key == "security" && securityView is not null && ReferenceEquals(screen.Content, securityView))) return;
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminals) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView) || key == "services" && services is not null && ReferenceEquals(screen.Content, services) || key == "tunnels" && tunnelsView is not null && ReferenceEquals(screen.Content, tunnelsView) || key == "firewall" && firewallView is not null && ReferenceEquals(screen.Content, firewallView) || key == "security" && securityView is not null && ReferenceEquals(screen.Content, securityView) || key == "cron" && cronView is not null && ReferenceEquals(screen.Content, cronView))) return;
         var previousContent = screen.Content; var previousPage = monitor?.Page;
         section = key;
         UpdateConnectionStatusVisibility();
@@ -835,6 +840,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             scriptsView ??= new ScriptsView(Session, EnsureScriptRunner());
             screen.Content = scriptsView;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
+        if (key == "cron")
+        {
+            cronView ??= new CronView(new CronService(Session));
+            screen.Content = cronView;
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
             return;
         }
@@ -946,7 +958,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); securityView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); securityView?.Dispose(); cronView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminals?.Dispose();
         try { await Session.DisposeAsync(); }

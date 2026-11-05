@@ -290,6 +290,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         Action("Delete", Ui.DeleteGlyph, "Удалить окончательно", Delete, nameof(FileBrowserViewModel.HasSelection), 60, "Delete");
         Action("Upload", Ui.UploadGlyph, "Загрузить файлы…", Upload, nameof(FileBrowserViewModel.CanCreate), 10);
         Action("Download", Ui.DownloadGlyph, "Скачать…", Download, nameof(FileBrowserViewModel.HasSelection), 20);
+        Action("CopyToServer", Ui.CopyGlyph, "Копировать на другой сервер…", CopyToServerAsync, nameof(FileBrowserViewModel.HasSelection), 15);
         Action("Compare", "", "Сравнить с папкой Windows…", CompareWithLocal, nameof(FileBrowserViewModel.CanCreate), 5);
         Action("BatchRename", Ui.RenameGlyph, "Переименовать несколько…", BatchRenameAsync, nameof(FileBrowserViewModel.HasSelection), 6);
         Action("ViewText", "", "Просмотреть как текст", ViewTextAsync, nameof(FileBrowserViewModel.HasSelection), 7, "F3");
@@ -719,6 +720,19 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     {
         if (!viewModel.CanCreate) return;
         var dialog = new OpenFolderDialog { Multiselect = true, Title = "Загрузить папки" }; if (dialog.ShowDialog(main) != true) return; var job = App.Transfers.Upload(session, dialog.FolderNames, CurrentPath); main.ShowTransfers(); await WaitAndRefresh(job);
+    }
+    internal Func<CopyToServerWindow, bool?>? CopyWindowOverride { get; set; }
+    /// <summary>Copies (or moves) the selection into a folder of another open server tab; the data streams through this computer.</summary>
+    async Task CopyToServerAsync()
+    {
+        var chosen = Selected(); if (chosen.Count == 0) return;
+        var targets = main.CopyTargets(session);
+        if (targets.Count == 0) { Ui.Info("Откройте вкладку сервера, на который нужно скопировать, — он появится в списке. Можно и перетащить файлы мышью из вкладки во вкладку."); return; }
+        var window = new CopyToServerWindow(chosen.Count == 1 ? chosen[0].Entry.Name : $"{chosen.Count} объектов", targets) { Owner = Window.GetWindow(this) };
+        if ((CopyWindowOverride?.Invoke(window) ?? window.ShowDialog()) != true || window.Target is not { } target) return;
+        var job = App.Transfers.Copy(session, chosen.Select(r => r.Entry.FullPath).ToArray(), target.Session, window.Destination, window.Move);
+        main.ShowTransfers();
+        await WaitAndRefresh(job);
     }
     async Task Download()
     {

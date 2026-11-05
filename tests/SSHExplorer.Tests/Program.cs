@@ -129,6 +129,7 @@ await SidebarTests.RunAsync(suite);
 await ExchangeTests.RunAsync(suite);
 await SecurityTests.RunAsync(suite);
 await GroupRunTests.RunAsync(suite);
+await CronTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

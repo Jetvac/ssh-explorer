@@ -45,6 +45,50 @@ internal static class GroupRunUiChecks
             check(calls.SequenceEqual(["web-2"]) && web2.State == "✓ Готово" && !window.RetryButton.IsEnabled, "the rerun goes only to the failed server: " + string.Join(",", calls));
         }
         finally { window.Close(); }
+
+        // «Копировать на другой сервер»: the target's open folder is suggested; a relative path is refused.
+        var a = new ServerSession(profiles[0], store); var b = new ServerSession(profiles[3], store);
+        var copy = new CopyToServerWindow("site.tar.gz", [new CopyTarget("web-1", a, "/srv/www"), new CopyTarget("test", b, "/home/deploy")]) { ShowInTaskbar = false, Left = 60, Top = 60 };
+        copy.Show(); Pump();
+        try
+        {
+            check(copy.Target?.Title == "web-1" && copy.Destination == "/srv/www" && copy.OkButton.IsEnabled, "the first open server and its current folder are suggested");
+            copy.Choose(1); Pump();
+            check(copy.Destination == "/home/deploy", "choosing another server takes its folder");
+            copy.Choose(1, "relative/dir"); Pump();
+            check(!copy.OkButton.IsEnabled, "a relative destination is refused");
+            copy.Choose(1, "~/incoming", moveIt: true); Pump();
+            check(copy.OkButton.IsEnabled && copy.Move, "a home-relative folder and «move» are accepted");
+            evidence.Capture((FrameworkElement)copy.Content, "copy-to-server", new { theme = "Light", fixtureOnly = true });
+        }
+        finally { copy.Close(); }
+
+        // «Задания cron»: jobs in words with the next run; the editor explains and validates the schedule.
+        const string crontab = "#user deploy\n#now 2026-11-05T10:20:00\n#crontab\nMAILTO=ops@example.org\n*/15 * * * * /usr/local/bin/check\n#sshx-off# 0 9 * * 1-5 /opt/report.sh\n#exit 0\n";
+        var cronService = new CronService(new ServerSession(profiles[0], store)) { ExecuteOverride = (_, _) => Task.FromResult(new CommandResult(crontab, "", 0)) };
+        var cronView = new CronView(cronService);
+        var cronHost = new Window { Width = 1100, Height = 600, Content = cronView, ShowInTaskbar = false, Left = 60, Top = 60 }; cronHost.Show(); Pump();
+        try
+        {
+            for (int i = 0; i < 50 && cronView.Rows.Count == 0; i++) Pump();
+            check(cronView.Rows.Count == 2 && cronView.Rows[0].When == "Каждые 15 мин" && cronView.Rows[0].Next == new DateTime(2026, 11, 5, 10, 30, 0).ToString("dd.MM HH:mm") && cronView.Rows[1].Enabled == "Выкл." && cronView.Rows[1].Next == "—"
+                && cronView.InfoText.Contains("Переменные окружения", StringComparison.Ordinal), "jobs are shown in words with the next run in server time: " + cronView.InfoText);
+            evidence.Capture((FrameworkElement)cronView, "cron", new { theme = "Light", fixtureOnly = true });
+        }
+        finally { cronHost.Close(); cronView.Dispose(); }
+        var job = new CronJobWindow(null, new DateTime(2026, 11, 5, 10, 20, 0)) { ShowInTaskbar = false, Left = 60, Top = 60 };
+        job.Show(); Pump();
+        try
+        {
+            job.Set("30 3 * * *", ""); Pump();
+            check(job.Words == "Каждый день в 03:30" && job.NextText.Contains("06.11 03:30", StringComparison.Ordinal) && !job.SaveButton.IsEnabled && job.Problem is null, "the schedule is explained with the next runs; an empty command waits quietly: " + job.NextText);
+            job.Set("70 3 * * *", "/opt/backup.sh"); Pump();
+            check(!job.SaveButton.IsEnabled && job.Problem!.StartsWith("Минута", StringComparison.Ordinal), "a wrong minute is named");
+            job.Pick(6); job.Set("0 9 * * 1-5", "/opt/backup.sh"); Pump();
+            check(job.SaveButton.IsEnabled && job.Words == "По будням в 09:00", "a preset fills the schedule");
+            evidence.Capture((FrameworkElement)job.Content, "cron-job", new { theme = "Light", fixtureOnly = true });
+        }
+        finally { job.Close(); }
     }
 
     static void Wait(Task task) { var watch = System.Diagnostics.Stopwatch.StartNew(); while (!task.IsCompleted) { if (watch.Elapsed > TimeSpan.FromSeconds(20)) throw new TimeoutException("group run"); Pump(); } task.GetAwaiter().GetResult(); Pump(); }
