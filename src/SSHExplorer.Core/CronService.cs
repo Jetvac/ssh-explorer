@@ -37,7 +37,7 @@ public sealed class CronService(ServerSession session)
             using var writer = new StreamWriter(stream, new UTF8Encoding(false));
             await writer.WriteAsync(text.AsMemory(), ct).ConfigureAwait(false);
         }
-        var backup = PosixPath.Combine(directory, $"crontab-{(AsRoot ? "root" : "user")}-{DateTime.UtcNow:yyyyMMddHHmmss}.bak");
+        var backup = PosixPath.Combine(directory, $"crontab-{(AsRoot ? "root" : "user")}-{DateTime.UtcNow:yyyyMMddHHmmss}-{id[..6]}.bak");
         var r = await Exec(Cron.InstallCommand(Prefix, path, read.Text, backup), ct).ConfigureAwait(false);
         if (r.Output.Contains("#changed", StringComparison.Ordinal)) return CronSaveOutcome.Changed;
         if (r.Output.Contains("#saved", StringComparison.Ordinal)) return CronSaveOutcome.Saved;
