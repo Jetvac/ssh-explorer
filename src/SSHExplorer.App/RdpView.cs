@@ -299,6 +299,12 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidCastException or InvalidOperationException) { Ui.Error("Ctrl+Alt+Del не отправлен: " + ErrorMessages.Describe(ex)); }
     }
 
+    static bool IsConnected(object ocx)
+    {
+        try { return Convert.ToInt32(Com.Get(ocx, "Connected"), CultureInfo.InvariantCulture) != 0; }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or System.Reflection.TargetInvocationException or InvalidCastException or MissingMethodException) { return false; }
+    }
+
     void TryCall(string method)
     {
         try { if (client?.Ocx is { } ocx) Com.Call(ocx, method); }
@@ -336,6 +342,8 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
     {
         if (disposed) return;
         userDisconnect = true; TryCall("Disconnect");
+        // Destroying the control while it is still disconnecting can block inside it: let the session end first.
+        for (int i = 0; i < 100 && client?.Ocx is { } ocx && IsConnected(ocx); i++) await Task.Delay(100);
         disposed = true; resize.Stop(); login?.TrySetResult(false); password = null;
         layer.Children.Remove(host);
         client?.Dispose(); client = null;
