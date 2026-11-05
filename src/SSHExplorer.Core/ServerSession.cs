@@ -30,6 +30,8 @@ public sealed partial class ServerSession : IAsyncDisposable
     public string? SftpError { get; private set; }
     public string? ShellError { get; private set; }
     public bool ShellAvailable { get; private set; }
+    /// <summary>The server runs Windows (OpenSSH Server): commands go through PowerShell, paths look like /C:/….</summary>
+    public bool IsWindows { get; private set; }
     public bool SftpAvailable => Files.Available;
     public RemoteFileService Files { get; }
     public CancellationToken Lifetime => _lifetime.Token;
@@ -88,9 +90,17 @@ public sealed partial class ServerSession : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                Report(operation, null, ConnectionStage.ExecProbe, Outcome(ex), ex);
-                if (ex is OperationCanceledException or HostKeyChangedException) throw;
-                ShellError = ErrorMessages.Describe(ex);
+                if (ex is OperationCanceledException or HostKeyChangedException) { Report(operation, null, ConnectionStage.ExecProbe, Outcome(ex), ex); throw; }
+                // A Windows server has no printf: cmd.exe (or PowerShell) answers «ver» instead.
+                CommandResult? windows = null;
+                try { windows = await ExecuteAsync(WindowsHost.DetectCommand, linked.Token).ConfigureAwait(false); }
+                catch (Exception probe) when (probe is not OperationCanceledException and not HostKeyChangedException) { }
+                if (windows is not null && WindowsHost.LooksLikeWindows(windows))
+                {
+                    IsWindows = true; ShellAvailable = true;
+                    Report(operation, null, ConnectionStage.ExecProbe, ConnectionStageOutcome.Succeeded);
+                }
+                else { Report(operation, null, ConnectionStage.ExecProbe, Outcome(ex), ex); ShellError = ErrorMessages.Describe(ex); }
             }
             Report(operation, null, ConnectionStage.Sftp, ConnectionStageOutcome.Started);
             try
@@ -352,7 +362,14 @@ public sealed partial class ServerSession : IAsyncDisposable
                 var shell = client.CreateShellStream("xterm-256color", Math.Clamp(columns, 2, 1000), Math.Clamp(rows, 2, 1000), 0, 0, 65536);
                 Register(shell);
                 shell.Closed += (_, _) => { _ = Task.Run(() => { Release(shell); Release(client); }); };
-                if (!string.IsNullOrWhiteSpace(directory))
+                if (!string.IsNullOrWhiteSpace(directory) && IsWindows)
+                {
+                    // «cd "C:/path"» works in cmd.exe and PowerShell alike.
+                    var target = WindowsHost.ToDisplay(directory).Replace(((char)34).ToString(), "");
+                    var data = Encoding.UTF8.GetBytes("cd " + (char)34 + target + (char)34 + (char)13);
+                    shell.Write(data, 0, data.Length); shell.Flush();
+                }
+                else if (!string.IsNullOrWhiteSpace(directory))
                 {
                     var path = PosixPath.Normalize(directory, Files.HomeDirectory);
                     var data = Encoding.UTF8.GetBytes("cd " + PosixPath.Quote(path) + "\r");

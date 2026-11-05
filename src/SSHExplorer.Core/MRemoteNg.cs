@@ -200,6 +200,12 @@ public static class MRemoteNg
             return c;
         }
 
+        /// <summary>
+        /// mRemoteNG's BouncyCastle (1.8) turned each char into its low byte without a check; newer BouncyCastle throws
+        /// on non-Latin characters, so the bytes are made the old way to open files protected by such passwords.
+        /// </summary>
+        static byte[] PasswordBytes(string password) { var bytes = new byte[password.Length]; for (int i = 0; i < password.Length; i++) bytes[i] = unchecked((byte)password[i]); return bytes; }
+
         /// <summary>«Protected» holds «ThisIsProtected» or «ThisIsNotProtected» encrypted with the file password.</summary>
         public bool Check(XElement root, string password)
         {
@@ -220,7 +226,7 @@ public static class MRemoteNg
             const int salt = 16, nonce = 16, mac = 128;
             if (data.Length < salt + nonce + mac / 8) throw new CryptographicException("Слишком короткие данные.");
             var generator = new Pkcs5S2ParametersGenerator();
-            generator.Init(PbeParametersGenerator.Pkcs5PasswordToBytes(password.ToCharArray()), data[..salt], iterations);
+            generator.Init(PasswordBytes(password), data[..salt], iterations);
             var key = (KeyParameter)generator.GenerateDerivedMacParameters(256);
             IBlockCipher block = engine.ToUpperInvariant() switch { "SERPENT" => new SerpentEngine(), "TWOFISH" => new TwofishEngine(), _ => new AesEngine() };
             IAeadBlockCipher aead = mode.ToUpperInvariant() switch { "CCM" => new CcmBlockCipher(block), "EAX" => new EaxBlockCipher(block), _ => new GcmBlockCipher(block) };
@@ -236,7 +242,7 @@ public static class MRemoteNg
         public static string Encrypt(string plain, string password, int iterations, byte[] salt, byte[] nonce, string engine = "AES", string mode = "GCM")
         {
             var generator = new Pkcs5S2ParametersGenerator();
-            generator.Init(PbeParametersGenerator.Pkcs5PasswordToBytes(password.ToCharArray()), salt, iterations);
+            generator.Init(PasswordBytes(password), salt, iterations);
             var key = (KeyParameter)generator.GenerateDerivedMacParameters(256);
             IBlockCipher block = engine.ToUpperInvariant() switch { "SERPENT" => new SerpentEngine(), "TWOFISH" => new TwofishEngine(), _ => new AesEngine() };
             IAeadBlockCipher aead = mode.ToUpperInvariant() switch { "CCM" => new CcmBlockCipher(block), "EAX" => new EaxBlockCipher(block), _ => new GcmBlockCipher(block) };

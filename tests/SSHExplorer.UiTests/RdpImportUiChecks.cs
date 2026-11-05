@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Threading;
 using SSHExplorer.App;
 using SSHExplorer.Core;
@@ -48,7 +49,7 @@ internal static class RdpImportUiChecks
             // .rdp files: one good, one without an address.
             var good = Path.Combine(dir, "sklad.rdp"); File.WriteAllText(good, "full address:s:sklad.corp.test:3390\r\nusername:s:CORP\\kladovshik\r\nredirectclipboard:i:0\r\n", System.Text.Encoding.Unicode);
             var bad = Path.Combine(dir, "empty.rdp"); File.WriteAllText(bad, "screen mode id:i:2\r\n");
-            main.RdpFilesOverride = () => [good, bad];
+            main.RdpFilesOverride = () => new[] { good, bad };
             string[]? warnings = null; main.ImportPreviewOverride = w => { warnings = w.Warnings.ToArray(); return true; };
             Wait(main.ImportRdpFilesAsync());
             var sklad = store.Profiles.SingleOrDefault(p => p.Name == "sklad");
