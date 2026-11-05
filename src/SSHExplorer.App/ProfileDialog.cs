@@ -77,8 +77,19 @@ public sealed class ProfileDialog:Window,ICancellableModal
         agentNote.SetBinding(VisibilityProperty,new Binding(nameof(_model.UsesSecret)){Converter=new InverseBooleanToVisibilityConverter()});panel.Children.Insert(panel.Children.IndexOf(secretLabel),agentNote);
         _advanced.Header="Дополнительные параметры";_advanced.Margin=new(0,4,0,0);var advanced=new StackPanel{Margin=new(0,8,0,0)};
         advanced.Children.Add(Field("Стартовая папка",nameof(_model.InitialPath),nameof(_model.InitialPathError)));
-        advanced.Children.Add(Field("Промежуточные узлы (ProxyJump)",nameof(_model.ProxyJump),nameof(_model.ProxyJumpError)));
-        var jumpHint=Ui.Text("Имя профиля или пользователь@узел:порт, через запятую, до трёх. Ключ каждого узла проверяется отдельно.",12);jumpHint.TextWrapping=TextWrapping.Wrap;jumpHint.SetResourceReference(TextBlock.ForegroundProperty,"Muted");jumpHint.Margin=new(0,-6,0,10);advanced.Children.Add(jumpHint);
+        advanced.Children.Add(Field("Подключаться через (промежуточный сервер, ProxyJump)",nameof(_model.ProxyJump),nameof(_model.ProxyJumpError)));
+        // Picking a saved server is the usual case; typing user@host:port or a chain stays possible.
+        var pickJump=Ui.FlyoutButton(IconCatalog.Network,"Выбрать сервер",()=>
+        {
+            var menu=new ContextMenu();menu.Items.Add(Ui.Menu("Напрямую — без промежуточного сервера",()=>_model.ProxyJump=""));
+            var others=(App.Store?.Profiles??Enumerable.Empty<ServerProfile>()).Where(p=>p.Id!=old?.Id&&!p.Name.Contains(',')).OrderBy(p=>p.Name,StringComparer.CurrentCultureIgnoreCase).ToArray();
+            if(others.Length>0)menu.Items.Add(new Separator());
+            foreach(var p in others){var name=p.Name;menu.Items.Add(Ui.Menu(name+"   "+p.Username+"@"+p.Endpoint+(p.ProxyJump.Length>0?" (сам через "+p.ProxyJump+")":""),()=>_model.ProxyJump=name));}
+            if(others.Length==0)menu.Items.Add(new MenuItem{Header="Других сохранённых серверов нет",IsEnabled=false});
+            return menu;
+        },"Подставить сохранённый сервер как промежуточный");
+        pickJump.Name="ProxyJumpPick";pickJump.HorizontalAlignment=HorizontalAlignment.Left;pickJump.Margin=new(0,-4,0,6);advanced.Children.Add(pickJump);
+        var jumpHint=Ui.Text("Выберите сохранённый сервер или введите пользователь@узел:порт; через запятую — цепочка до трёх узлов. Ключ каждого узла проверяется отдельно. Чтобы закрыть прямой SSH к этому серверу, после подключения откройте «Файервол» → «Доступ только через сервер».",12);jumpHint.TextWrapping=TextWrapping.Wrap;jumpHint.SetResourceReference(TextBlock.ForegroundProperty,"Muted");jumpHint.Margin=new(0,-6,0,10);advanced.Children.Add(jumpHint);
         advanced.Children.Add(Field("Группа на «Главной»",nameof(_model.Group),nameof(_model.GroupError)));
         var timeout=Field("Таймаут подключения, 3–120 секунд",nameof(_model.Timeout),nameof(_model.TimeoutError));timeout.HorizontalAlignment=HorizontalAlignment.Left;timeout.Width=245;advanced.Children.Add(timeout);_advanced.Content=advanced;panel.Children.Add(_advanced);
         // A profile that already routes through jump hosts shows that route without an extra click.

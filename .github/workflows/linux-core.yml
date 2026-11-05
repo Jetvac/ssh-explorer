@@ -92,6 +92,11 @@ jobs:
           dotnet_bin="$(command -v dotnet)"; tests_dll="$PWD/tests/SSHExplorer.Tests/bin/Release/net10.0/SSHExplorer.Tests.dll"
           sudo ip netns exec client sudo -u "$USER" env HOME="$HOME" SSH_AUTH_SOCK="$SSH_AUTH_SOCK" DOTNET_ROOT="${DOTNET_ROOT:-$(dirname "$dotnet_bin")}" DOTNET_CLI_TELEMETRY_OPTOUT=1 \
             "$dotnet_bin" "$tests_dll" --jump-integration "$USER" 10.200.1.1 2225 2224 2223 2>&1 | tee artifacts-jump.log
+          # 0.3.1 F: real ufw — safe apply confirmed by a new connection, restore on a failed check or refused command,
+          # the scheduled restore when nobody confirms, the jump-only plan. Last, so ufw cannot affect the other tests; reset afterwards.
+          command -v ufw > /dev/null || sudo apt-get install -y -q ufw > /dev/null
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --firewall-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-firewall.log
+          sudo ufw --force reset > /dev/null 2>&1 || true; sudo ufw disable > /dev/null 2>&1 || true
           for pid in "$fixture"/*.pid; do sudo kill "$(cat "$pid")" || true; done
       - name: Collector benchmark beta.5 vs protocol 2 (same runner, +300 processes)
         run: |
@@ -114,5 +119,6 @@ jobs:
             artifacts-compare.log
             artifacts-groupc.log
             artifacts-groupd.log
+            artifacts-firewall.log
             artifacts/collector-benchmark.json
           retention-days: 14

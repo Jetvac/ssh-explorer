@@ -487,7 +487,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
+    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -511,6 +511,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         // After the task manager and its pages, so the module never splits them.
         // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
         side.Children.Add(Nav(IconCatalog.Network, "Туннели", "tunnels"));
+        side.Children.Add(Nav(IconCatalog.Firewall, "Файервол", "firewall"));
         var dockerNav = Nav(IconCatalog.Docker, "Docker", "docker"); side.Children.Add(dockerNav);
         var scriptsNav = Nav("", "Скрипты", "scripts"); side.Children.Add(scriptsNav);
         void ApplyModules()
@@ -663,7 +664,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         if (disposed) return;
         if (section == key && key != "monitor" && screen.Content is not null &&
-            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminals) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView) || key == "services" && services is not null && ReferenceEquals(screen.Content, services) || key == "tunnels" && tunnelsView is not null && ReferenceEquals(screen.Content, tunnelsView))) return;
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminals) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView) || key == "services" && services is not null && ReferenceEquals(screen.Content, services) || key == "tunnels" && tunnelsView is not null && ReferenceEquals(screen.Content, tunnelsView) || key == "firewall" && firewallView is not null && ReferenceEquals(screen.Content, firewallView))) return;
         var previousContent = screen.Content; var previousPage = monitor?.Page;
         section = key;
         UpdateConnectionStatusVisibility();
@@ -681,6 +682,14 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             scriptsView ??= new ScriptsView(Session, EnsureScriptRunner());
             screen.Content = scriptsView;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
+        if (key == "firewall")
+        {
+            // Explains an unconnected session or missing rights inside the page, like Docker and «Службы».
+            firewallView ??= new FirewallView(new FirewallService(Session));
+            screen.Content = firewallView;
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
             return;
         }
@@ -777,7 +786,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminals?.Dispose();
         try { await Session.DisposeAsync(); }
