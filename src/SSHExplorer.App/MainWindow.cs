@@ -784,7 +784,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     SidebarEditor? sidebarEditor;
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; SecurityView? securityView; CronView? cronView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
+    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; WindowsFirewallView? windowsFirewallView; SecurityView? securityView; CronView? cronView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -1044,8 +1044,8 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         if (key == "firewall")
         {
             // Explains an unconnected session or missing rights inside the page, like Docker and «Службы».
-            firewallView ??= new FirewallView(new FirewallService(Session));
-            screen.Content = firewallView;
+            if (Session.IsWindows) { windowsFirewallView ??= new WindowsFirewallView(new WindowsFirewallService(Session)); screen.Content = windowsFirewallView; }
+            else { firewallView ??= new FirewallView(new FirewallService(Session)); screen.Content = firewallView; }
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
             return;
         }
@@ -1146,7 +1146,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; healthTimer?.Stop(); AlertCenter.Forget(Session.Profile.Id); if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); securityView?.Dispose(); cronView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; healthTimer?.Stop(); AlertCenter.Forget(Session.Profile.Id); if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); windowsFirewallView?.Dispose(); securityView?.Dispose(); cronView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminals?.Dispose();
         try { await Session.DisposeAsync(); }

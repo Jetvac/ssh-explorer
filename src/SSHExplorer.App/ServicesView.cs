@@ -36,7 +36,7 @@ public sealed class ServicesView : UserControl, IDisposable
         systemd = service; Name = "ServicesView";
         SetResourceReference(BackgroundProperty, "Paper");
         var title = Ui.Text("Службы", 18, true);
-        subtitle.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); subtitle.TextTrimming = TextTrimming.CharacterEllipsis; subtitle.MaxWidth = 340; subtitle.Text = "systemd · " + systemd.Session.Profile.Name;
+        subtitle.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); subtitle.TextTrimming = TextTrimming.CharacterEllipsis; subtitle.MaxWidth = 340; subtitle.Text = (systemd.Windows ? "Службы Windows · " : "systemd · ") + systemd.Session.Profile.Name;
         var heading = new StackPanel { Margin = new Thickness(4, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center }; heading.Children.Add(title); heading.Children.Add(subtitle);
         var bar = new ResponsiveCommandBar { Name = "ServicesCommandBar", VerticalAlignment = VerticalAlignment.Center };
         void Command(string key, string glyph, string label, Func<Task> action, string tooltip, int priority)
@@ -128,7 +128,7 @@ public sealed class ServicesView : UserControl, IDisposable
         state.Text = "Службы недоступны"; UpdateCommands();
     }
 
-    string Rights => systemd.IsRoot ? "действия от root" : systemd.Sudo ? "действия через sudo без пароля" : "без повышения прав: изменять службы сервер может не разрешить";
+    string Rights => systemd.Windows ? (systemd.IsRoot ? "действия от администратора Windows" : "без прав администратора: изменять службы Windows нельзя") : systemd.IsRoot ? "действия от root" : systemd.Sudo ? "действия через sudo без пароля" : "без повышения прав: изменять службы сервер может не разрешить";
 
     void UpdateState()
     {
@@ -145,7 +145,7 @@ public sealed class ServicesView : UserControl, IDisposable
         commands["Start"].IsEnabled = ok && !u!.IsRunning && u.Load != "masked";
         commands["Stop"].IsEnabled = ok && u!.IsRunning;
         commands["Restart"].IsEnabled = ok && u!.Load != "masked";
-        commands["Reload"].IsEnabled = ok && u!.IsRunning;
+        commands["Reload"].IsEnabled = ok && u!.IsRunning && !systemd.Windows;
         commands["Enable"].IsEnabled = ok && u!.UnitFileState is "disabled";
         commands["Disable"].IsEnabled = ok && u!.UnitFileState is "enabled";
     }

@@ -18,7 +18,7 @@ internal static class WindowsHostIntegration
         await using var session = new ServerSession(profile, store);
         await t.Run("Windows host: connect, detect Windows, SFTP and commands available", async () =>
         {
-            await session.ConnectAsync(new SessionCredentials(password), _ => Task.FromResult(TrustDecision.Session));
+            await session.ConnectAsync(new SessionCredentials(password), _ => Task.FromResult(TrustDecision.Permanent));
             TestSuite.True(session.IsWindows && session.ShellAvailable && session.SftpAvailable && session.ShellError is null, $"windows={session.IsWindows} shell={session.ShellAvailable} sftp={session.SftpAvailable} cmd={session.WindowsShellIsCmd} {session.ShellError} {session.SftpError}");
         });
         await t.Run("Windows host: drives at the root, home as /C:/Users/…, shown as C:\\Users\\…", async () =>
@@ -62,6 +62,57 @@ internal static class WindowsHostIntegration
         {
             var issues = ServerHealth.Parse((await session.ExecuteAsync(ServerHealth.WindowsCommand)).Output, 1);
             TestSuite.True(issues.Any(i => i.Key.StartsWith("disk:C:", StringComparison.OrdinalIgnoreCase)), "with a 1% threshold the system disk is reported: " + string.Join(" | ", issues.Select(i => i.Text)));
+        });
+        await t.Run("Windows host: services list with states; start and stop a service; its events", async () =>
+        {
+            var services = new SystemdService(session);
+            var list = await services.ListAsync();
+            var sshd = list.Units.SingleOrDefault(u => u.Name.Equals("sshd", StringComparison.OrdinalIgnoreCase));
+            TestSuite.True(list.Available && list.IsRoot && list.Units.Count > 50 && sshd is { IsRunning: true } && sshd.StateText == "Работает", $"{list.Units.Count} services, admin={list.IsRoot}, sshd={sshd?.StateText}/{sshd?.StartupText} {list.Error}");
+            // The time service is harmless to start, restart and stop on a runner.
+            var target = list.Units.FirstOrDefault(u => u.Name.Equals("W32Time", StringComparison.OrdinalIgnoreCase)) ?? list.Units.First(u => u.Name.Equals("Spooler", StringComparison.OrdinalIgnoreCase));
+            bool wasRunning = target.IsRunning;
+            await services.ActAsync(target.Name, wasRunning ? ServiceAction.Restart : ServiceAction.Start);
+            var after = (await services.ListAsync()).Units.Single(u => u.Name == target.Name);
+            if (!wasRunning) await services.ActAsync(target.Name, ServiceAction.Stop);
+            var lines = new List<string>();
+            await services.JournalAsync(target.Name, 50, false, l => { lock (lines) lines.Add(l); }, CancellationToken.None);
+            var reloadRefused = false; try { await services.ActAsync(target.Name, ServiceAction.Reload); } catch (NotSupportedException) { reloadRefused = true; }
+            TestSuite.True(after.IsRunning && lines.Count > 0 && reloadRefused, $"{target.Name}: running after start/restart={after.IsRunning}, events={lines.Count}: {lines.LastOrDefault()}");
+        });
+        await t.Run("Windows host: firewall rules read; a rule is added, switched off and removed with the restore safety net", async () =>
+        {
+            var fw = new WindowsFirewallService(session);
+            var before = await fw.ReadAsync();
+            TestSuite.True(before.Admin && before.Rules.Count > 20 && before.Profiles.Count == 3, $"rules={before.Rules.Count} profiles={before.Profiles.Count} admin={before.Admin}");
+            var rule = new WindowsFirewallNewRule("SSH Explorer CI " + Guid.NewGuid().ToString("N")[..6], true, "TCP", "47001-47002", "203.0.113.0/24, 198.51.100.7");
+            var added = await fw.ApplyAsync(WindowsFirewall.AddScript(rule));
+            var mine = (await fw.ReadAsync()).Rules.SingleOrDefault(r => r.Name == rule.Name);
+            TestSuite.True(added.Outcome == ApplyOutcome.Confirmed && mine is { Ours: true, Enabled: true, Allows: true, Protocol: "TCP" } && mine.LocalPorts == "47001-47002" && mine.RemoteAddresses.Contains("203.0.113.0", StringComparison.Ordinal),
+                $"{added.Outcome}: {added.Message} {added.Output} rule={mine?.LocalPorts} {mine?.RemoteAddresses}");
+            var tasks = await session.ExecuteAsync(WindowsHost.PowerShell("@(Get-ScheduledTask -TaskName 'SSHExplorer-firewall-*' -ErrorAction SilentlyContinue).Count"));
+            TestSuite.True(tasks.Output.Trim() == "0", "the restore task is cancelled after a confirmed change: " + tasks.Output.Trim());
+            var off = await fw.ApplyAsync(WindowsFirewall.EnableScript(mine!.Id, false));
+            var offRule = (await fw.ReadAsync()).Rules.Single(r => r.Id == mine.Id);
+            fw.VerifyOverride = _ => Task.FromResult(false);
+            var rolled = await fw.ApplyAsync(WindowsFirewall.RemoveScript(mine.Id));
+            var stillThere = (await fw.ReadAsync()).Rules.Any(r => r.Id == mine.Id);
+            fw.VerifyOverride = null;
+            var removed = await fw.ApplyAsync(WindowsFirewall.RemoveScript(mine.Id));
+            var gone = (await fw.ReadAsync()).Rules.All(r => r.Id != mine.Id);
+            var bad = await fw.ApplyAsync("throw 'нельзя'");
+            TestSuite.True(off.Outcome == ApplyOutcome.Confirmed && !offRule.Enabled && rolled.Outcome == ApplyOutcome.RolledBack && stillThere && removed.Outcome == ApplyOutcome.Confirmed && gone && bad.Outcome == ApplyOutcome.Failed,
+                $"off={off.Outcome}/{offRule.Enabled} rolledBack={rolled.Outcome} kept={stillThere} removed={removed.Outcome} gone={gone} bad={bad.Outcome}: {bad.Output}");
+            TestSuite.True(WindowsFirewall.Validate(rule with { Ports = "70000" }) is not null && WindowsFirewall.Validate(rule with { RemoteAddresses = "evil.example" }) is not null && WindowsFirewall.Validate(rule with { Protocol = "Any", Ports = "" }) is null, "rule validation");
+        });
+        await t.Run("Windows host: group run executes PowerShell on a Windows server", async () =>
+        {
+            profile.SaveSecret = true; await store.SaveProfileAsync(profile, password);
+            var runner = new GroupRunner(store);
+            var results = new List<GroupRunResult>();
+            await runner.RunAsync([profile], new SavedScript { Name = "проверка", Body = "Write-Output \"host=$env:COMPUTERNAME\"\ncmd /c exit 4", TimeoutMinutes = 2, StopOnError = false }, r => { lock (results) results.Add(r); });
+            var last = results.Last();
+            TestSuite.True(last.State == GroupRunState.Failed && last.ExitCode == 4 && last.Output.Contains("host=", StringComparison.Ordinal), $"{last.State} {last.ExitCode} {last.Output} {last.Problem}");
         });
         try { Directory.Delete(dir, true); } catch (IOException) { }
     }

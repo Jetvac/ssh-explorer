@@ -19,5 +19,5 @@ public sealed class LogWindow : Window
 
     /// <summary>tail of a server file; follows with -F until the window is closed.</summary>
     public static LogView.LogSource Tail(ServerSession session, string path) =>
-        (lines, follow, onLine, ct) => session.StreamLinesAsync(follow ? LogFollow.Wrap(Systemd.TailCommand(path, lines, true)) : Systemd.TailCommand(path, lines, false), onLine, ct);
+        (lines, follow, onLine, ct) => session.IsWindows ? session.StreamLinesAsync(WindowsServices.TailCommand(path, lines, follow), onLine, ct) : session.StreamLinesAsync(follow ? LogFollow.Wrap(Systemd.TailCommand(path, lines, true)) : Systemd.TailCommand(path, lines, false), onLine, ct);
 }

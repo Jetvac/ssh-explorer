@@ -64,6 +64,22 @@ public sealed class GroupRunner(AppStore store)
             return Done(GroupRunState.Failed, untrusted ? "Ключ этого сервера ещё не подтверждён: подключитесь к нему один раз во вкладке и сверьте отпечаток." : "Не удалось подключиться: " + ErrorMessages.Describe(ex));
         }
         report(Done(GroupRunState.Running, null));
+        if (session.IsWindows)
+        {
+            // Windows server: the same commands as one PowerShell script; the exit code of the last native command counts.
+            string command;
+            try { command = WindowsHost.PowerShell((script.StopOnError ? "$ErrorActionPreference='Stop';" : "$ErrorActionPreference='Continue';") + (char)10 + script.Body.Replace("\r\n", "\n") + (char)10 + "if($LASTEXITCODE){exit $LASTEXITCODE}"); }
+            catch (ArgumentException) { return Done(GroupRunState.Failed, "Скрипт слишком длинный для командной строки Windows (до 2,5 КБ)."); }
+            try
+            {
+                var r = await session.ExecuteLongAsync(command, TimeSpan.FromMinutes(Math.Clamp(script.TimeoutMinutes, 1, 24 * 60)), ct).ConfigureAwait(false);
+                var output = (r.Output + WindowsHost.CleanError(r.Error)).TrimEnd();
+                return r.ExitStatus == 0 ? Done(GroupRunState.Succeeded, null, 0, output) : Done(GroupRunState.Failed, $"Код завершения {r.ExitStatus}.", r.ExitStatus, output);
+            }
+            catch (OperationCanceledException) { return Done(GroupRunState.Cancelled, "Остановлено: команда на сервере могла продолжить работу."); }
+            catch (Exception ex) when (ex is Renci.SshNet.Common.SshOperationTimeoutException or TimeoutException) { return Done(GroupRunState.Failed, "Превышен таймаут."); }
+            catch (Exception ex) when (ex is IOException or Renci.SshNet.Common.SshException) { return Done(GroupRunState.Failed, ErrorMessages.Describe(ex)); }
+        }
         using var runner = new ScriptRunner(session, () => [script], () => false);
         using var stop = ct.Register(runner.Dispose);
         ScriptRun? run;
