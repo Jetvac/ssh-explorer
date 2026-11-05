@@ -89,10 +89,10 @@ public static class SshKeys
     /// <summary>Exactly one public key on one line, from a file or the clipboard.</summary>
     public static (AuthorizedKey? Key, string? Error) ParsePublic(string text)
     {
+        if (text.Contains("PRIVATE KEY", StringComparison.Ordinal) || text.Contains("PuTTY-User-Key-File", StringComparison.Ordinal)) return (null, "Это закрытый ключ. Его нельзя отправлять на сервер — нужен файл .pub.");
         var lines = text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')).ToArray();
         if (lines.Length == 0) return (null, "Вставьте открытый ключ: строку вида «ssh-ed25519 AAAA… комментарий».");
         if (lines.Length > 1) return (null, "Нужен один открытый ключ — одна строка.");
-        if (lines[0].Contains("PRIVATE KEY", StringComparison.Ordinal)) return (null, "Это закрытый ключ. Его нельзя отправлять на сервер — нужен файл .pub.");
         var key = Parse(lines[0]);
         if (key is null || key.Options.Length > 0) return (null, "Строка не похожа на открытый ключ OpenSSH.");
         return (key, key.Type == "ssh-dss" ? "Ключи DSA отключены в современных OpenSSH — создайте Ed25519." : null);
