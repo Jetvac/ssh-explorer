@@ -34,8 +34,8 @@ internal static class RdpUiChecks
         {
             var advanced = Descendants<Expander>(dialog).First(); advanced.IsExpanded = true; dialog.UpdateLayout(); Pump();
             var auth = Descendants<ComboBox>(dialog).First(c => System.Windows.Automation.AutomationProperties.GetName(c) == "Способ входа");
-            var options = Descendants<StackPanel>(dialog).Single(p => p.Name == "RdpOptions");
-            check(!auth.IsVisible && options.IsVisible && Descendants<TextBox>(dialog).Any(t => t.IsVisible && System.Windows.Automation.AutomationProperties.GetName(t) == "Домен (необязательно)" && t.Text == "CORP"),
+            var options = (FrameworkElement)LogicalTreeHelper.FindLogicalNode(dialog, "RdpOptions");
+            check(auth.Visibility != Visibility.Visible && options is { Visibility: Visibility.Visible } && Descendants<TextBox>(dialog).Any(t => t.IsVisible && System.Windows.Automation.AutomationProperties.GetName(t) == "Домен (необязательно)" && t.Text == "CORP"),
                 "an RDP profile shows the domain and the RDP options, not the SSH sign-in");
             evidence.Capture((FrameworkElement)dialog.Content, "rdp-profile", new { theme = "Light", fixtureOnly = true });
         }

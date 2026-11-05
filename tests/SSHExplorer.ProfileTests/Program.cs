@@ -485,7 +485,7 @@ internal static class Program
                     if(window is ProfileDialog)
                     {
                         if(profiles++!=0)continue;Fill(window);Field(window,"Адрес сервера").Text=cfg.GetProperty("Host").GetString()!;Field(window,"Порт").Text=cfg.GetProperty("Ports").GetProperty("password").GetInt32().ToString();Field(window,"Пользователь Linux").Text=cfg.GetProperty("Username").GetString()!;
-                        Logical<PasswordBox>(window).Single().Password=secret;Logical<CheckBox>(window).Single().IsChecked=true;
+                        Logical<PasswordBox>(window).Single().Password=secret;Logical<CheckBox>(window).Single(c=>AutomationProperties.GetName(c)=="Сохранять пароль или парольную фразу с защитой Windows").IsChecked=true;
                         FindButton(window,"Сохранить и подключиться").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }
                     else if(window.Title=="Проверка ключа сервера")

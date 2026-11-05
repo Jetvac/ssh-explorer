@@ -21,6 +21,8 @@ public sealed class ExportDocument
     public List<TrustedHostKey>? HostKeys { get; set; }
     public ExportedSidebar? Sidebar { get; set; }
     public List<FirewallRuleSet>? RuleSets { get; set; }
+    /// <summary>Home folder values the exported servers inherit (user, domain, RDP options); folder passwords stay here.</summary>
+    public List<FolderDefaults>? Folders { get; set; }
 }
 
 public sealed class ExportSeal
@@ -110,6 +112,9 @@ public static class ProfileExchange
             }
             if (options.IncludeSidebar) doc.Sidebar = new ExportedSidebar { Order = [.. settings.SidebarOrder], Hidden = [.. settings.SidebarHidden], Docker = settings.DockerModule, Scripts = settings.ScriptsModule };
             if (options.IncludeRuleSets) doc.RuleSets = settings.FirewallRuleSets.Select(r => r.Clone()).ToList();
+            var folders = settings.Folders.Where(f => profiles.Any(p => p.Inherit != InheritFlags.None && ProfileInheritance.Chain(p.Group, [f]).Count > 0))
+                .Select(f => { var c = f.Clone(); c.HasPassword = false; return c; }).ToList();
+            if (folders.Count > 0) doc.Folders = folders;
             return doc;
         }
         finally { if (key is not null) CryptographicOperations.ZeroMemory(key); }

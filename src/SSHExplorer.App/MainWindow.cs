@@ -306,6 +306,7 @@ public sealed partial class MainWindow : Window
                 }
                 summary.Add($"Наборов правил файервола добавлено: {sets.Count}.");
             }
+            if (doc.Folders is { Count: > 0 } folders) { await SaveImportedFoldersAsync(folders, new Dictionary<Guid, string>(), App.Store.Profiles.ToArray()); summary.Add($"Значения папок для наследования: {folders.Count} (пароли папок не переносятся)."); }
             if (layout || window.IncludeRuleSets) await App.Store.SaveAsync(windowLifetime.Token);
             if (layout) App.RaiseModulesChanged();
             RefreshHome();

@@ -38,6 +38,9 @@ public static class WindowsHost
         return joined.Length == 0 ? "" : (char)10 + joined;
     }
 
+    /// <summary>An SFTP path of Win32-OpenSSH: «/C:/…».</summary>
+    public static bool IsWindowsPath(string path) => path.Length >= 3 && path[0] == '/' && char.IsAsciiLetter(path[1]) && path[2] == ':';
+
     /// <summary>A PowerShell single-quoted literal.</summary>
     public static string Quote(string value) => "'" + value.Replace("'", "''") + "'";
 

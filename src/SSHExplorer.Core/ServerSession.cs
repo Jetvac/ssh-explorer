@@ -100,9 +100,7 @@ public sealed partial class ServerSession : IAsyncDisposable
                 if (windows is not null && WindowsHost.LooksLikeWindows(windows))
                 {
                     IsWindows = true; ShellAvailable = true;
-                    // cmd.exe expands %COMSPEC%; PowerShell prints it as it is.
-                    try { WindowsShellIsCmd = (await ExecuteAsync("echo %COMSPEC%", linked.Token).ConfigureAwait(false)).Output.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase); }
-                    catch (Exception shell) when (shell is not OperationCanceledException and not HostKeyChangedException) { }
+                    await DetectWindowsShellAsync(linked.Token).ConfigureAwait(false);
                     Report(operation, null, ConnectionStage.ExecProbe, ConnectionStageOutcome.Succeeded);
                 }
                 else { Report(operation, null, ConnectionStage.ExecProbe, Outcome(ex), ex); ShellError = ErrorMessages.Describe(ex); }
@@ -120,6 +118,12 @@ public sealed partial class ServerSession : IAsyncDisposable
                 SftpError = ErrorMessages.Describe(ex);
             }
             linked.Token.ThrowIfCancellationRequested();
+            // Win32-OpenSSH answers SFTP paths as /C:/…: that is Windows even when Git's printf answered the POSIX probe.
+            if (!IsWindows && SftpAvailable && WindowsHost.IsWindowsPath(Files.HomeDirectory))
+            {
+                IsWindows = true;
+                if (ShellAvailable) await DetectWindowsShellAsync(linked.Token).ConfigureAwait(false);
+            }
             if (!ShellAvailable && !SftpAvailable) throw new IOException("Нет доступных SSH-подсистем для этой учётной записи.");
             SetState(SessionState.Connected);
             Report(operation, null, ConnectionStage.Connect, ConnectionStageOutcome.Succeeded);
@@ -349,6 +353,12 @@ public sealed partial class ServerSession : IAsyncDisposable
             return cmd.ExitStatus;
         }
         finally { Release(client); }
+    }
+    /// <summary>cmd.exe expands %COMSPEC%; PowerShell prints it as it is.</summary>
+    async Task DetectWindowsShellAsync(CancellationToken ct)
+    {
+        try { WindowsShellIsCmd = (await ExecuteAsync("echo %COMSPEC%", ct).ConfigureAwait(false)).Output.Contains("cmd.exe", StringComparison.OrdinalIgnoreCase); }
+        catch (Exception ex) when (ex is not OperationCanceledException and not HostKeyChangedException) { }
     }
     public async Task<ShellStream> CreateShellAsync(uint columns = 100, uint rows = 30, string? directory = null, CancellationToken ct = default)
     {

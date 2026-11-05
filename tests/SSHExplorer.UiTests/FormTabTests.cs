@@ -40,7 +40,7 @@ internal static class FormTabTests
             var name=Descendants<TextBox>(dialog).Single(field=>AutomationProperties.GetName(field)=="Название");
             var host=Descendants<TextBox>(dialog).Single(field=>AutomationProperties.GetName(field)=="Адрес сервера");
             var combo=Descendants<ComboBox>(dialog).Single(field=>AutomationProperties.GetName(field)=="Способ входа");
-            var masked=Descendants<PasswordBox>(dialog).Single();var remember=Descendants<CheckBox>(dialog).Single();
+            var masked=Descendants<PasswordBox>(dialog).Single();var remember=Descendants<CheckBox>(dialog).Single(c=>AutomationProperties.GetName(c)=="Сохранять пароль или парольную фразу с защитой Windows");
             var tabsBefore=(TabControl)Field(main,"tabs");var selectedBefore=tabsBefore.SelectedItem;int tabCountBefore=tabsBefore.Items.Count;
             bool SourceBlocks(Key key,ModifierKeys modifiers)=>!main.TryHandleTabShortcut(key,modifiers,name,null);
             assert(SourceBlocks(Key.Tab,ModifierKeys.Control)&&SourceBlocks(Key.F4,ModifierKeys.Control)&&SourceBlocks(Key.A,ModifierKeys.Control|ModifierKeys.Shift)&&ReferenceEquals(tabsBefore.SelectedItem,selectedBefore)&&tabsBefore.Items.Count==tabCountBefore,"production tab-shortcut branch leaves tab switch, close and all-tabs commands unhandled for a real text input source");

@@ -142,7 +142,7 @@ public sealed class WindowsFirewallService(ServerSession session)
         try
         {
             await Exec(WindowsFirewall.RollbackNow(id), CancellationToken.None).ConfigureAwait(false);
-            return new ApplyResult(ApplyOutcome.RolledBack, "Новое SSH-подключение после изменения не прошло, поэтому прежние правила восстановлены.", Clean(output));
+            return new ApplyResult(ApplyOutcome.RolledBack, "Новое SSH-подключение после изменения не прошло, поэтому прежние правила восстановлены." + (LastVerifyError is { } why ? " Причина: " + why : ""), Clean(output));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         { return new ApplyResult(ApplyOutcome.RolledBack, $"Новое подключение не прошло, а связь с сервером потеряна. Прежние правила вернёт запланированная задача не позже чем через {WindowsFirewall.RollbackSeconds} с.", Clean(output)); }
@@ -150,8 +150,11 @@ public sealed class WindowsFirewallService(ServerSession session)
 
     static string Clean(string output) => string.Join("\n", output.Split('\n').Where(l => !l.StartsWith('#') && !l.StartsWith('<')).Select(l => l.Trim()).Where(l => l.Length > 0));
 
+    /// <summary>Why the last check by a new connection failed (for the message).</summary>
+    public string? LastVerifyError { get; private set; }
     async Task<bool> VerifyAsync(CancellationToken ct)
     {
+        LastVerifyError = null;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(25));
         SshClient? client = null;
         try
@@ -159,9 +162,10 @@ public sealed class WindowsFirewallService(ServerSession session)
             client = await session.CreateSshClientAsync(timeout.Token).ConfigureAwait(false);
             using var cmd = client.CreateCommand(WindowsHost.DetectCommand); cmd.CommandTimeout = TimeSpan.FromSeconds(10);
             await cmd.ExecuteAsync(timeout.Token).ConfigureAwait(false);
+            if (cmd.ExitStatus != 0) LastVerifyError = $"проверочная команда завершилась с кодом {cmd.ExitStatus}";
             return cmd.ExitStatus == 0;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { return false; }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { LastVerifyError = ErrorMessages.Describe(ex); return false; }
         finally { if (client is not null) session.ReleaseClient(client); }
     }
 }
