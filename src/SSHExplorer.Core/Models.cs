@@ -26,6 +26,8 @@ public sealed class ServerProfile
     public List<DockerTemplate> DockerTemplates { get; set; } = [];
     /// <summary>Saved scripts for this server (module «Скрипты»).</summary>
     public List<SavedScript> Scripts { get; set; } = [];
+    /// <summary>Saved port forwards (-L/-R) for this server; opened from «Туннели» or on connect.</summary>
+    public List<TunnelSpec> Tunnels { get; set; } = [];
     public string Endpoint => $"{(Host.Contains(':') ? $"[{Host}]" : Host)}:{Port}";
     public void Validate()
     {

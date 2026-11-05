@@ -487,7 +487,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
+    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -510,6 +510,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
         // After the task manager and its pages, so the module never splits them.
         // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
+        side.Children.Add(Nav(IconCatalog.Network, "Туннели", "tunnels"));
         var dockerNav = Nav(IconCatalog.Docker, "Docker", "docker"); side.Children.Add(dockerNav);
         var scriptsNav = Nav("", "Скрипты", "scripts"); side.Children.Add(scriptsNav);
         void ApplyModules()
@@ -573,8 +574,21 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             if (disposed || failed) return;
             viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected); UpdateConnectionStatusVisibility();
             // Scheduled scripts run while this server is connected, whether or not their section is open.
-            if (Session.State == SessionState.Connected && !presentationOnly) EnsureScriptRunner();
+            if (Session.State == SessionState.Connected && !presentationOnly) { EnsureScriptRunner(); _ = AutoStartTunnelsAsync(); }
         });
+    }
+    TunnelManager EnsureTunnelManager() => tunnelManager ??= new TunnelManager(Session);
+    /// <summary>Opens the server's «при подключении» tunnels once per connection; a failure is shown in the status line.</summary>
+    async Task AutoStartTunnelsAsync()
+    {
+        if (tunnelsAutoStarted) return; tunnelsAutoStarted = true;
+        var specs = (App.Store.Profiles.FirstOrDefault(p => p.Id == Session.Profile.Id)?.Tunnels ?? Session.Profile.Tunnels).Where(t => t.StartOnConnect).Select(t => t.Clone()).ToArray();
+        foreach (var spec in specs)
+        {
+            try { await EnsureTunnelManager().StartAsync(spec, Session.Lifetime); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { if (!disposed) SetNotice($"Туннель «{(spec.Name.Length > 0 ? spec.Name : SSHExplorer.Core.Tunnels.Describe(spec))}» не открылся: {ErrorMessages.Describe(ex)}"); }
+            catch (OperationCanceledException) { return; }
+        }
     }
     internal ScriptRunner EnsureScriptRunner()
     {
@@ -630,7 +644,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
                 return false;
             }
             prompts.Dispose();
-            files?.Dispose(); files = null; terminal?.Dispose(); terminal = null; monitor?.Dispose(); monitor = null;
+            files?.Dispose(); files = null; terminals?.Dispose(); terminals = null; monitor?.Dispose(); monitor = null;
             await Session.DisposeAsync();
             if (!disposed) SetConnectionFailure(ex, attempt.TimedOut);
             return false;
@@ -649,7 +663,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         if (disposed) return;
         if (section == key && key != "monitor" && screen.Content is not null &&
-            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView) || key == "services" && services is not null && ReferenceEquals(screen.Content, services))) return;
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminals) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView) || key == "services" && services is not null && ReferenceEquals(screen.Content, services) || key == "tunnels" && tunnelsView is not null && ReferenceEquals(screen.Content, tunnelsView))) return;
         var previousContent = screen.Content; var previousPage = monitor?.Page;
         section = key;
         UpdateConnectionStatusVisibility();
@@ -667,6 +681,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             scriptsView ??= new ScriptsView(Session, EnsureScriptRunner());
             screen.Content = scriptsView;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
+        if (key == "tunnels")
+        {
+            tunnelsView ??= new TunnelsView(Session, EnsureTunnelManager());
+            screen.Content = tunnelsView; tunnelsView.Reload();
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
             return;
         }
@@ -702,6 +723,26 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         if (!ReferenceEquals(previousContent, screen.Content) || key == "monitor" && previousPage != monitorPage) UiMotion.SurfaceChanged(screen);
     }
     void UpdateConnectionStatusVisibility() => connectionStatus.Visibility = hasNotice || section != "monitor" || !presentationOnly && Session.State != SessionState.Connected ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>The «Терминал» section: up to four shells side by side or stacked, each its own PTY on its own connection.</summary>
+    SplitWorkspace CreateTerminals()
+    {
+        SplitWorkspace? workspace = null;
+        workspace = new SplitWorkspace(() =>
+        {
+            var view = new TerminalView(Session);
+            view.PaneShortcut += key => workspace!.Shortcut(view, key);
+            view.Focused += () => workspace!.FocusBody(view);
+            return view;
+        }, body => ((TerminalView)body).Dispose());
+        workspace.PaneAdded += body => _ = StartPaneAsync((TerminalView)body);
+        return workspace;
+    }
+    async Task StartPaneAsync(TerminalView view)
+    {
+        try { await view.StartAsync(); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { await LocalDiagnostics.RecordAsync("terminal.split.failed", ex); if (!disposed) SetNotice("Новый терминал не открылся: " + ErrorMessages.Describe(ex)); }
+        catch (OperationCanceledException) { }
+    }
     async Task OpenTerminalAsync()
     {
         if (!Session.ShellAvailable || disposed) return;
@@ -710,16 +751,16 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", "started");
             if (disposed || section != "terminal") throw new OperationCanceledException();
-            terminal ??= new TerminalView(Session); screen.Content = terminal;
+            terminals ??= CreateTerminals(); screen.Content = terminals;
             // WebView2 is an HWND host: do not animate/reposition it or delay its input.
             UiMotion.Stop(screen); screen.Opacity = 1; screen.RenderTransform = Transform.Identity;
-            await terminal.StartAsync();
+            await ((TerminalView)terminals.Start()).StartAsync();
             await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", "succeeded");
         }
         catch (Exception ex)
         {
             await LocalDiagnostics.RecordOperationAsync(operation, "terminal.initialize", ex is OperationCanceledException ? "cancelled" : "failed", ex);
-            if (ex is not OperationCanceledException) { terminal?.Dispose(); terminal = null; }
+            if (ex is not OperationCanceledException) { terminals?.Dispose(); terminals = null; }
             if (!disposed && section == "terminal")
             {
                 SetNotice(ErrorMessages.Describe(ex));
@@ -736,9 +777,9 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
-        monitor?.Dispose(); files?.Dispose(); terminal?.Dispose();
+        monitor?.Dispose(); files?.Dispose(); terminals?.Dispose();
         try { await Session.DisposeAsync(); }
         finally { if (diagnostics is not null) Session.StageChanged -= diagnostics; }
     }

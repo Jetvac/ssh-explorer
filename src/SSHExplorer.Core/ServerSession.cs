@@ -266,6 +266,8 @@ public sealed partial class ServerSession : IAsyncDisposable
         if (_resources.TryRemove(resource, out _)) { try { resource.Dispose(); } catch { } }
     }
     internal Task<SshClient> CreateSshClientAsync(CancellationToken ct) => ConnectClientAsync(info => new SshClient(info), ct);
+    /// <summary>Closes a connection made by <see cref="CreateSshClientAsync"/> (a tunnel that is stopped).</summary>
+    internal void ReleaseClient(SshClient client) => Release(client);
     public async Task<CommandResult> ExecuteAsync(string command, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

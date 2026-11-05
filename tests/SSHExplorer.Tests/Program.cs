@@ -15,6 +15,12 @@ if (args.Length == 4 && args[0] == "--compare-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real comparison checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 4 && args[0] == "--groupd-integration")
+{
+    await GroupDIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
+    Console.WriteLine($"RESULT: {suite.Passed} real tunnel checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 4 && args[0] == "--groupc-integration")
 {
     await GroupCIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
@@ -105,6 +111,7 @@ await FolderCompareTests.RunAsync(suite);
 await OwnershipTests.RunAsync(suite);
 await BatchRenameTests.RunAsync(suite);
 await GroupCTests.RunAsync(suite);
+await GroupDTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

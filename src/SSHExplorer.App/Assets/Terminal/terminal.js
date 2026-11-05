@@ -28,6 +28,7 @@
     // preventDefault stops the browser's own paste event, so the native confirmation runs exactly once.
     if ((e.ctrlKey && e.shiftKey && e.code === 'KeyV') || (clipboardKeys && plainCtrl && e.code === 'KeyV')) { e.preventDefault(); post({type:'paste'}); return false; }
     if (e.ctrlKey && e.shiftKey && e.code === 'KeyF') { post({type:'search'}); return false; }
+    if (e.ctrlKey && e.shiftKey && !e.altKey && (e.code === 'KeyD' || e.code === 'KeyE' || e.code === 'KeyW')) { if (e.type === 'keydown') { e.preventDefault(); post({type:'pane',key:e.code.slice(3)}); } return false; }
     if (e.ctrlKey && (e.code==='Equal' || e.code==='NumpadAdd')) { post({type:'font',delta:1}); return false; }
     if (e.ctrlKey && (e.code==='Minus' || e.code==='NumpadSubtract')) { post({type:'font',delta:-1}); return false; }
     return true;

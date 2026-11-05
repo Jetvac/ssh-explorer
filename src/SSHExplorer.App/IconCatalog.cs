@@ -28,7 +28,7 @@ public static class IconCatalog
         ViewList = Prefix + "view-list", ViewDetails = Prefix + "view-details", ViewTiles = Prefix + "view-tiles", ViewContent = Prefix + "view-content",
         TabList = Prefix + "tab-list", NewTab = Prefix + "new-tab", Documents = Prefix + "documents", Transfers = Prefix + "transfers",
         Server = Prefix + "server", Processes = Prefix + "processes", Performance = Prefix + "performance", Terminal = Prefix + "terminal",
-        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage", Settings = Prefix + "settings", Docker = Prefix + "docker", Services = Prefix + "services";
+        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage", Settings = Prefix + "settings", Docker = Prefix + "docker", Services = Prefix + "services", SplitRight = Prefix + "split-right", SplitDown = Prefix + "split-down";
 
     public sealed record Entry(string Key, string Purpose, string Source, string? Glyph, string? PathData, string Style = "stroke");
 
@@ -96,6 +96,8 @@ public static class IconCatalog
         new("settings", "Параметры", "SSH Explorer vector", null, "M6.79 3.15L7.1 1.56L8.9 1.56L9.21 3.15A5 5 0 0 1 10.58 3.71L11.91 2.81L13.19 4.09L12.29 5.42A5 5 0 0 1 12.85 6.79L14.44 7.1L14.44 8.9L12.85 9.21A5 5 0 0 1 12.29 10.58L13.19 11.91L11.91 13.19L10.58 12.29A5 5 0 0 1 9.21 12.85L8.9 14.44L7.1 14.44L6.79 12.85A5 5 0 0 1 5.42 12.29L4.09 13.19L2.81 11.91L3.71 10.58A5 5 0 0 1 3.15 9.21L1.56 8.9L1.56 7.1L3.15 6.79A5 5 0 0 1 3.71 5.42L2.81 4.09L4.09 2.81L5.42 3.71A5 5 0 0 1 6.79 3.15Z M10.25 8A2.25 2.25 0 1 1 5.75 8A2.25 2.25 0 1 1 10.25 8Z"),
         new("docker", "Docker", "SSH Explorer vector", null, "M1.5 8.5H14.5L13.6 11.9A2 2 0 0 1 11.7 13.5H4.3A2 2 0 0 1 2.4 11.9Z M3.5 5.5H6V8.5H3.5Z M6.5 5.5H9V8.5H6.5Z M9.5 5.5H12V8.5H9.5Z M6.5 2.5H9V5.5H6.5Z"),
         new("services", "Службы", "SSH Explorer vector", null, "M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M7.5 8A1.5 1.5 0 1 1 4.5 8A1.5 1.5 0 1 1 7.5 8Z M6 4.75V5.75 M6 10.25V11.25 M2.75 8H3.75 M8.25 8H9.25 M10.5 6.5H12.5 M10.5 9.5H12.5"),
+        new("split-right", "Разделить вправо", "SSH Explorer vector", null, "M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M8 2.5V13.5"),
+        new("split-down", "Разделить вниз", "SSH Explorer vector", null, "M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M1.5 8H14.5"),
         new("storage", "Хранилища", "SSH Explorer vector", null, "M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8"),
     ];
 

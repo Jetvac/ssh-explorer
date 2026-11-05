@@ -48,8 +48,14 @@ public sealed class TerminalView : UserControl, IDisposable
         root.Children.Add(tools); root.Children.Add(_web); Content = root;
         _search.KeyDown += async (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) { await FindAsync(false); e.Handled = true; } };
         _web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 17, 24, 32);
+        _web.GotFocus += (_, _) => Focused?.Invoke();
         IsVisibleChanged += async (_, _) => { if (IsVisible && _ready.Task.IsCompletedSuccessfully && !_disposed) await RunScriptAsync("window.sshExplorer.fit()"); };
     }
+
+    /// <summary>Ctrl+Shift+D/E/W pressed inside the terminal ("D", "E" or "W"): the split workspace handles them.</summary>
+    public event Action<string>? PaneShortcut;
+    /// <summary>The terminal's HWND got keyboard focus (its clicks never reach WPF).</summary>
+    public event Action? Focused;
 
     public Task StartAsync(string? directory = null) => _start ??= InitializeAsync(directory);
 
@@ -168,6 +174,7 @@ public sealed class TerminalView : UserControl, IDisposable
                 case "paste": await PasteAsync(); break;
                 case "search": _search.Focus(); _search.SelectAll(); break;
                 case "font": await ChangeFontAsync(Math.Clamp(data.GetProperty("delta").GetInt32(), -1, 1)); break;
+                case "pane": PaneShortcut?.Invoke(data.GetProperty("key").GetString() ?? ""); break;
             }
         }
         catch (OperationCanceledException) { }
