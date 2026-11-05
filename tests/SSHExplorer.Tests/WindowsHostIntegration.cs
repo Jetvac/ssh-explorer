@@ -43,7 +43,7 @@ internal static class WindowsHostIntegration
             TestSuite.True(s.System.CpuCount > 0 && s.System.MemoryTotalBytes > 1L << 30 && s.System.CpuPercent is >= 0 and <= 100 && s.Processes.Count > 10 && s.Processes.Any(p => p.Name.Equals("sshd", StringComparison.OrdinalIgnoreCase))
                 && s.Storage.Any(d => d.MountPoint.StartsWith("C:", StringComparison.OrdinalIgnoreCase) && d.TotalBytes > 0) && s.Networks.Count > 0 && monitor.History.Count == 1,
                 $"cpus={s.System.CpuCount} mem={s.System.MemoryTotalBytes} cpu={s.System.CpuPercent} procs={s.Processes.Count} disks={string.Join(",", s.Storage.Select(d => d.MountPoint))} nets={s.Networks.Count} dur={s.CollectionDuration.TotalMilliseconds:0} ms");
-            var sleeper = await session.ExecuteAsync(WindowsHost.PowerShell("(Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep 300' -WindowStyle Hidden -PassThru).Id"));
+            var sleeper = await session.ExecuteAsync(WindowsHost.PowerShell("(Invoke-CimMethod Win32_Process -MethodName Create -Arguments @{CommandLine='powershell -NoProfile -Command Start-Sleep 300'}).ProcessId"));
             int pid = int.Parse(sleeper.Output.Trim());
             var again = await monitor.SampleAsync(); var proc = again.Processes.SingleOrDefault(p => p.Pid == pid) ?? throw new InvalidOperationException($"process {pid} not in the sample of {again.Processes.Count}");
             await monitor.SignalAsync(proc.Identity, 15);

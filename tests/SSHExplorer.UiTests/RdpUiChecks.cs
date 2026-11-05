@@ -75,7 +75,7 @@ internal static class RdpUiChecks
         // Until the runner is known to accept RDP to itself, a failed live sign-in is reported, not fatal (RDP_LIVE_REQUIRED=1 makes it fatal).
         bool required = Environment.GetEnvironmentVariable("RDP_LIVE_REQUIRED") == "1";
         Action<bool, string> live = (ok, text) => { if (required) check(ok, text); else Console.WriteLine((ok ? "PASS " : "INFO (not required) ") + text); };
-        var prompts = new List<HostKeyPrompt>();
+        var prompts = new List<HostKeyPrompt>(); main.DesktopCloseConfirmOverride = _ => true;
         Dialogs.RdpCertificateOverride = p => { prompts.Add(p); return TrustDecision.Permanent; };
         try
         {
@@ -95,7 +95,7 @@ internal static class RdpUiChecks
             var disconnectAgain = view.DisconnectAsync(); watch.Restart(); while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
             live(Close(main, view), "live: the tab closes");
         }
-        finally { Dialogs.RdpCertificateOverride = null; }
+        finally { Dialogs.RdpCertificateOverride = null; main.DesktopCloseConfirmOverride = null; }
     }
 
     static bool Close(MainWindow main, RdpView view)

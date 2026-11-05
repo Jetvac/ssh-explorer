@@ -576,7 +576,7 @@ public sealed partial class MainWindow : Window
         if (!closingTabs.Add(tab)) return;
         try
         {
-            if (view.State == SessionState.Connected && !Ui.Confirm($"Отключиться от «{view.Profile.Name}»? Программы на удалённом компьютере продолжат работать.")) return;
+            if (view.State == SessionState.Connected && !(DesktopCloseConfirmOverride ?? (t => Ui.Confirm(t)))($"Отключиться от «{view.Profile.Name}»? Программы на удалённом компьютере продолжат работать.")) return;
             var index = tabs.Items.IndexOf(tab); var next = ReferenceEquals(tabs.SelectedItem, tab) ? tabs.Items.OfType<TabItem>().ElementAtOrDefault(index + 1) ?? tabs.Items.OfType<TabItem>().ElementAtOrDefault(Math.Max(0, index - 1)) : null;
             await view.DisposeAsync();
             desktops.Remove(tab); if (next is not null) { tabs.SelectedItem = next; next.Focus(); } tabs.Items.Remove(tab); RefreshHome();
@@ -586,6 +586,8 @@ public sealed partial class MainWindow : Window
     /// <summary>CI hook: open a desktop tab without connecting (fixture profiles).</summary>
     internal RdpView AddDesktopForTest(ServerProfile profile) { var view = new RdpView(profile, desktopLayer) { ReconnectRequested = v => ReconnectDesktopAsync(v) }; AddDesktopTab(profile, view); return view; }
     internal IReadOnlyCollection<RdpView> Desktops => desktops.Values;
+    /// <summary>CI hook: the answer to «Отключиться от …?» when a connected desktop tab closes.</summary>
+    internal Func<string, bool>? DesktopCloseConfirmOverride;
     void AddSessionTab(ServerProfile profile, ServerSession session, SessionView view)
     {
         var tab = new TabItem { Content = view };

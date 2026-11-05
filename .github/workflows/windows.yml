@@ -106,6 +106,9 @@ jobs:
           "RDP_TEST_PASSWORD=$password" >> $env:GITHUB_ENV
       - name: beta.6 user actions (tabs after Show, address input, caption, sorting, graphs, panels, icons)
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        timeout-minutes: 30
+        env:
+          RDP_LIVE_REQUIRED: '1'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/ui-beta6 | Out-Null
