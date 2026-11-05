@@ -198,10 +198,10 @@ public static class RdpFile
             Drives = (v.GetValueOrDefault("drivestoredirect") ?? "").Length > 0 || Flag(v, "redirectdrives", false), Microphone = Flag(v, "audiocapturemode", false),
             Audio = Int(v, "audiomode") switch { 1 => RdpAudio.RemoteComputer, 2 => RdpAudio.Off, _ => RdpAudio.ThisComputer },
             Nla = Flag(v, "enablecredsspsupport", true), AdminSession = Flag(v, "administrative session", false) || Flag(v, "connect to console", false),
-            ColorDepth = Int(v, "session bpp") is 15 or 16 or 24 or 32 and var bpp ? bpp : 32,
+            ColorDepth = Int(v, "session bpp") is { } bpp && bpp is 15 or 16 or 24 or 32 ? bpp : 32,
         };
         if (Int(v, "screen mode id") == 1 && Int(v, "desktopwidth") is >= 640 and <= 8192 and var w && Int(v, "desktopheight") is >= 480 and <= 8192 and var h && !Flag(v, "dynamic resolution", false) && !Flag(v, "smart sizing", false)) { o.Width = w; o.Height = h; }
-        if (v.GetValueOrDefault("gatewayhostname") is { Length: > 0 } gw && Int(v, "gatewayusagemethod") is 1 or 2 or 4 and var usage)
+        if (v.GetValueOrDefault("gatewayhostname") is { Length: > 0 } gw && Int(v, "gatewayusagemethod") is { } usage && usage is 1 or 2 or 4)
         { o.GatewayHost = gw; o.GatewayMode = usage == 1 ? RdpGatewayMode.Always : RdpGatewayMode.Detect; o.GatewaySameCredentials = Flag(v, "promptcredentialonce", true); }
         if (v.ContainsKey("password 51")) notes.Add("Пароль из файла .rdp не переносится.");
         if ((v.GetValueOrDefault("remoteapplicationprogram") ?? "").Length > 0) notes.Add("RemoteApp не поддерживается: откроется весь рабочий стол.");

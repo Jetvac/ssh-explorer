@@ -51,53 +51,17 @@ public static class ExternalSessionImport
         return (candidates, skipped);
     }
 
-    /// <summary>
-    /// mRemoteNG's <c>confCons.xml</c>: SSH connections (SSH1/SSH2) become profiles, folders become the group
-    /// («Прод/Web»), an inherited user or port is taken from the folder. Passwords — encrypted by mRemoteNG — are not
-    /// imported; other protocols are named and skipped. A file encrypted as a whole cannot be read here.
-    /// </summary>
+    /// <summary>mRemoteNG's <c>confCons.xml</c> without passwords; see <see cref="MRemoteNg.Read"/>.</summary>
     public static (IReadOnlyList<ImportCandidate> Candidates, IReadOnlyList<string> Skipped) FromMRemoteNg(string xml, string localUser,
         IReadOnlyCollection<ServerProfile> existing, Func<string, bool>? fileExists = null)
     {
-        var candidates = new List<ImportCandidate>(); var skipped = new List<string>();
-        System.Xml.Linq.XDocument doc;
-        try
-        {
-            using var reader = System.Xml.XmlReader.Create(new StringReader(xml), new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 64 * 1024 * 1024 });
-            doc = System.Xml.Linq.XDocument.Load(reader);
-        }
-        catch (System.Xml.XmlException ex) { skipped.Add("Файл не похож на confCons.xml mRemoteNG: " + ex.Message); return (candidates, skipped); }
-        var root = doc.Root;
-        if (root is null || root.Name.LocalName != "Connections") { skipped.Add("Файл не похож на confCons.xml mRemoteNG: нет элемента Connections."); return (candidates, skipped); }
-        if (string.Equals((string?)root.Attribute("FullFileEncryption"), "true", StringComparison.OrdinalIgnoreCase))
-        { skipped.Add("Файл mRemoteNG зашифрован целиком. В mRemoteNG: «Параметры» → «Безопасность» → снимите «Шифровать весь файл», сохраните и импортируйте снова."); return (candidates, skipped); }
-        static string? A(System.Xml.Linq.XElement e, string name) => (string?)e.Attribute(name) is { Length: > 0 } v ? v : null;
-        static bool Inherits(System.Xml.Linq.XElement e, string what) => string.Equals(A(e, "Inherit" + what), "true", StringComparison.OrdinalIgnoreCase);
-        void Walk(System.Xml.Linq.XElement parent, string? group, string? user, int? port)
-        {
-            foreach (var node in parent.Elements().Where(e => e.Name.LocalName == "Node"))
-            {
-                var name = A(node, "Name") ?? "(без имени)";
-                var ownUser = Inherits(node, "Username") ? user : A(node, "Username");
-                int? ownPort = Inherits(node, "Port") ? port : int.TryParse(A(node, "Port"), out var p) ? p : null;
-                if (string.Equals(A(node, "Type"), "Container", StringComparison.OrdinalIgnoreCase))
-                {
-                    Walk(node, group is null ? name : group + "/" + name, ownUser ?? user, ownPort ?? port);
-                    continue;
-                }
-                var protocol = A(node, "Protocol") ?? "";
-                var label = group is null ? name : group + "/" + name;
-                if (!protocol.StartsWith("SSH", StringComparison.OrdinalIgnoreCase)) { skipped.Add($"{label}: протокол {(protocol.Length > 0 ? protocol : "не указан")} — не SSH"); continue; }
-                var notes = new List<string>();
-                if (protocol.Equals("SSH1", StringComparison.OrdinalIgnoreCase)) notes.Add("SSH1 устарел; подключение пойдёт по SSH2.");
-                if (A(node, "Password") is not null) notes.Add("Пароль из mRemoteNG не переносится.");
-                if (A(node, "PuttySession") is { } putty && !putty.Equals("Default Settings", StringComparison.OrdinalIgnoreCase)) notes.Add($"Используется сессия PuTTY «{putty}»: её ключ и параметры не переносятся — при необходимости импортируйте PuTTY отдельно.");
-                candidates.Add(Map(name, group, A(node, "Hostname"), ownPort is 0 ? null : ownPort, ownUser, null, localUser, existing, fileExists, notes));
-            }
-        }
-        Walk(root, null, null, null);
-        return (candidates, skipped);
+        var result = MRemoteNg.Read(xml, localUser, existing, importPasswords: false, password: null, fileExists);
+        return (result.Candidates, result.Skipped);
     }
+
+    internal static ImportCandidate MapSsh(string name, string? group, string? host, int? port, string? user, string localUser,
+        IReadOnlyCollection<ServerProfile> existing, Func<string, bool>? fileExists, List<string> notes)
+        => Map(name, group, host, port, user, null, localUser, existing, fileExists, notes);
 
     /// <summary>Reads WinSCP.ini: <c>[Sessions\name]</c> sections with <c>Key=Value</c> lines.</summary>
     public static IReadOnlyList<ExternalSession> ParseWinScpIni(string text)
