@@ -40,6 +40,7 @@ public sealed class FirewallView : UserControl, IDisposable
     internal Func<string, bool>? ConfirmOverride { get; set; }
     internal Func<FirewallSnapshot, RuleDraft?>? EditOverride { get; set; }
     internal Func<FirewallSnapshot, IReadOnlyList<string>?>? WizardOverride { get; set; }
+    internal Func<FirewallSnapshot, (string Name, IReadOnlyList<string> Commands)?>? RuleSetsOverride { get; set; }
     internal string StateText => state.Text;
     internal string AccessText => access.Text;
     internal FirewallSnapshot? Snapshot => snapshot;
@@ -64,6 +65,7 @@ public sealed class FirewallView : UserControl, IDisposable
         Command("Toggle", IconCatalog.Power, "Включить", ToggleAsync, "Включить или выключить ufw", 85);
         Command("Policy", IconCatalog.Settings, "Политика…", PolicyAsync, "Что делать с подключениями, которые не подошли ни к одному правилу", 40);
         Command("Bastion", IconCatalog.Network, "Доступ только через сервер…", BastionAsync, "Закрыть SSH для всех, кроме промежуточного сервера", 60);
+        Command("Sets", IconCatalog.Documents, "Наборы правил…", RuleSetsAsync, "Сохранить правила как набор или применить набор к этому серверу", 50);
         var barRow = new DockPanel(); DockPanel.SetDock(heading, Dock.Left); barRow.Children.Add(heading); var divider = Ui.Line(); DockPanel.SetDock(divider, Dock.Left); barRow.Children.Add(divider); barRow.Children.Add(bar);
         var barHost = new Border { Child = barRow, Padding = new Thickness(10, 4, 10, 4) }; barHost.SetResourceReference(StyleProperty, "CommandBarStyle");
 
@@ -145,7 +147,7 @@ public sealed class FirewallView : UserControl, IDisposable
     {
         bool ok = snapshot is not null && !busy;
         commands["Refresh"].IsEnabled = !busy;
-        commands["Add"].IsEnabled = commands["Policy"].IsEnabled = commands["Bastion"].IsEnabled = commands["Toggle"].IsEnabled = ok;
+        commands["Add"].IsEnabled = commands["Policy"].IsEnabled = commands["Bastion"].IsEnabled = commands["Toggle"].IsEnabled = commands["Sets"].IsEnabled = ok;
         commands["Remove"].IsEnabled = ok && Selected is not null;
         var label = snapshot is { Active: true } ? "Выключить" : "Включить";
         if (commands["Toggle"].Content is Panel p) foreach (var t in p.Children.OfType<TextBlock>()) if (t.Text is "Включить" or "Выключить") t.Text = label;
@@ -213,6 +215,20 @@ public sealed class FirewallView : UserControl, IDisposable
         }
         if (planned is null || planned.Count == 0) return;
         await ApplyAsync("Закрыть прямой SSH-доступ и оставить его только через промежуточный сервер", planned);
+    }
+
+    async Task RuleSetsAsync()
+    {
+        if (snapshot is not { } s) return;
+        (string Name, IReadOnlyList<string> Commands)? chosen;
+        if (RuleSetsOverride is not null) chosen = RuleSetsOverride(s);
+        else
+        {
+            var window = new FirewallRuleSetsWindow(s, App.Store.Settings.FirewallRuleSets, () => App.Store.SaveAsync(), firewall.Session.Profile.Name) { Owner = Window.GetWindow(this) };
+            chosen = window.ShowDialog() == true && window.Commands.Count > 0 ? (window.AppliedName ?? "", window.Commands) : null;
+        }
+        if (chosen is not { } c || c.Commands.Count == 0) return;
+        await ApplyAsync($"Применить набор правил «{c.Name}»", c.Commands);
     }
 
     public void Dispose() => lifetime.Cancel();

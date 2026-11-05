@@ -87,6 +87,20 @@ internal static class FirewallIntegration
                     && Ufw.CheckAccess(after.Rules, after.Active, after.DefaultIncoming, "127.0.0.1", port).Allowed == true && Ufw.CheckAccess(after.Rules, after.Active, after.DefaultIncoming, "198.51.100.9", port).Allowed == false,
                     $"{result.Outcome} {result.Message} rules={string.Join(" | ", after.Rules.Select(r => r.Spec))}");
             });
+
+            await t.Run("firewall integration: a rule set saved from this server re-creates its rules on a clean ufw", async () =>
+            {
+                var source = await firewall.ReadAsync();
+                var (set, skipped) = FirewallRuleSets.FromSnapshot(source, "стенд", true);
+                await Sh("sudo -n ufw --force reset >/dev/null 2>&1; sudo -n ufw disable >/dev/null 2>&1; true");
+                var clean = await firewall.ReadAsync();
+                var plan = FirewallRuleSets.Plan(clean, set, false);
+                var result = await firewall.ApplyAsync([.. plan.Commands, Ufw.EnableCommand]);
+                var after = await firewall.ReadAsync();
+                var again = FirewallRuleSets.Plan(after, set, false);
+                TestSuite.True(set.Rules.Count > 0 && skipped.Count == 0 && result.Outcome == ApplyOutcome.Confirmed && after.Active && again.Commands.Count == 0 && again.Present.Count == set.Rules.Count,
+                    $"{result.Outcome} {result.Message} set={set.Rules.Count} again={string.Join(" | ", again.Commands)}");
+            });
         }
         finally { await Sh("sudo -n ufw --force reset >/dev/null 2>&1; sudo -n ufw disable >/dev/null 2>&1; sudo -n rm -rf /var/tmp/sshx-ufw-*; true"); }
     }

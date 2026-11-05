@@ -89,6 +89,31 @@ internal static class FirewallTests
                 && Ufw.CheckAfter(inactive, enable).Allowed == true && Ufw.CheckAfter(inactive, enable, "8.8.8.8").Allowed == false, string.Join("\n", enable));
             TestSuite.Throws<ArgumentException>(() => Ufw.BastionCommands(s, ["any"], 22, [], [], "b"));
         });
+        await t.Run("ufw rule sets: a server's rules become a set; what a set cannot carry is named", () =>
+        {
+            var s = Ufw.Parse(ActiveFixture);
+            var (set, skipped) = FirewallRuleSets.FromSnapshot(s, "  база  ", true);
+            TestSuite.True(set.Name == "база" && set.DefaultIncoming == "deny" && set.Rules.Count == 3 && skipped.Count == 2 && skipped.Any(r => r.App == "OpenSSH") && skipped.Any(r => r.Route)
+                && set.Rules[1] is { From: "10.0.0.0/8", Port: "5432", Proto: "tcp", Comment: "office db" } && set.Rules[2] is { Action: FirewallAction.Deny, Interface: "eth1", From: "198.51.100.7", Proto: "any" }, string.Join(" | ", set.Rules));
+            TestSuite.True(FirewallRuleSets.ValidateName("БАЗА", [set]) is not null && FirewallRuleSets.ValidateName("база", [set], set.Id) is null && FirewallRuleSets.ValidateName(" ", []) is not null, "names");
+        });
+        await t.Run("ufw rule sets: applying adds only what is missing, in order; «exact copy» also removes the rest", () =>
+        {
+            var s = Ufw.Parse(ActiveFixture);
+            var set = new FirewallRuleSet { Name = "веб", Rules = [new RuleDraft { Port = "22", Comment = "другой комментарий" }, new RuleDraft { Port = "80,443" }, new RuleDraft { From = "203.0.113.10", Port = "9000" }], DefaultIncoming = "reject" };
+            var add = FirewallRuleSets.Plan(s, set, false);
+            TestSuite.True(add.Present.Count == 1 && add.Added.Count == 2 && add.Removed.Count == 0 && add.Commands.SequenceEqual(["ufw allow in proto tcp from 'any' to any port '80,443'", "ufw allow in proto tcp from '203.0.113.10' to any port '9000'", "ufw default reject incoming"])
+                && add.Notes.Any(n => n.Contains("203.0.113.10", StringComparison.Ordinal)), string.Join("
+", add.Commands));
+            var exact = FirewallRuleSets.Plan(s, set, true);
+            TestSuite.True(exact.Removed.Count == 4 && exact.Commands.Take(4).All(c => c.StartsWith("ufw --force delete", StringComparison.Ordinal)) && exact.Commands.Count == 7 && Ufw.CheckAfter(s, exact.Commands).Allowed == true
+                && exact.Notes.Any(n => n.Contains("тоже будут удалены", StringComparison.Ordinal)), string.Join("
+", exact.Commands));
+            var same = FirewallRuleSets.Plan(s, FirewallRuleSets.FromSnapshot(s, "x", true).Set, false);
+            TestSuite.True(same.Commands.Count == 0 && same.Present.Count == 3, "a set made from the server needs no change");
+            var closing = new FirewallRuleSet { Name = "закрыть", Rules = [new RuleDraft { Action = FirewallAction.Deny, Port = "22" }] };
+            TestSuite.True(Ufw.CheckAfter(s, FirewallRuleSets.Plan(s, closing, true).Commands).Allowed == false, "a set that would cut this SSH connection is predicted as such");
+        });
         await t.Run("ufw: the safe-apply script saves state, schedules the restore, restores on a failing command; odd commands are refused", () =>
         {
             var script = FirewallScripts.SafeApply("abc123", ["ufw allow in proto tcp from 'any' to any port '80'", Ufw.EnableCommand], 90);

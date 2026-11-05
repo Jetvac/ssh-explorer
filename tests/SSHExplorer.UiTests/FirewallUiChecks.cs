@@ -98,7 +98,30 @@ internal static class FirewallUiChecks
             evidence.Capture((FrameworkElement)wizard.Content, "firewall-bastion", new { theme = "Light", fixtureOnly = true });
         }
         finally { wizard.Close(); }
+
+        // Rule sets: save this server's rules, see the plan for applying a set, rename and delete — all on this computer.
+        var sets = new List<FirewallRuleSet> { new() { Name = "Веб-сервер", Rules = [new RuleDraft { Port = "22" }, new RuleDraft { Port = "80,443", Comment = "web" }], DefaultIncoming = "deny" } };
+        int saves = 0;
+        var setsWindow = new FirewallRuleSetsWindow(snapshot, sets, () => { saves++; return Task.CompletedTask; }, "фикстура") { ShowInTaskbar = false, Left = 60, Top = 60 };
+        setsWindow.Show(); Layout(setsWindow);
+        try
+        {
+            check(setsWindow.List.SelectedItem == sets[0] && setsWindow.Preview == "ufw allow in proto tcp from 'any' to any port '80,443' comment 'web'" && setsWindow.ApplyButton.IsEnabled && setsWindow.Verdict.Contains("Разрешено", StringComparison.Ordinal),
+                "a set's plan adds only the missing rule and shows this connection's access: " + setsWindow.Preview);
+            setsWindow.SetRemoveOthers(true); Pump();
+            check(setsWindow.Preview.Contains("ufw --force delete 'allow' 'from' '10.0.0.0/8'", StringComparison.Ordinal), "«exact copy» also removes the server's other rules");
+            setsWindow.SetRemoveOthers(false);
+            setsWindow.TypeNewName("Веб-сервер"); Wait(setsWindow.SaveNewAsync());
+            check(sets.Count == 1 && setsWindow.SaveState.Contains("уже есть", StringComparison.Ordinal), "a duplicate name is refused");
+            setsWindow.TypeNewName("Фикстура целиком"); Wait(setsWindow.SaveNewAsync()); Pump();
+            check(sets.Count == 2 && saves == 1 && sets[1].Rules.Count == 2 && setsWindow.List.SelectedItem == sets[1] && setsWindow.Preview.StartsWith("На сервере уже есть", StringComparison.Ordinal), "the server's rules are saved as a new set that needs no change here: " + setsWindow.SaveState);
+            evidence.Capture((FrameworkElement)setsWindow.Content, "firewall-rule-sets", new { theme = "Light", fixtureOnly = true });
+            Wait(setsWindow.RenameAsync("Фикстура — копия")); Wait(setsWindow.DeleteAsync()); Pump();
+            check(sets.Count == 1 && sets[0].Name == "Веб-сервер" && saves == 3, "rename and delete are saved");
+        }
+        finally { setsWindow.Close(); }
     }
+    static void Wait(Task task) { var watch = System.Diagnostics.Stopwatch.StartNew(); while (!task.IsCompleted) { if (watch.Elapsed > TimeSpan.FromSeconds(10)) throw new TimeoutException("rule set action"); Pump(); } task.GetAwaiter().GetResult(); }
 
     static void Pump() { var frame = new DispatcherFrame(); Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, () => frame.Continue = false); Dispatcher.PushFrame(frame); }
     static void Layout(Window w) { w.UpdateLayout(); Pump(); }
