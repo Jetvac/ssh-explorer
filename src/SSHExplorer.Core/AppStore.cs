@@ -287,6 +287,26 @@ public sealed class HostTrustStore
         }
         finally { _gate.Release(); }
     }
+    /// <summary>Stores a key the user confirmed (RDP certificates: also a replacement the user explicitly accepted).</summary>
+    public async Task TrustAsync(string host, int port, string algorithm, byte[] publicKey, bool replace, CancellationToken ct = default)
+    {
+        host = NormalizeHost(host);
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            TrustedHostKey[] removed;
+            var record = new TrustedHostKey { Host = host, Port = port, Algorithm = algorithm, PublicKey = Convert.ToBase64String(publicKey), Fingerprint = Fingerprint(publicKey), TrustedAtUtc = DateTime.UtcNow };
+            lock (_records)
+            {
+                removed = _records.Where(x => x.Host == host && x.Port == port && x.Algorithm == algorithm).ToArray();
+                if (removed.Length > 0 && !replace) throw new InvalidOperationException($"Для {host}:{port} уже доверен другой ключ.");
+                _records.RemoveAll(x => removed.Contains(x)); _records.Add(record);
+            }
+            try { await PersistAsync(ct).ConfigureAwait(false); }
+            catch { lock (_records) { _records.Remove(record); _records.AddRange(removed); } throw; }
+        }
+        finally { _gate.Release(); }
+    }
     // Calling this is an explicit trust reset. UI must show fingerprint and require a separate confirmation.
     public async Task ForgetAsync(string host, int port, string algorithm, CancellationToken ct = default)
     {

@@ -44,7 +44,9 @@ public sealed class ServerProfileViewModel(ServerProfile profile, SessionState[]
     public ServerProfile Profile => profile;
     public string Name => profile.Name;
     public string Endpoint => profile.Endpoint;
-    public string Username => profile.Username;
+    public string Username => profile.IsRdp && profile.Rdp.Domain.Length > 0 ? profile.Rdp.Domain + "\\" + profile.Username : profile.Username;
+    public string ProtocolGlyph => profile.IsRdp ? IconCatalog.RemoteDesktop : IconCatalog.Terminal;
+    public string ProtocolName => profile.IsRdp ? "Удалённый рабочий стол (RDP)" : "SSH: файлы и терминал";
     /// <summary>Null when ungrouped: sorts after named groups and shows as «Без группы».</summary>
     public string? GroupKey => string.IsNullOrWhiteSpace(profile.Group) ? null : profile.Group.Trim();
     public string GroupName => GroupKey ?? "Без группы";

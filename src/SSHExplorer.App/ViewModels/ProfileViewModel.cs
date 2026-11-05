@@ -21,6 +21,63 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public string ProxyJump{get=>_proxyJump;set=>Set(ref _proxyJump,value);}
     public string Group{get=>_group;set=>Set(ref _group,value);}
     public string ProxyJumpError=>Error(nameof(ProxyJump));
+    // Remote desktop (RDP) and folder inheritance.
+    int _protocolIndex,_audioIndex,_gatewayModeIndex;
+    string _domain="",_rdpWidth="",_rdpHeight="",_gatewayHost="",_gatewayUsername="";
+    bool _fitTab=true,_clipboard=true,_drives,_printers,_smartCards,_microphone,_nla=true,_adminSession,_gatewaySame=true;
+    bool _inheritUsername,_inheritDomain,_inheritPassword,_inheritRdp;
+    int _colorDepth=32;
+    /// <summary>0 — SSH, 1 — RDP.</summary>
+    public int ProtocolIndex
+    {
+        get=>_protocolIndex;
+        set
+        {
+            if(_protocolIndex==value)return;
+            // A port left at the other protocol's default follows the protocol.
+            if(value==1&&Port.Trim()=="22")Port="3389";else if(value==0&&Port.Trim()=="3389")Port="22";
+            Set(ref _protocolIndex,value);foreach(var name in new[]{nameof(IsRdp),nameof(IsSsh),nameof(UsernameLabel),nameof(ShowAgentNote),nameof(UsesSecret),nameof(SecretLabel),nameof(SecretExplanation)})Changed(name);
+            ClearError(nameof(Username));ClearError(nameof(InitialPath));ClearError("Rdp");
+        }
+    }
+    public bool IsRdp=>ProtocolIndex==1;
+    public bool ShowAgentNote=>IsSsh&&AuthenticationIndex==(int)AuthenticationKind.Agent;
+    public bool IsSsh=>!IsRdp;
+    public string UsernameLabel=>IsRdp?"Пользователь Windows":"Пользователь Linux";
+    public string Domain{get=>_domain;set=>Set(ref _domain,value);}
+    public bool FitTab{get=>_fitTab;set{Set(ref _fitTab,value);Changed(nameof(FixedSize));}}
+    public bool FixedSize=>!FitTab;
+    public string RdpWidth{get=>_rdpWidth;set=>Set(ref _rdpWidth,value);}
+    public string RdpHeight{get=>_rdpHeight;set=>Set(ref _rdpHeight,value);}
+    public int ColorDepthIndex{get=>_colorDepth switch{32=>0,24=>1,16=>2,_=>3};set=>Set(ref _colorDepth,value switch{0=>32,1=>24,2=>16,_=>15});}
+    public bool Clipboard{get=>_clipboard;set=>Set(ref _clipboard,value);}
+    public bool Drives{get=>_drives;set=>Set(ref _drives,value);}
+    public bool Printers{get=>_printers;set=>Set(ref _printers,value);}
+    public bool SmartCards{get=>_smartCards;set=>Set(ref _smartCards,value);}
+    public bool Microphone{get=>_microphone;set=>Set(ref _microphone,value);}
+    /// <summary>0 — на этом компьютере, 1 — на удалённом, 2 — не воспроизводить.</summary>
+    public int AudioIndex{get=>_audioIndex;set=>Set(ref _audioIndex,value);}
+    public bool Nla{get=>_nla;set=>Set(ref _nla,value);}
+    public bool AdminSession{get=>_adminSession;set=>Set(ref _adminSession,value);}
+    /// <summary>0 — без шлюза, 1 — всегда через шлюз, 2 — если сервер недоступен напрямую.</summary>
+    public int GatewayModeIndex{get=>_gatewayModeIndex;set{Set(ref _gatewayModeIndex,value);Changed(nameof(UsesGateway));}}
+    public bool UsesGateway=>GatewayModeIndex!=0;
+    public string GatewayHost{get=>_gatewayHost;set=>Set(ref _gatewayHost,value);}
+    public bool GatewaySameCredentials{get=>_gatewaySame;set{Set(ref _gatewaySame,value);Changed(nameof(GatewayOwnCredentials));}}
+    public bool GatewayOwnCredentials=>!GatewaySameCredentials;
+    public string GatewayUsername{get=>_gatewayUsername;set=>Set(ref _gatewayUsername,value);}
+    public bool InheritUsername{get=>_inheritUsername;set{Set(ref _inheritUsername,value);ClearError(nameof(Username));}}
+    public bool InheritDomain{get=>_inheritDomain;set=>Set(ref _inheritDomain,value);}
+    public bool InheritPassword{get=>_inheritPassword;set{Set(ref _inheritPassword,value);Changed(nameof(UsesSecret));Changed(nameof(SecretExplanation));ClearError("Secret");}}
+    public bool InheritRdp{get=>_inheritRdp;set=>Set(ref _inheritRdp,value);}
+    public string RdpError=>Error("Rdp");
+    RdpOptions BuildRdp()=>new()
+    {
+        Domain=Domain.Trim(),Width=FitTab?0:int.TryParse(RdpWidth.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out var w)?w:-1,Height=FitTab?0:int.TryParse(RdpHeight.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out var h)?h:-1,
+        ColorDepth=_colorDepth,Clipboard=Clipboard,Drives=Drives,Printers=Printers,SmartCards=SmartCards,Microphone=Microphone,Audio=(RdpAudio)Math.Clamp(AudioIndex,0,2),Nla=Nla,AdminSession=AdminSession,
+        GatewayMode=(RdpGatewayMode)Math.Clamp(GatewayModeIndex,0,2),GatewayHost=GatewayHost.Trim(),GatewaySameCredentials=GatewaySameCredentials,GatewayUsername=GatewayUsername.Trim(),
+    };
+    InheritFlags BuildInherit()=>(InheritUsername?InheritFlags.Username:0)|(InheritDomain&&IsRdp?InheritFlags.Domain:0)|(InheritPassword?InheritFlags.Password:0)|(InheritRdp&&IsRdp?InheritFlags.RdpOptions:0);
     public string GroupError=>Error(nameof(Group));
     private readonly Dictionary<string,string> _errors=[];
     private string _profileName,_host,_port,_username,_keyPath,_initialPath,_timeout,_status="";
@@ -33,6 +90,14 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         _profileName=old?.Name??"";_host=old?.Host??"";_port=(old?.Port??22).ToString(CultureInfo.InvariantCulture);
         _username=old?.Username??"";_keyPath=old?.PrivateKeyPath??"";_initialPath=old?.InitialPath??"~";
         _timeout=(old?.TimeoutSeconds??20).ToString(CultureInfo.InvariantCulture);_authenticationIndex=(int)(old?.Authentication??AuthenticationKind.Password);_saveSecret=old?.SaveSecret??false;
+        _protocolIndex=old?.IsRdp==true?1:0;
+        if(old?.Rdp is {} o)
+        {
+            _domain=o.Domain;_fitTab=o.FitsTab;_rdpWidth=o.FitsTab?"":o.Width.ToString(CultureInfo.InvariantCulture);_rdpHeight=o.FitsTab?"":o.Height.ToString(CultureInfo.InvariantCulture);_colorDepth=o.ColorDepth;
+            _clipboard=o.Clipboard;_drives=o.Drives;_printers=o.Printers;_smartCards=o.SmartCards;_microphone=o.Microphone;_audioIndex=(int)o.Audio;_nla=o.Nla;_adminSession=o.AdminSession;
+            _gatewayModeIndex=(int)o.GatewayMode;_gatewayHost=o.GatewayHost;_gatewaySame=o.GatewaySameCredentials;_gatewayUsername=o.GatewayUsername;
+        }
+        var inherit=old?.Inherit??InheritFlags.None;_inheritUsername=inherit.HasFlag(InheritFlags.Username);_inheritDomain=inherit.HasFlag(InheritFlags.Domain);_inheritPassword=inherit.HasFlag(InheritFlags.Password);_inheritRdp=inherit.HasFlag(InheritFlags.RdpOptions);
     }
     void Changed([System.Runtime.CompilerServices.CallerMemberName]string? property=null)=>PropertyChanged?.Invoke(this,new(property));
     void Set<T>(ref T field,T value,[System.Runtime.CompilerServices.CallerMemberName]string? property=null)
@@ -50,13 +115,13 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public int AuthenticationIndex
     {
         get=>_authenticationIndex;
-        set{if(_authenticationIndex!=value)_hasStoredSecret=false;Set(ref _authenticationIndex,value);Changed(nameof(IsKeyAuthentication));Changed(nameof(UsesSecret));Changed(nameof(SecretLabel));Changed(nameof(SecretExplanation));ClearError(nameof(PrivateKeyPath));ClearError("Secret");}
+        set{if(_authenticationIndex!=value)_hasStoredSecret=false;Set(ref _authenticationIndex,value);Changed(nameof(IsKeyAuthentication));Changed(nameof(UsesSecret));Changed(nameof(SecretLabel));Changed(nameof(SecretExplanation));Changed(nameof(ShowAgentNote));ClearError(nameof(PrivateKeyPath));ClearError("Secret");}
     }
     public bool SaveSecret{get=>_saveSecret;set{Set(ref _saveSecret,value);Changed(nameof(SecretExplanation));ClearError("Secret");}}
-    public bool IsKeyAuthentication=>AuthenticationIndex==(int)AuthenticationKind.PrivateKey;
+    public bool IsKeyAuthentication=>IsSsh&&AuthenticationIndex==(int)AuthenticationKind.PrivateKey;
     /// <summary>An SSH agent signs for the user: there is no password or passphrase to enter or store.</summary>
-    public bool UsesSecret=>AuthenticationIndex!=(int)AuthenticationKind.Agent;
-    public string SecretLabel=>IsKeyAuthentication?"Парольная фраза ключа (если задана)":AuthenticationIndex==2?"Пароль для первоначального запроса":"Пароль";
+    public bool UsesSecret=>IsRdp?!InheritPassword:AuthenticationIndex!=(int)AuthenticationKind.Agent&&!InheritPassword;
+    public string SecretLabel=>IsRdp?"Пароль Windows":IsKeyAuthentication?"Парольная фраза ключа (если задана)":AuthenticationIndex==2?"Пароль для первоначального запроса":"Пароль";
     public string SecretExplanation=>(IsKeyAuthentication?"Для незашифрованного ключа парольная фраза не нужна. ":AuthenticationIndex==2?"Дополнительные запросы и одноразовые коды вводятся отдельно и не сохраняются. ":"Пустое поле можно заполнить при подключении. ")+
         (SaveSecret?"«Сохранить» записывает введённый секрет без проверки. «Сохранить и подключиться» обновит его только после успешного входа.":"«Сохранить» записывает только профиль; пароль потребуется при будущем входе. «Сохранить и подключиться» использует введённое значение в этой попытке.")+
         (_hasStoredSecret?" Пустое поле при отдельном сохранении оставит прежний защищённый секрет.":"");
@@ -76,7 +141,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         RaiseErrors();
         if(_errors.Count==0&&Status==ValidationSummary)Status="";
     }
-    void RaiseErrors(){foreach(var name in new[]{nameof(NameError),nameof(HostError),nameof(PortError),nameof(UserError),nameof(KeyError),nameof(InitialPathError),nameof(ProxyJumpError),nameof(TimeoutError),nameof(SecretError)})Changed(name);}
+    void RaiseErrors(){foreach(var name in new[]{nameof(NameError),nameof(HostError),nameof(PortError),nameof(UserError),nameof(KeyError),nameof(InitialPathError),nameof(ProxyJumpError),nameof(TimeoutError),nameof(SecretError),nameof(RdpError)})Changed(name);}
     public void SecretChanged()=>ClearError("Secret");
     public bool Validate(string secret)
         =>Validate(secret,deferSecretUntilAuthentication:false);
@@ -87,13 +152,17 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         if(string.IsNullOrWhiteSpace(Host))_errors[nameof(Host)]="Введите адрес сервера.";
         else if(!TryNormalizeHost(Host,out _))_errors[nameof(Host)]="Укажите DNS-имя, IPv4 или IPv6 без схемы, порта и пути.";
         if(!int.TryParse(Port.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out int port)||port is <1 or >65535)_errors[nameof(Port)]="Порт: число от 1 до 65535.";
-        if(string.IsNullOrWhiteSpace(Username))_errors[nameof(Username)]="Введите имя пользователя Linux.";
+        if(string.IsNullOrWhiteSpace(Username)&&!InheritUsername)_errors[nameof(Username)]=IsRdp?"Введите имя пользователя Windows или отметьте «Из папки».":"Введите имя пользователя Linux.";
         else if(Username.Any(char.IsControl))_errors[nameof(Username)]="Имя пользователя содержит управляющие символы.";
         if(AuthenticationIndex is <0 or >3)_errors["Authentication"]="Выберите способ входа.";
         if(IsKeyAuthentication&&(string.IsNullOrWhiteSpace(PrivateKeyPath)||!File.Exists(PrivateKeyPath.Trim())))_errors[nameof(PrivateKeyPath)]="Выберите существующий локальный файл приватного ключа.";
         if(!int.TryParse(Timeout.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out int timeout)||timeout is <3 or >120)_errors[nameof(Timeout)]="Таймаут: число от 3 до 120 секунд.";
-        try{_ = PosixPath.Normalize(string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim());}
-        catch(ArgumentException){_errors[nameof(InitialPath)]="Используйте абсолютный POSIX-путь или ~ домашней папки.";}
+        if(IsSsh)
+        {
+            try{_ = PosixPath.Normalize(string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim());}
+            catch(ArgumentException){_errors[nameof(InitialPath)]="Используйте абсолютный POSIX-путь или ~ домашней папки.";}
+        }
+        else if(RdpOptions.Validate(BuildRdp()) is {} rdp)_errors["Rdp"]=rdp;
         try{_ = ProxyJumpSpec.Parse(ProxyJump);}
         catch(ArgumentException ex){_errors[nameof(ProxyJump)]=ex.Message;}
         if(ProxyJump.Trim().Length>0&&(AuthenticationKind)AuthenticationIndex is AuthenticationKind.Password or AuthenticationKind.KeyboardInteractive&&ProxyJumpSpec.Parse(ProxyJump.Trim()) is {Count:>0} hops&&hops[^1] is {User:not null} or {Port:not null})
@@ -123,7 +192,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         try
         {
             TryNormalizeHost(Host,out string host);
-            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret&&UsesSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim(),DockerTemplates=_dockerTemplates.Select(t=>t.Clone()).ToList(),Scripts=_scripts.Select(s=>s.Clone()).ToList(),Tunnels=_tunnels.Select(t=>t.Clone()).ToList()};
+            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=IsRdp?AuthenticationKind.Password:(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret&&UsesSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim(),DockerTemplates=_dockerTemplates.Select(t=>t.Clone()).ToList(),Scripts=_scripts.Select(s=>s.Clone()).ToList(),Tunnels=_tunnels.Select(t=>t.Clone()).ToList(),Protocol=IsRdp?ConnectionProtocol.Rdp:ConnectionProtocol.Ssh,Rdp=BuildRdp(),Inherit=BuildInherit()};
             var result=deferSecretUntilAuthentication
                 ?await _persistence.SaveForConnectionAsync(profile,ct)
                 :await _persistence.SaveAsync(profile,SaveSecret&&!(secret.Length==0&&_hasStoredSecret)?secret:null,ct);

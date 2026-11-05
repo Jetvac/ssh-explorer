@@ -55,6 +55,7 @@ public static class ProxyJumpSpec
         var named = last.User is null && last.Port is null ? saved.FirstOrDefault(p => string.Equals(p.Name, last.Host, StringComparison.OrdinalIgnoreCase) && p.Id != target.Id) : null;
         ServerProfile hop;
         bool needsSecret;
+        if (named is { IsRdp: true }) throw new InvalidOperationException($"«{named.Name}» — профиль удалённого рабочего стола (RDP); промежуточным может быть только SSH-сервер.");
         if (named is not null)
         {
             hop = Clone(named); needsSecret = named.Authentication is AuthenticationKind.Password or AuthenticationKind.KeyboardInteractive;

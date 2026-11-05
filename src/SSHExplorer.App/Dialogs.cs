@@ -43,11 +43,11 @@ public static class Dialogs
     {
         if(ct.IsCancellationRequested)return null;
         var w = Window("Вход — " + profile.Name, 480,owner); var p = new StackPanel { Margin = new Thickness(24) };
-        p.Children.Add(Ui.DialogHeading(profile.Username + "@" + profile.Endpoint));
+        p.Children.Add(Ui.DialogHeading((profile.IsRdp && profile.Rdp.Domain.Length > 0 ? profile.Rdp.Domain + "\\" : "") + profile.Username + "@" + profile.Endpoint));
         if(notice is not null){var warning=Ui.Text(notice,12);warning.TextWrapping=TextWrapping.Wrap;warning.Margin=new Thickness(0,8,0,8);p.Children.Add(warning);}
-        p.Children.Add(Ui.Text(profile.Authentication == AuthenticationKind.PrivateKey ? "Passphrase приватного ключа (может быть пустой)" : "Пароль", 14));
-        var password = new SecretEntry(profile.Authentication==AuthenticationKind.PrivateKey?"Парольная фраза приватного ключа":"Пароль SSH") { Password = saved ?? "", Margin = new Thickness(0, 10, 0, 12) }; p.Children.Add(password);
-        var info = Ui.Text("Секрет передаётся только после проверки ключа сервера.\n"+(profile.SaveSecret?"Защищённая копия обновится только после успешного подключения.":"Секрет не сохраняется. Эту настройку можно изменить в профиле."), 12); info.TextWrapping = TextWrapping.Wrap; info.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(info);
+        p.Children.Add(Ui.Text(profile.IsRdp ? "Пароль Windows" : profile.Authentication == AuthenticationKind.PrivateKey ? "Passphrase приватного ключа (может быть пустой)" : "Пароль", 14));
+        var password = new SecretEntry(profile.IsRdp?"Пароль удалённого рабочего стола":profile.Authentication==AuthenticationKind.PrivateKey?"Парольная фраза приватного ключа":"Пароль SSH") { Password = saved ?? "", Margin = new Thickness(0, 10, 0, 12) }; p.Children.Add(password);
+        var info = Ui.Text((profile.IsRdp?"Пароль передаётся только элементу удалённого рабочего стола Windows и только после проверки сертификата сервера.\n":"Секрет передаётся только после проверки ключа сервера.\n")+(profile.SaveSecret?"Защищённая копия обновится только после успешного подключения.":"Секрет не сохраняется. Эту настройку можно изменить в профиле."), 12); info.TextWrapping = TextWrapping.Wrap; info.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); p.Children.Add(info);
         var ok = Ui.Button("Подключиться", () => w.DialogResult = true); ok.IsDefault = true;ok.SetResourceReference(FrameworkElement.StyleProperty,"PrimaryButtonStyle");
         var cancel = Ui.Button("Отмена", () => w.DialogResult = false); cancel.IsCancel = true;
         w.Content = Ui.DialogSurface(p,cancel,ok); w.Loaded += (_, _) => password.FocusInput();
@@ -74,6 +74,40 @@ public static class Dialogs
             w.Content=Ui.DialogSurface(p,cancel,Ui.Button("Только эта сессия",()=>{result=TrustDecision.Session;w.DialogResult=true;}),permanent);
         }
         return ModalRunner.Show(w,Owner(owner),ct)?result:TrustDecision.Reject;
+    }
+    /// <summary>CI hook: the decision for an RDP certificate instead of the dialog.</summary>
+    internal static Func<HostKeyPrompt, TrustDecision>? RdpCertificateOverride { get; set; }
+    /// <summary>
+    /// The TLS key of a remote desktop server. A new key is confirmed like an SSH host key. A changed key is refused by
+    /// default; it can be replaced only after ticking that the new fingerprint was checked (RDP certificates are renewed
+    /// by Windows, unlike SSH host keys).
+    /// </summary>
+    public static TrustDecision RdpCertificate(HostKeyPrompt key,Window? owner=null)
+    {
+        if(RdpCertificateOverride is { } decide)return decide(key);
+        var w = Window(key.Changed?"Сертификат сервера изменён":"Проверка сертификата сервера", 660,owner); var p = new StackPanel { Margin = new Thickness(24) };
+        p.Children.Add(Ui.DialogHeading(key.Changed?"Сертификат удалённого рабочего стола изменён":"Доверять этому серверу?"));
+        var explanation = Ui.Text(key.Changed
+            ?"Ключ сервера не совпадает с сохранённым. Windows обновляет сертификат удалённого рабочего стола по сроку, но так же выглядит и подмена сервера. Пароль не отправлен."
+            :"Сервер удалённого рабочего стола впервые предъявил ключ. Сравните отпечаток с данными администратора до входа: пароль отправляется только после вашего решения."); explanation.TextWrapping = TextWrapping.Wrap; explanation.Margin = new Thickness(0, 12, 0, 18); p.Children.Add(explanation);
+        var endpoint=Ui.Text($"Адрес: {key.Host}:{key.Port}\nКлюч: {key.Algorithm}");endpoint.TextWrapping=TextWrapping.Wrap;p.Children.Add(endpoint);
+        var fp = new TextBox { Text = key.Fingerprint, IsReadOnly = true, FontFamily = new FontFamily("Consolas"), Margin = new Thickness(0, 14, 0, 12) };System.Windows.Automation.AutomationProperties.SetName(fp,"SHA256-отпечаток ключа сервера");p.Children.Add(fp);
+        var result = TrustDecision.Reject;
+        var cancel=Ui.Button("Не подключаться",()=>w.DialogResult=false);cancel.IsCancel=true;
+        if(key.Changed)
+        {
+            var old=Ui.Text("Ранее: "+key.PreviousFingerprint);old.TextWrapping=TextWrapping.Wrap;old.Margin=new Thickness(0,0,0,12);p.Children.Add(old);
+            var checkedBox=new CheckBox{Content=new TextBlock{Text="Я сверил новый отпечаток с администратором сервера",TextWrapping=TextWrapping.Wrap},Margin=new Thickness(0,0,0,6)};p.Children.Add(checkedBox);
+            var replace=Ui.Button("Заменить и подключиться",()=>{result=TrustDecision.Permanent;w.DialogResult=true;});replace.IsEnabled=false;replace.Name="RdpReplaceCertificate";
+            checkedBox.Checked+=(_,_)=>replace.IsEnabled=true;checkedBox.Unchecked+=(_,_)=>replace.IsEnabled=false;
+            w.Content=Ui.DialogSurface(p,replace,cancel);w.Loaded+=(_,_)=>cancel.Focus();
+        }
+        else
+        {
+            var permanent=Ui.Button("Доверить и сохранить",()=>{result=TrustDecision.Permanent;w.DialogResult=true;});permanent.SetResourceReference(FrameworkElement.StyleProperty,"PrimaryButtonStyle");
+            w.Content=Ui.DialogSurface(p,cancel,Ui.Button("Только этот сеанс",()=>{result=TrustDecision.Session;w.DialogResult=true;}),permanent);
+        }
+        return ModalRunner.Show(w,Owner(owner),CancellationToken.None)?result:TrustDecision.Reject;
     }
     public static string? Interactive(InteractivePrompt prompt,Window? owner=null,CancellationToken ct=default)
     {

@@ -24,6 +24,23 @@ public sealed partial class ServerSession
         finally { _jumpGate.Release(); }
     }
 
+    /// <summary>
+    /// Remote desktop through SSH: only the jump tunnel to <c>Profile.Host:Profile.Port</c> (3389) is opened and its
+    /// loopback port returned. Nothing of the target's credentials goes over SSH; saved hop profiles sign in with their
+    /// own secrets, and an address-only hop is refused for a password profile (see <see cref="ProxyJumpSpec.ResolveLast"/>).
+    /// </summary>
+    public async Task<int> OpenForwardOnlyAsync(Func<HostKeyPrompt, CancellationToken, Task<TrustDecision>> prompt, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (ProxyJumpSpec.Parse(Profile.ProxyJump).Count == 0) throw new InvalidOperationException("Промежуточный сервер не задан.");
+        _credentials ??= new SessionCredentials(""); _prompt = prompt; if (_connectOperationId == Guid.Empty) _connectOperationId = Guid.NewGuid();
+        var (_, port) = await ConnectEndpointAsync(ct).ConfigureAwait(false);
+        return port;
+    }
+
+    /// <summary>True while the tunnel opened by <see cref="OpenForwardOnlyAsync"/> is up.</summary>
+    public bool ForwardAlive => _jump is { IsAlive: true };
+
     /// <summary>Description of the route for the status line, e.g. "через bastion → jump2".</summary>
     public string? Route => _jump?.Route;
     internal int? JumpPort => _jump?.Port;

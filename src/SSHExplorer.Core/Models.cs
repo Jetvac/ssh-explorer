@@ -28,15 +28,23 @@ public sealed class ServerProfile
     public List<SavedScript> Scripts { get; set; } = [];
     /// <summary>Saved port forwards (-L/-R) for this server; opened from «Туннели» or on connect.</summary>
     public List<TunnelSpec> Tunnels { get; set; } = [];
+    /// <summary>SSH (files, terminal, task manager) or RDP (remote desktop in a tab). Older profiles are SSH.</summary>
+    public ConnectionProtocol Protocol { get; set; }
+    /// <summary>Remote desktop options; used when <see cref="Protocol"/> is RDP or the server is opened by RDP.</summary>
+    public RdpOptions Rdp { get; set; } = new();
+    /// <summary>Values taken from the nearest Home folder that defines them (as in mRemoteNG); see <see cref="ProfileInheritance"/>.</summary>
+    public InheritFlags Inherit { get; set; }
+    public bool IsRdp => Protocol == ConnectionProtocol.Rdp;
     public string Endpoint => $"{(Host.Contains(':') ? $"[{Host}]" : Host)}:{Port}";
     public void Validate()
     {
-        if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username))
+        if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username) && !Inherit.HasFlag(InheritFlags.Username))
             throw new ArgumentException("Укажите название, адрес сервера и пользователя.");
         if (Host.Any(char.IsWhiteSpace) || Host.IndexOfAny(['/', '\\', '\0']) >= 0)
             throw new ArgumentException("Адрес должен быть DNS-именем, IPv4 или IPv6 без схемы и пути.");
         if (Port is < 1 or > 65535) throw new ArgumentException("Порт должен быть от 1 до 65535.");
         if (TimeoutSeconds is < 3 or > 120) throw new ArgumentException("Время ожидания должно быть от 3 до 120 секунд.");
+        if (IsRdp) { if (RdpOptions.Validate(Rdp) is { } rdp) throw new ArgumentException(rdp); return; }
         if (Authentication == AuthenticationKind.PrivateKey && !File.Exists(PrivateKeyPath))
             throw new FileNotFoundException("Приватный ключ не найден.", PrivateKeyPath);
     }
@@ -93,6 +101,8 @@ public sealed class AppSettings
     public bool AlertWindowsNotifications { get; set; } = true;
     /// <summary>Saved terminal commands («Фрагменты»), shared by all servers.</summary>
     public List<CommandSnippet> Snippets { get; set; } = [];
+    /// <summary>Home folders with values their servers inherit (user, domain, password, RDP options).</summary>
+    public List<FolderDefaults> Folders { get; set; } = [];
     /// <summary>Once a day at start: ask GitHub whether a newer release exists (nothing is downloaded).</summary>
     public bool CheckUpdates { get; set; } = true;
     public DateTime? LastUpdateCheckUtc { get; set; }

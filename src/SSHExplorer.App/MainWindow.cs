@@ -23,6 +23,9 @@ public sealed partial class MainWindow : Window
     readonly DataGrid servers = new();
     readonly TextBox search = new() { MinWidth = 300, ToolTip = "Поиск сохранённых серверов" };
     readonly Dictionary<TabItem, SessionView> sessions = [];
+    /// <summary>Remote desktop tabs; their native controls live on <see cref="desktopLayer"/> over the whole window.</summary>
+    readonly Dictionary<TabItem, RdpView> desktops = [];
+    readonly Canvas desktopLayer = new() { Name = "DesktopLayer" };
     readonly Dictionary<Guid, int> sessionNumbers = [];
     readonly TextBlock homeStatus = Ui.Text("");
     readonly HomeViewModel viewModel = new();
@@ -56,7 +59,7 @@ public sealed partial class MainWindow : Window
         caption = new WindowCaption(this);
         var trailing = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top }; trailing.Children.Add(actions); trailing.Children.Add(caption);
         SessionTabInfo.SetTrailingContent(tabs, trailing);
-        root.Children.Add(tabs); Content = root;
+        root.Children.Add(tabs); root.Children.Add(desktopLayer); Content = root;
         home.Header = Ui.Row(Ui.Icon("\uE80F", 16), Ui.Text("Главная")); SessionTabInfo.SetTitle(home, "Главная"); home.Content = BuildHome(); tabs.Items.Add(home); tabs.SelectedItem = home;
         tabs.SelectionChanged += (_, e) => { if (!ReferenceEquals(e.OriginalSource, tabs)) return; foreach (var (tab, view) in sessions) view.SetActive(tabs.SelectedItem == tab); RevealSelectedTab(); RefreshHome(); };
         tabs.SizeChanged+=(_,_)=>RevealSelectedTab();
@@ -106,12 +109,12 @@ public sealed partial class MainWindow : Window
         servers.Margin = new Thickness(12, 4, 12, 0); servers.SelectionMode = DataGridSelectionMode.Single;
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
-        AddColumn(servers, "Название", "Name", 260); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+        servers.Columns.Add(ProtocolColumn()); AddColumn(servers, "Название", "Name", 240); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
         TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank)], "Name",
             group: new("Group", r => ((ServerProfileViewModel)r).GroupKey, true));
         HomeGrouping.Attach(servers, () => viewModel.HasGroups);
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Выполнить на группе…", () => RunOnGroupAsync(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.Terminal), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
+        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Открыть по RDP", () => viewModel.SelectedProfile is { } chosen ? OpenDesktopAsync(chosen.Profile, asDesktop: true) : Task.CompletedTask, glyph: IconCatalog.RemoteDesktop), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Выполнить на группе…", () => RunOnGroupAsync(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.Terminal), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
         var body = new Grid(); body.Children.Add(servers); var empty = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 390, Margin = new Thickness(24) }; var emptyTitle = Ui.Text("", 18, true); emptyTitle.HorizontalAlignment = HorizontalAlignment.Center; emptyTitle.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateTitle))); empty.Children.Add(emptyTitle); var emptyText = Ui.Text(""); emptyText.TextWrapping = TextWrapping.Wrap; emptyText.TextAlignment = TextAlignment.Center; emptyText.Margin = new Thickness(0, 10, 0, 16); emptyText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); emptyText.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateMessage))); empty.Children.Add(emptyText); empty.SetBinding(VisibilityProperty, new Binding(nameof(HomeViewModel.ShowEmptyState)) { Converter = new BooleanToVisibilityConverter() }); body.Children.Add(empty); p.Children.Add(body); return p;
     }
@@ -127,7 +130,7 @@ public sealed partial class MainWindow : Window
     {
         if (refreshingHome) return;
         refreshingHome = true;
-        try { viewModel.Refresh(App.Store.Profiles, sessions.Values.Select(v => (v.Session.Profile.Id, v.Session.State))); }
+        try { viewModel.Refresh(App.Store.Profiles, sessions.Values.Select(v => (v.Session.Profile.Id, v.Session.State)).Concat(desktops.Values.Select(d => (d.Profile.Id, d.State)))); }
         finally { refreshingHome = false; }
     }
     const string ImportGlyph = "";
@@ -350,11 +353,12 @@ public sealed partial class MainWindow : Window
     internal Task RunOnGroupAsync(ServerProfile? around = null)
     {
         if (closing) return Task.CompletedTask;
-        if (App.Store.Profiles.Count == 0) { Ui.Info("Сохранённых серверов нет."); return Task.CompletedTask; }
+        var ssh = App.Store.Profiles.Where(p => !p.IsRdp).ToArray();
+        if (ssh.Length == 0) { Ui.Info("Сохранённых SSH-серверов нет."); return Task.CompletedTask; }
         var chosen = around ?? viewModel.SelectedProfile?.Profile;
-        var ids = chosen is null ? App.Store.Profiles.Select(p => p.Id).ToArray()
-            : chosen.Group.Length > 0 ? App.Store.Profiles.Where(p => p.Group == chosen.Group).Select(p => p.Id).ToArray() : [chosen.Id];
-        var window = new GroupRunWindow(App.Store.Profiles.ToArray(), ids, new GroupRunner(App.Store)) { Owner = this };
+        var ids = chosen is null ? ssh.Select(p => p.Id).ToArray()
+            : chosen.Group.Length > 0 ? ssh.Where(p => p.Group == chosen.Group).Select(p => p.Id).ToArray() : chosen.IsRdp ? Array.Empty<Guid>() : new[] { chosen.Id };
+        var window = new GroupRunWindow(ssh, ids, new GroupRunner(App.Store)) { Owner = this };
         if (GroupRunWindowOverride is not null) GroupRunWindowOverride(window); else ModalRunner.Show(window, this, windowLifetime.Token);
         _ = App.Store.SaveAsync();
         return Task.CompletedTask;
@@ -412,6 +416,7 @@ public sealed partial class MainWindow : Window
         TabItem? replacement = null, SessionView? previous = null)
     {
         if (closing) return;
+        if (profile.IsRdp) { await OpenDesktopAsync(profile, forceCredentials: forceCredentials); return; }
         using var attempt = connectionAttempts.TryBegin(profile.Id, independent);
         if (attempt is null) return;
         ServerSession? session = null; SessionView? view = null; ConnectionInteraction? interaction = null;
@@ -486,6 +491,112 @@ public sealed partial class MainWindow : Window
             interaction?.InitialFinished(); await attempt.FlushAsync(); RefreshHome();
         }
     }
+    static DataGridTemplateColumn ProtocolColumn()
+    {
+        var icon = new FrameworkElementFactory(typeof(ContentControl));
+        icon.SetBinding(ContentControl.ContentProperty, new Binding(nameof(ServerProfileViewModel.ProtocolGlyph)) { Converter = new GlyphIconConverter() });
+        icon.SetBinding(FrameworkElement.ToolTipProperty, new Binding(nameof(ServerProfileViewModel.ProtocolName)));
+        icon.SetBinding(System.Windows.Automation.AutomationProperties.NameProperty, new Binding(nameof(ServerProfileViewModel.ProtocolName)));
+        icon.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        icon.SetValue(Control.IsTabStopProperty, false);
+        return new DataGridTemplateColumn { Header = "", Width = 34, CanUserResize = false, CanUserSort = false, CellTemplate = new DataTemplate { VisualTree = icon } };
+    }
+    sealed class GlyphIconConverter : IValueConverter
+    {
+        public object? Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) => value is string glyph ? Ui.Icon(glyph, 16, false) : null;
+        public object? ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) => Binding.DoNothing;
+    }
+    /// <summary>
+    /// Opens a remote desktop tab. An SSH profile opened «по RDP» uses the same address and user with port 3389. The
+    /// password comes from the profile, from its folder (inheritance) or is asked for; it goes only to the RDP control.
+    /// </summary>
+    internal async Task OpenDesktopAsync(ServerProfile stored, bool asDesktop = false, bool forceCredentials = false, RdpView? previous = null)
+    {
+        if (closing) return;
+        var source = stored;
+        if (!stored.IsRdp)
+        {
+            if (!asDesktop) return;
+            source = new ServerProfile { Id = stored.Id, Name = stored.Name, Host = stored.Host, Port = 3389, Username = stored.Username, Group = stored.Group, Protocol = ConnectionProtocol.Rdp, Rdp = stored.Rdp.Clone(), Inherit = stored.Inherit, TimeoutSeconds = stored.TimeoutSeconds, ProxyJump = stored.ProxyJump, Authentication = AuthenticationKind.Password };
+        }
+        var resolved = ProfileInheritance.Resolve(source, App.Store.Settings.Folders);
+        if (resolved.Missing.Count > 0) { Ui.Error($"Профиль «{stored.Name}» наследует из папки «{stored.Group}»: {string.Join(", ", resolved.Missing)}, но в папке они не заданы. Задайте их: правый щелчок по группе на «Главной» → «Параметры папки…»."); return; }
+        var profile = resolved.Profile;
+        string? saved = null; bool unavailable = false;
+        try
+        {
+            if (resolved.PasswordFolder is { } folder) saved = await App.Store.ReadSecretAsync(folder, windowLifetime.Token);
+            else if (stored.IsRdp && stored.SaveSecret) saved = await App.Store.ReadSecretAsync(stored.Id, windowLifetime.Token);
+        }
+        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or IOException or UnauthorizedAccessException or FormatException) { unavailable = true; _ = LocalDiagnostics.RecordAsync("rdp.secret.read.failed", ex); }
+        string secret;
+        bool typed = false;
+        if (saved is not null && !forceCredentials && !requireCredentials.Contains(stored.Id)) secret = saved;
+        else
+        {
+            var entered = Dialogs.Credentials(profile, null, this, windowLifetime.Token, unavailable ? "Сохранённый пароль недоступен. Введите его заново." : null);
+            if (entered is null) return;
+            secret = entered.Secret; typed = true;
+        }
+        TabItem? tab = null; var view = previous;
+        if (view is null)
+        {
+            view = new RdpView(profile, desktopLayer) { ReconnectRequested = v => ReconnectDesktopAsync(v) };
+            view.StateChanged += (_, _) => { if (!closing && !Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(RefreshHome); };
+            tab = AddDesktopTab(stored, view);
+        }
+        else tabs.SelectedItem = desktops.FirstOrDefault(p => ReferenceEquals(p.Value, view)).Key;
+        RefreshHome();
+        bool ok;
+        try { ok = await view.ConnectAsync(secret, windowLifetime.Token); }
+        catch (OperationCanceledException) { return; }
+        if (!ok) { if (view.LastError is { } why && why.Contains("пароль", StringComparison.OrdinalIgnoreCase)) requireCredentials.Add(stored.Id); return; }
+        requireCredentials.Remove(stored.Id);
+        if (typed && stored.IsRdp && stored.SaveSecret && resolved.PasswordFolder is null && saved != secret)
+        {
+            try { await App.Store.SaveAuthenticatedSecretAsync(stored, secret, windowLifetime.Token); }
+            catch (Exception ex) { _ = LocalDiagnostics.RecordAsync("rdp.secret.commit.failed", ex); }
+        }
+    }
+    Task ReconnectDesktopAsync(RdpView view) => OpenDesktopAsync(App.Store.Profiles.FirstOrDefault(p => p.Id == view.Profile.Id) ?? view.Profile, asDesktop: true, previous: view);
+    TabItem AddDesktopTab(ServerProfile profile, RdpView view)
+    {
+        var tab = new TabItem { Content = view };
+        tab.SetResourceReference(StyleProperty, "SessionTabItemStyle");
+        var number = sessionNumbers.GetValueOrDefault(profile.Id) + 1; sessionNumbers[profile.Id] = number; var title = profile.Name + (number > 1 ? $" ({number})" : "");
+        SessionTabInfo.SetTitle(tab, title); SessionTabInfo.SetDescription(tab, "RDP · " + (view.Profile.Rdp.Domain.Length > 0 ? view.Profile.Rdp.Domain + "\\" : "") + view.Profile.Username + "@" + view.Profile.Endpoint);
+        System.Windows.Automation.AutomationProperties.SetName(tab, title); System.Windows.Automation.AutomationProperties.SetHelpText(tab, SessionTabInfo.GetDescription(tab));
+        var close = Ui.Button("", async () => await CloseTab(tab), "Закрыть «" + title + "» (Ctrl+F4)"); close.Name = "SessionTabCloseButton"; close.Content = Ui.Icon(Ui.CloseGlyph, 11, false); close.SetResourceReference(StyleProperty, "TabCloseButtonStyle"); WindowChrome.SetIsHitTestVisibleInChrome(close, true);
+        var label = Ui.Text(title); label.TextTrimming = TextTrimming.CharacterEllipsis; label.MinWidth = 0;
+        var header = new Grid { ToolTip = title + "\n" + SessionTabInfo.GetDescription(tab) }; header.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        header.Children.Add(Ui.Icon(IconCatalog.RemoteDesktop, 16)); Grid.SetColumn(label, 1); header.Children.Add(label); Grid.SetColumn(close, 2); header.Children.Add(close); tab.Header = header; WindowChrome.SetIsHitTestVisibleInChrome(header, true);
+        bool middlePressed = false;
+        tab.PreviewMouseDown += (_, e) => { if (e.ChangedButton == MouseButton.Middle) { middlePressed = true; e.Handled = true; } };
+        tab.PreviewMouseUp += async (_, e) => { if (e.ChangedButton != MouseButton.Middle) return; e.Handled = true; if (!middlePressed) return; middlePressed = false; await Ui.Guard(() => CloseTab(tab)); };
+        tab.MouseLeave += (_, _) => middlePressed = false;
+        Point? start = null;
+        header.PreviewMouseLeftButtonDown += (_, e) => start = e.GetPosition(header);
+        header.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && start is Point a && (e.GetPosition(header) - a).Length > 12 && !close.IsMouseOver) { start = null; DragDrop.DoDragDrop(header, TabDragData(tab), DragDropEffects.Move); } };
+        header.AllowDrop = true;
+        header.Drop += (_, e) => { if (DraggedTab(e.Data) is TabItem moved && moved != home && moved != tab) { var dest = tabs.Items.IndexOf(tab); tabs.Items.Remove(moved); tabs.Items.Insert(dest, moved); tabs.SelectedItem = moved; e.Handled = true; } };
+        desktops[tab] = view; tabs.Items.Add(tab); tabs.SelectedItem = tab;
+        return tab;
+    }
+    async Task CloseDesktopTabAsync(TabItem tab, RdpView view)
+    {
+        if (!closingTabs.Add(tab)) return;
+        try
+        {
+            if (view.State == SessionState.Connected && !Ui.Confirm($"Отключиться от «{view.Profile.Name}»? Программы на удалённом компьютере продолжат работать.")) return;
+            var index = tabs.Items.IndexOf(tab); var next = ReferenceEquals(tabs.SelectedItem, tab) ? tabs.Items.OfType<TabItem>().ElementAtOrDefault(index + 1) ?? tabs.Items.OfType<TabItem>().ElementAtOrDefault(Math.Max(0, index - 1)) : null;
+            await view.DisposeAsync();
+            desktops.Remove(tab); if (next is not null) { tabs.SelectedItem = next; next.Focus(); } tabs.Items.Remove(tab); RefreshHome();
+        }
+        finally { closingTabs.Remove(tab); }
+    }
+    /// <summary>CI hook: open a desktop tab without connecting (fixture profiles).</summary>
+    internal RdpView AddDesktopForTest(ServerProfile profile) { var view = new RdpView(profile, desktopLayer) { ReconnectRequested = v => ReconnectDesktopAsync(v) }; AddDesktopTab(profile, view); return view; }
+    internal IReadOnlyCollection<RdpView> Desktops => desktops.Values;
     void AddSessionTab(ServerProfile profile, ServerSession session, SessionView view)
     {
         var tab = new TabItem { Content = view };
@@ -563,6 +674,7 @@ public sealed partial class MainWindow : Window
     internal Task CloseSessionTabAsync(TabItem tab)=>CloseTab(tab);
     async Task CloseTab(TabItem tab)
     {
+        if (desktops.TryGetValue(tab, out var desktop)) { await CloseDesktopTabAsync(tab, desktop); return; }
         if (!sessions.TryGetValue(tab, out var view) || !closingTabs.Add(tab)) return;
         try
         {
@@ -590,6 +702,10 @@ public sealed partial class MainWindow : Window
         {
             App.Transfers.CancelSession(view.Session.Id);
             try { await view.DisposeAsync(); } catch (Exception ex) { await LocalDiagnostics.RecordAsync("app.close.session.failed", ex); }
+        }
+        foreach (var desktop in desktops.Values.ToArray())
+        {
+            try { await desktop.DisposeAsync(); } catch (Exception ex) { await LocalDiagnostics.RecordAsync("app.close.desktop.failed", ex); }
         }
         try { await App.Store.SaveAsync(); }
         catch (Exception ex) { await LocalDiagnostics.RecordAsync("app.close.settings.failed", ex); Ui.Error("Не удалось сохранить последние настройки окна. " + ErrorMessages.Describe(ex)); }

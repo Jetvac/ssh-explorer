@@ -59,6 +59,24 @@ jobs:
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/Test-UiComposition.ps1
+      - name: Remote Desktop on the runner with a throwaway local account (live RDP sign-in to itself)
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $user = 'sshx-rdp'
+          $bytes = [byte[]]::new(24); [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          $password = 'Aa1!' + ([Convert]::ToBase64String($bytes) -replace '[/+=]', 'x')
+          Write-Output "::add-mask::$password"
+          New-LocalUser -Name $user -Password (ConvertTo-SecureString $password -AsPlainText -Force) -PasswordNeverExpires -AccountNeverExpires | Out-Null
+          Add-LocalGroupMember -SID 'S-1-5-32-555' -Member $user
+          Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -Value 0
+          Enable-NetFirewallRule -DisplayGroup 'Remote Desktop' -ErrorAction SilentlyContinue
+          Start-Service TermService
+          $ok = (Test-NetConnection 127.0.0.2 -Port 3389 -WarningAction SilentlyContinue).TcpTestSucceeded
+          Write-Output "RDP listener on 127.0.0.2:3389 reachable: $ok"
+          "RDP_TEST_USER=$user" >> $env:GITHUB_ENV
+          "RDP_TEST_PASSWORD=$password" >> $env:GITHUB_ENV
       - name: beta.6 user actions (tabs after Show, address input, caption, sorting, graphs, panels, icons)
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         shell: pwsh

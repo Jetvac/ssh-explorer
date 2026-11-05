@@ -3,6 +3,8 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- Remote desktop: the Windows RDP ActiveX control is hosted through WinForms AxHost in a WindowsFormsHost. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>SSHExplorer</AssemblyName>
@@ -20,6 +22,11 @@
     <!-- Package IntelliSense XML (WebView2 *.xml) is for developers, not for the portable bundle. -->
     <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- WinForms is used only by the RDP host: its names must not shadow WPF ones elsewhere. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SSHExplorer.Core\SSHExplorer.Core.csproj" />
     <ProjectReference Include="..\SSHExplorer.Monitoring\SSHExplorer.Monitoring.csproj" />
