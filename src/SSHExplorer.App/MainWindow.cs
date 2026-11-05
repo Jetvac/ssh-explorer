@@ -88,6 +88,8 @@ public sealed partial class MainWindow : Window
         commands.Add("import", import, () => { var item = new MenuItem { Header = "Импорт", Icon = Ui.Icon(ImportGlyph, 16, false) }; foreach (var entry in ImportEntries()) item.Items.Add(entry); return item; }, 20);
         var export = Ui.AsyncCommandButton(ExportGlyph, "Экспорт", () => ExportProfilesAsync()); export.Name = "HomeExport"; export.ToolTip = "Сохранить серверы в файл для другого компьютера";
         commands.Add("export", export, () => Ui.AsyncMenu("Экспорт…", () => ExportProfilesAsync(), glyph: ExportGlyph), 15);
+        var group = Ui.AsyncCommandButton(IconCatalog.Terminal, "Выполнить на нескольких…", () => RunOnGroupAsync()); group.Name = "HomeGroupRun"; group.ToolTip = "Выполнить команды или скрипт сразу на нескольких серверах";
+        commands.Add("group", group, () => Ui.AsyncMenu("Выполнить на нескольких…", () => RunOnGroupAsync(), glyph: IconCatalog.Terminal), 30);
         foreach (var (key,glyph,label,action,priority) in new (string,string,string,Func<Task>,int)[] { ("connect","\uE768","Подключиться",ConnectSelected,80), ("edit",Ui.RenameGlyph,"Изменить",EditSelected,50), ("remove",Ui.DeleteGlyph,"Удалить профиль",RemoveSelected,10) })
         {
             var button = Ui.AsyncCommandButton(glyph,label,action); button.SetBinding(IsEnabledProperty,new Binding(nameof(HomeViewModel.HasSelectedProfile)));
@@ -104,7 +106,7 @@ public sealed partial class MainWindow : Window
             group: new("Group", r => ((ServerProfileViewModel)r).GroupKey, true));
         HomeGrouping.Attach(servers, () => viewModel.HasGroups);
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
+        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Выполнить на группе…", () => RunOnGroupAsync(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.Terminal), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
         var body = new Grid(); body.Children.Add(servers); var empty = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 390, Margin = new Thickness(24) }; var emptyTitle = Ui.Text("", 18, true); emptyTitle.HorizontalAlignment = HorizontalAlignment.Center; emptyTitle.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateTitle))); empty.Children.Add(emptyTitle); var emptyText = Ui.Text(""); emptyText.TextWrapping = TextWrapping.Wrap; emptyText.TextAlignment = TextAlignment.Center; emptyText.Margin = new Thickness(0, 10, 0, 16); emptyText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); emptyText.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateMessage))); empty.Children.Add(emptyText); empty.SetBinding(VisibilityProperty, new Binding(nameof(HomeViewModel.ShowEmptyState)) { Converter = new BooleanToVisibilityConverter() }); body.Children.Add(empty); p.Children.Add(body); return p;
     }
@@ -297,6 +299,20 @@ public sealed partial class MainWindow : Window
             return imported;
         }
         finally { profileEditorOpen = false; }
+    }
+    internal Func<GroupRunWindow, bool?>? GroupRunWindowOverride;
+    /// <summary>Opens the group run with the chosen server's group ticked (or every server when it has none).</summary>
+    internal Task RunOnGroupAsync(ServerProfile? around = null)
+    {
+        if (closing) return Task.CompletedTask;
+        if (App.Store.Profiles.Count == 0) { Ui.Info("Сохранённых серверов нет."); return Task.CompletedTask; }
+        var chosen = around ?? viewModel.SelectedProfile?.Profile;
+        var ids = chosen is null ? App.Store.Profiles.Select(p => p.Id).ToArray()
+            : chosen.Group.Length > 0 ? App.Store.Profiles.Where(p => p.Group == chosen.Group).Select(p => p.Id).ToArray() : [chosen.Id];
+        var window = new GroupRunWindow(App.Store.Profiles.ToArray(), ids, new GroupRunner(App.Store)) { Owner = this };
+        if (GroupRunWindowOverride is not null) GroupRunWindowOverride(window); else ModalRunner.Show(window, this, windowLifetime.Token);
+        _ = App.Store.SaveAsync();
+        return Task.CompletedTask;
     }
     async Task AddProfile()
     {

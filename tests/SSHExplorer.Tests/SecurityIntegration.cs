@@ -42,6 +42,27 @@ internal static class SecurityIntegration
                 TestSuite.True(after.Count == before.Count - 1 && after.All(k => k.Fingerprint != generated.Fingerprint) && login is not null && mode == "600", $"{before.Count}->{after.Count} login={login} mode={mode}");
             });
 
+            await t.Run("group run integration: one script on several servers over new connections; an unconfirmed host key and a missing password are reported", async () =>
+            {
+                // The fixture's key is trusted permanently once, as a user would in a tab.
+                var trusted = new ServerProfile { Name = "Группа · 1", Host = host, Port = port, Username = user, Authentication = AuthenticationKind.Agent, Group = "Группа" };
+                await using (var once = new ServerSession(trusted, store)) await once.ConnectAsync(new SessionCredentials(""), _ => Task.FromResult(TrustDecision.Permanent));
+                var second = new ServerProfile { Name = "Группа · 2", Host = host, Port = port, Username = user, Authentication = AuthenticationKind.Agent, Group = "Группа" };
+                var unknownKey = new ServerProfile { Name = "Группа · новый ключ", Host = host, Port = port, Username = user, Authentication = AuthenticationKind.Agent, Group = "Группа" };
+                var password = new ServerProfile { Name = "Группа · пароль", Host = host, Port = port, Username = user, Authentication = AuthenticationKind.Password, Group = "Группа" };
+                var results = new System.Collections.Concurrent.ConcurrentDictionary<Guid, GroupRunResult>();
+                await new GroupRunner(store) { Parallelism = 2 }.RunAsync([trusted, second, password], new SavedScript { Name = "проверка", Body = "echo group-ok\nid -un" }, r => results[r.ProfileId] = r);
+                // Another computer's store: the same server's key is not trusted there yet.
+                await new GroupRunner(new AppStore(Path.Combine(dir, "fresh-store"))).RunAsync([unknownKey], new SavedScript { Name = "x", Body = "true" }, r => results[r.ProfileId] = r);
+                TestSuite.True(results[trusted.Id] is { State: GroupRunState.Succeeded, ExitCode: 0 } ok && ok.Output.Contains("group-ok", StringComparison.Ordinal) && ok.Output.Contains(user, StringComparison.Ordinal)
+                    && results[second.Id].State == GroupRunState.Succeeded && results[unknownKey.Id] is { State: GroupRunState.Failed } bad && bad.Problem!.Contains("не подтверждён", StringComparison.Ordinal)
+                    && results[password.Id].State == GroupRunState.Skipped,
+                    string.Join(" | ", results.Values.Select(r => $"{r.State} {r.ExitCode} {r.Problem}")));
+                var failing = new System.Collections.Concurrent.ConcurrentDictionary<Guid, GroupRunResult>();
+                await new GroupRunner(store).RunAsync([trusted], new SavedScript { Name = "сбой", Body = "echo before\nfalse\necho after" }, r => failing[r.ProfileId] = r);
+                TestSuite.True(failing[trusted.Id] is { State: GroupRunState.Failed, ExitCode: 1, Retryable: true } f && f.Output.Contains("before", StringComparison.Ordinal) && !f.Output.Contains("after", StringComparison.Ordinal), failing[trusted.Id].Output);
+            });
+
             var sshd = new SshdService(session);
             await sshd.ProbeAsync();
             var first = await sshd.ReadAsync();
