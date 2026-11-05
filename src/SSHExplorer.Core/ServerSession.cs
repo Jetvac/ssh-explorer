@@ -301,6 +301,38 @@ public sealed partial class ServerSession : IAsyncDisposable
         }
         finally { Release(client); }
     }
+    /// <summary>
+    /// Runs a long-lived command (journalctl -f, tail -F) on its own SSH connection and hands every output line to
+    /// <paramref name="onLine"/> as it arrives (on a background thread). Cancelling closes the channel; commands built with
+    /// <see cref="LogFollow.Wrap"/> also end on the server when the channel's input closes. Returns the exit status.
+    /// </summary>
+    public async Task<int?> StreamLinesAsync(string command, Action<string> onLine, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, Lifetime);
+        var client = await CreateSshClientAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            using var cmd = client.CreateCommand(command, Encoding.UTF8);
+            var run = cmd.ExecuteAsync(linked.Token);
+            var output = cmd.OutputStream;
+            var reader = Task.Run(() =>
+            {
+                try
+                {
+                    using var lines = new StreamReader(output, Encoding.UTF8, false, 8192, leaveOpen: true);
+                    string? line; while ((line = lines.ReadLine()) is not null) onLine(line);
+                }
+                catch (Exception ex) when (ex is ObjectDisposedException or IOException) { }
+            });
+            try { await run.ConfigureAwait(false); }
+            catch (OperationCanceledException) when (linked.IsCancellationRequested) { }
+            try { await reader.WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); } catch (TimeoutException) { }
+            linked.Token.ThrowIfCancellationRequested();
+            return cmd.ExitStatus;
+        }
+        finally { Release(client); }
+    }
     public async Task<ShellStream> CreateShellAsync(uint columns = 100, uint rows = 30, string? directory = null, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

@@ -15,6 +15,12 @@ if (args.Length == 4 && args[0] == "--compare-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real comparison checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 4 && args[0] == "--groupc-integration")
+{
+    await GroupCIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
+    Console.WriteLine($"RESULT: {suite.Passed} real archive/search/log/systemd checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 4 && args[0] == "--scripts-integration")
 {
     await ScriptIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
@@ -98,6 +104,7 @@ await ScriptTests.RunAsync(suite);
 await FolderCompareTests.RunAsync(suite);
 await OwnershipTests.RunAsync(suite);
 await BatchRenameTests.RunAsync(suite);
+await GroupCTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

@@ -60,6 +60,11 @@ jobs:
           kill "$listener" || true
           # 0.3 B3: folder comparison over SFTP, with and without SHA-256.
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --compare-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-compare.log
+          # 0.3 C1-C4: archives (every format the runner has), grep, tail -F that ends with the viewer, systemd with a fixture unit.
+          printf '%s\n' '[Unit]' 'Description=SSH Explorer fixture' '[Service]' "ExecStart=/bin/sh -c 'echo sshx fixture says hello; exec sleep infinity'" '[Install]' 'WantedBy=multi-user.target' | sudo tee /etc/systemd/system/sshx-fixture.service > /dev/null
+          sudo systemctl daemon-reload
+          command -v zip > /dev/null || sudo apt-get install -y -q zip unzip > /dev/null
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --groupc-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-groupc.log
           # 0.3 S: saved scripts run as 0700 files, stop-on-error, own #!, no text in ps, timeout, OnConnect.
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --scripts-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-scripts.log
           # 0.3 G: real Docker over SSH — env through a 0600 env-file, recreate with new env, lifecycle.
@@ -105,5 +110,6 @@ jobs:
             artifacts-docker.log
             artifacts-scripts.log
             artifacts-compare.log
+            artifacts-groupc.log
             artifacts/collector-benchmark.json
           retention-days: 14

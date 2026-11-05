@@ -487,7 +487,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
+    FileBrowserView? files; TerminalView? terminal; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -506,6 +506,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
 
         monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
         monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
+        monitorNavigation.Children.Add(Nav("", "Службы", "services"));
         monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
         // After the task manager and its pages, so the module never splits them.
         // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
@@ -536,7 +537,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         var b = Ui.Button("", () => ShowSection(key), text); var label = Ui.Text(text); label.ClearValue(TextBlock.FontWeightProperty); label.TextTrimming = TextTrimming.CharacterEllipsis;
         var content = new DockPanel { LastChildFill = true }; var icon = Ui.Icon(glyph); DockPanel.SetDock(icon, Dock.Left); content.Children.Add(icon); content.Children.Add(label); b.Content = content;
-        b.SetResourceReference(StyleProperty, key is "processes" or "performance" ? "SubNavigationButtonStyle" : "NavigationButtonStyle"); navigationButtons[key] = b; return b;
+        b.SetResourceReference(StyleProperty, key is "processes" or "performance" or "services" ? "SubNavigationButtonStyle" : "NavigationButtonStyle"); navigationButtons[key] = b; return b;
     }
     // Presentation-only fixture: it uses the production layout without opening SSH or polling.
     internal SessionView(ServerSession session, MainWindow main, FileBrowserView fileView, MonitorView monitorView) : this(session, main, null)
@@ -596,7 +597,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             await Session.ConnectAsync(credentials, (key, ct) => trustOverride is null ? prompts.TrustAsync(key, ct) : trustOverride(key).WaitAsync(ct), attempt.Token, attempt.Id);
             attempt.Token.ThrowIfCancellationRequested();
             navigationButtons["terminal"].IsEnabled = Session.ShellAvailable;
-            navigationButtons["monitor"].IsEnabled = navigationButtons["processes"].IsEnabled = navigationButtons["performance"].IsEnabled = Session.ShellAvailable;
+            navigationButtons["monitor"].IsEnabled = navigationButtons["processes"].IsEnabled = navigationButtons["performance"].IsEnabled = navigationButtons["services"].IsEnabled = Session.ShellAvailable;
             navigationButtons["files"].IsEnabled = Session.SftpAvailable;
             if (Session.SftpAvailable)
             {
@@ -648,24 +649,32 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     {
         if (disposed) return;
         if (section == key && key != "monitor" && screen.Content is not null &&
-            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView))) return;
+            (key == "files" && ReferenceEquals(screen.Content, files) || key == "monitor" && ReferenceEquals(screen.Content, monitor) || key == "terminal" && ReferenceEquals(screen.Content, terminal) || key == "server" && serverPanel is not null && ReferenceEquals(screen.Content, serverPanel) || key == "docker" && docker is not null && ReferenceEquals(screen.Content, docker) || key == "scripts" && scriptsView is not null && ReferenceEquals(screen.Content, scriptsView) || key == "services" && services is not null && ReferenceEquals(screen.Content, services))) return;
         var previousContent = screen.Content; var previousPage = monitor?.Page;
         section = key;
         UpdateConnectionStatusVisibility();
         if (key != "monitor") monitor?.SetActive(false);
-        monitorNavigation.Visibility = key == "monitor" ? Visibility.Visible : Visibility.Collapsed;
+        monitorNavigation.Visibility = key is "monitor" or "services" ? Visibility.Visible : Visibility.Collapsed;
         if (files is not null) Ui.SetIsFileSectionActive(files.Navigation, key == "files");
         addressHost.Visibility = commandHost.Visibility = fileStatusHost.Visibility = key == "files" ? Visibility.Visible : Visibility.Collapsed;
         foreach (var (name, button) in navigationButtons)
         {
             Ui.SetIsNavigationActive(button, key == "monitor" ? name == (monitorPage == MonitorPage.Processes ? "processes" : "performance") : name == key);
-            button.FontWeight = name == "monitor" && key == "monitor" ? FontWeights.SemiBold : FontWeights.Normal;
+            button.FontWeight = name == "monitor" && key is "monitor" or "services" ? FontWeights.SemiBold : FontWeights.Normal;
         }
         if (key == "terminal") { _ = OpenTerminalAsync(); return; }
         if (key == "scripts")
         {
             scriptsView ??= new ScriptsView(Session, EnsureScriptRunner());
             screen.Content = scriptsView;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
+        if (key == "services")
+        {
+            if (!Session.ShellAvailable) return;
+            services ??= new ServicesView(new SystemdService(Session));
+            screen.Content = services;
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
             return;
         }
@@ -727,7 +736,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminal?.Dispose();
         try { await Session.DisposeAsync(); }

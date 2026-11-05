@@ -78,6 +78,76 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         finally { await RefreshAsync(); }
     }
 
+    static string? FirstLine(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+    async Task<IReadOnlySet<string>> ArchiveToolsAsync() => Archives.ParseTools((await session.ExecuteAsync(Archives.ToolsCommand, lifetime.Token)).Output);
+    HashSet<string> FolderNames() => viewModel.Entries.Select(e => e.Entry.Name).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>Packs the selection into a new archive in this folder with the server's tar/zip; an existing file is never replaced.</summary>
+    async Task ArchiveAsync()
+    {
+        var chosen = Selected(); if (chosen.Count == 0) return;
+        var directory = viewModel.CurrentPath; var names = chosen.Select(r => r.Entry.Name).ToArray();
+        var window = new ArchiveCreateWindow(directory, names, await ArchiveToolsAsync(), FolderNames()) { Owner = Window.GetWindow(this) };
+        if (window.ShowDialog() != true) return;
+        var temporary = ".sshexplorer-archive-" + Guid.NewGuid().ToString("N")[..12] + ".part";
+        viewModel.Message = "Сжатие в «" + window.ArchiveName + "»…";
+        var result = await session.ExecuteLongAsync(Archives.CreateCommand(directory, names, window.ArchiveName, window.Format, temporary), TimeSpan.FromHours(2), lifetime.Token);
+        await RefreshAsync();
+        if (result.ExitStatus == 0) { RestoreSelection([PosixPath.Combine(directory, window.ArchiveName)]); viewModel.Message = "Архив создан: " + window.ArchiveName; return; }
+        viewModel.Message = "";
+        Ui.Error(result.ExitStatus == 17 ? $"«{window.ArchiveName}» уже существует: архив не создан, существующий файл не изменён." : $"Архив не создан (код {result.ExitStatus}): {FirstLine(result.Error) ?? FirstLine(result.Output) ?? "без сообщения"}");
+    }
+
+    /// <summary>Extracts the selected archive after showing what it contains; into a new folder by default, never over existing files.</summary>
+    async Task ExtractAsync()
+    {
+        var chosen = Selected();
+        if (chosen.Count != 1 || chosen[0].Entry is not { IsRegularFile: true } entry || Archives.Detect(entry.Name) is not { } format) { viewModel.Message = "Выберите один архив: .zip, .tar, .tar.gz (.tgz), .tar.xz или .tar.bz2."; return; }
+        var missing = Archives.Missing(format, false, await ArchiveToolsAsync());
+        var listing = new ArchiveListing([], [], false);
+        if (missing is null)
+        {
+            viewModel.Message = "Чтение содержимого «" + entry.Name + "»…";
+            var list = await session.ExecuteLongAsync(Archives.ListCommand(entry.FullPath, format), TimeSpan.FromMinutes(5), lifetime.Token);
+            viewModel.Message = "";
+            listing = Archives.ParseListing(list.Output);
+            if (listing.Entries.Count == 0 && FirstLine(list.Error) is { } error) { Ui.Error("Архив не прочитан: " + error); return; }
+        }
+        var window = new ArchiveExtractWindow(entry.FullPath, listing, FolderNames(), missing) { Owner = Window.GetWindow(this) };
+        if (window.ShowDialog() != true) return;
+        viewModel.Message = "Распаковка «" + entry.Name + "»…";
+        var result = await session.ExecuteLongAsync(Archives.ExtractCommand(entry.FullPath, format, window.Destination, window.Mode), TimeSpan.FromHours(2), lifetime.Token);
+        await RefreshAsync();
+        if (result.ExitStatus == 0)
+        {
+            if (window.Mode == ExtractMode.NewFolder) RestoreSelection([window.Destination]);
+            viewModel.Message = window.Mode == ExtractMode.NewFolder ? "Распаковано в «" + PosixPath.Name(window.Destination) + "»" : "Распаковано; существующие файлы оставлены как были";
+            return;
+        }
+        viewModel.Message = "";
+        Ui.Error(result.ExitStatus == 17 ? "Папка назначения уже существует: ничего не распаковано." : $"Распаковка завершилась с ошибкой (код {result.ExitStatus}): {FirstLine(result.Error) ?? FirstLine(result.Output) ?? "без сообщения"}" + (window.Mode == ExtractMode.NewFolder ? "\n\nЧасть файлов могла остаться в «" + PosixPath.Name(window.Destination) + "»." : ""));
+    }
+
+    /// <summary>grep under the selected folder (or this one); results open in the viewer at the matching line.</summary>
+    Task SearchContentAsync()
+    {
+        var chosen = Selected();
+        var folder = chosen.Count == 1 && chosen[0].Entry is { IsDirectory: true, IsSymbolicLink: false } d ? d.FullPath : viewModel.CurrentPath;
+        var window = new ContentSearchWindow(session, folder) { Owner = Window.GetWindow(this), ShowInFolder = path => _ = Ui.Guard(async () => { await NavigateAsync(PosixPath.Parent(path)); RestoreSelection([path]); }) };
+        TrackWindow(window); window.Show();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Follows the selected file like tail -F (keeps following across log rotation) until the window is closed.</summary>
+    Task FollowFileAsync()
+    {
+        var chosen = Selected();
+        if (chosen.Count != 1 || chosen[0].Entry is not { IsDirectory: false } entry || !(entry.IsRegularFile || entry.IsSymbolicLink)) { viewModel.Message = "Выберите один файл журнала."; return Task.CompletedTask; }
+        var window = new LogWindow(entry.FullPath, LogWindow.Tail(session, entry.FullPath)) { Owner = Window.GetWindow(this) };
+        TrackWindow(window); window.Show();
+        return Task.CompletedTask;
+    }
+
     /// <summary>Opens the comparison of this folder with a chosen Windows folder (non-modal, so transfers stay visible).</summary>
     Task CompareWithLocal()
     {
@@ -223,6 +293,10 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         Action("Compare", "", "Сравнить с папкой Windows…", CompareWithLocal, nameof(FileBrowserViewModel.CanCreate), 5);
         Action("BatchRename", Ui.RenameGlyph, "Переименовать несколько…", BatchRenameAsync, nameof(FileBrowserViewModel.HasSelection), 6);
         Action("ViewText", "", "Просмотреть как текст", ViewTextAsync, nameof(FileBrowserViewModel.HasSelection), 7, "F3");
+        Action("Grep", Ui.SearchGlyph, "Найти в файлах…", SearchContentAsync, nameof(FileBrowserViewModel.CanCreate), 5, "Ctrl+Shift+F");
+        Action("Archive", IconCatalog.Storage, "Сжать в архив…", ArchiveAsync, nameof(FileBrowserViewModel.HasSelection), 4);
+        Action("Extract", IconCatalog.Storage, "Распаковать…", ExtractAsync, nameof(FileBrowserViewModel.HasSelection), 4);
+        Action("Follow", Ui.SearchGlyph, "Следить за файлом (tail -F)", FollowFileAsync, nameof(FileBrowserViewModel.HasSelection), 3);
         commands.Add("Sort", Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu), () => Submenu("Сортировать", Ui.SortGlyph, BuildSortMenu), 40);
         var viewButton = Ui.FlyoutButton(CommandGlyphs.View(mode), "Просмотреть", BuildViewMenu);
         viewModeRow = (Panel)viewButton.Content;
@@ -497,6 +571,10 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             var newTab = Ui.AsyncMenu("Открыть в новой вкладке", () => main.OpenServer(session.Profile, first.FullPath), glyph: Ui.NewTabGlyph); newTab.IsEnabled = chosen.Count == 1 && first.IsDirectory && !first.IsSymbolicLink; newTab.ToolTip = newTab.IsEnabled ? "Открыть каталог в независимой сессии" : "Доступно для одного обычного каталога"; m.Items.Add(newTab);
             var editText = Ui.AsyncMenu("Редактировать в Блокноте", EditSelectedText, glyph: "\uE70F"); editText.IsEnabled = chosen.Count == 1 && (first.IsSymbolicLink || first.IsRegularFile && DocumentText.CandidateName(first.Name)); m.Items.Add(editText);
             var previewText = Ui.AsyncMenu("Просмотр", () => OpenFileContent(true), glyph: Ui.SearchGlyph); previewText.IsEnabled = chosen.Count == 1 && (first.IsRegularFile || first.IsSymbolicLink); m.Items.Add(previewText);
+            var followItem = Ui.AsyncMenu("Следить за файлом (tail -F)", FollowFileAsync, glyph: ""); followItem.IsEnabled = chosen.Count == 1 && !first.IsDirectory && (first.IsRegularFile || first.IsSymbolicLink); m.Items.Add(followItem);
+            var archiveItem = Ui.AsyncMenu("Сжать в архив…", ArchiveAsync, glyph: ""); m.Items.Add(archiveItem);
+            var extractItem = Ui.AsyncMenu("Распаковать…", ExtractAsync, glyph: ""); extractItem.IsEnabled = chosen.Count == 1 && first.IsRegularFile && Archives.Detect(first.Name) is not null; m.Items.Add(extractItem);
+            if (chosen.Count == 1 && first.IsDirectory && !first.IsSymbolicLink) m.Items.Add(Ui.AsyncMenu("Найти в файлах этой папки…", SearchContentAsync, "Ctrl+Shift+F", Ui.SearchGlyph));
             m.Items.Add(Ui.AsyncMenu(first.IsDirectory ? "Открыть в терминале" : "Открыть родительскую папку в терминале", () => OpenTerminal(first.IsDirectory && !first.IsSymbolicLink ? first.FullPath : PosixPath.Parent(first.FullPath)), glyph: Ui.TerminalGlyph));
             var strip = new FileContextCommandStrip();
             strip.Add(Ui.CutGlyph, "Вырезать · Ctrl+X", () => CopySelection(true), viewModel.HasSelection);
@@ -790,7 +868,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             if (!(alt && key is Key.Left or Key.Right or Key.Up) && key != Key.F5 && key != Key.Escape) return;
         }
         Func<Task>? action = null;
-        if (key == Key.F5) action = RefreshAsync; else if (key == Key.F3) action = ViewTextAsync; else if (key == Key.F2) action = Rename; else if (key == Key.Delete) action = Delete; else if (key == Key.Enter && alt) action = Properties; else if (key == Key.Enter) action = Open; else if (key == Key.Left && alt) action = Back; else if (key == Key.Right && alt) action = Forward; else if (key == Key.Up && alt) action = Up; else if (ctrl && key == Key.C) action = () => CopySelection(false); else if (ctrl && key == Key.X) action = () => CopySelection(true); else if (ctrl && key == Key.V) action = Paste; else if (ctrl && key == Key.Z) action = Undo; else if (ctrl && shift && key == Key.N) action = () => Create(true);
+        if (key == Key.F5) action = RefreshAsync; else if (key == Key.F3) action = ViewTextAsync; else if (ctrl && shift && key == Key.F) action = SearchContentAsync; else if (key == Key.F2) action = Rename; else if (key == Key.Delete) action = Delete; else if (key == Key.Enter && alt) action = Properties; else if (key == Key.Enter) action = Open; else if (key == Key.Left && alt) action = Back; else if (key == Key.Right && alt) action = Forward; else if (key == Key.Up && alt) action = Up; else if (ctrl && key == Key.C) action = () => CopySelection(false); else if (ctrl && key == Key.X) action = () => CopySelection(true); else if (ctrl && key == Key.V) action = Paste; else if (ctrl && key == Key.Z) action = Undo; else if (ctrl && shift && key == Key.N) action = () => Create(true);
         else if (ctrl && key == Key.A) { if (mode == "Details") table.SelectAll(); else tiles.SelectAll(); e.Handled = true; }
         else if (key == Key.Escape) { navigationCts.Cancel(); recursiveSearchCts?.Cancel(); viewModel.SearchQuery = ""; if (mode == "Details") table.UnselectAll(); else tiles.UnselectAll(); e.Handled = true; }
         else if (shift && key == Key.F10) { var menu = BuildContextMenu(Selected().Count > 0); Ui.OpenContextMenu(mode == "Details" ? table : tiles, menu); e.Handled = true; }

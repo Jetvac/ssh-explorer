@@ -22,6 +22,11 @@ public sealed class TextViewerWindow : Window
     readonly CancellationTokenSource lifetime = new();
     byte[]? bytes;
     public string Shown => text.Text;
+    /// <summary>Line (1-based) to show and select after loading — from a content search result.</summary>
+    public int? StartLine { get; init; }
+    /// <summary>Text put into the search box (and selected on <see cref="StartLine"/> when found there).</summary>
+    public string? StartSearch { get; init; }
+    internal int CaretLine => text.GetLineIndexFromCharacterIndex(text.CaretIndex) + 1;
 
     public TextViewerWindow(string title, Func<CancellationToken, Task<byte[]>> readBytes)
     {
@@ -49,6 +54,22 @@ public sealed class TextViewerWindow : Window
         try { bytes = await read(lifetime.Token); }
         catch (Exception ex) when (ex is not OperationCanceledException) { state.Text = "Не удалось прочитать файл: " + ErrorMessages.Describe(ex); return; }
         Render();
+        if (StartSearch is { Length: > 0 } s) search.Text = s;
+        if (StartLine is { } line && text.Text.Length > 0) GoToLine(line, StartSearch);
+    }
+
+    /// <summary>Scrolls to the line and selects the search text in it (or the whole line).</summary>
+    internal void GoToLine(int line, string? highlight)
+    {
+        // From the text itself: the box may not be laid out yet right after loading.
+        var all = text.Text; int start = 0;
+        for (int i = 1; i < line; i++) { var next = all.IndexOf('\n', start); if (next < 0) break; start = next + 1; }
+        var end = all.IndexOf('\n', start); if (end < 0) end = all.Length;
+        var lineText = all[start..end].TrimEnd('\r');
+        var at = string.IsNullOrEmpty(highlight) ? -1 : lineText.IndexOf(highlight, StringComparison.CurrentCultureIgnoreCase);
+        text.Focus();
+        if (at >= 0) text.Select(start + at, highlight!.Length); else text.Select(start, lineText.Length);
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => { var index = text.GetLineIndexFromCharacterIndex(text.SelectionStart); if (index >= 0) text.ScrollToLine(index); });
     }
 
     void Render()

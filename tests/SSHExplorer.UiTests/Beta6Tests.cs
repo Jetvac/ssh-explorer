@@ -317,6 +317,7 @@ internal static class Beta6Tests
             Check(!navigation["scripts"].IsVisible && scriptErrors.Count == 0, "disabling «Скрипты» hides it without errors: " + string.Join(" | ", scriptErrors));
             ScriptsUiChecks.Run(store, evidence, Check);
             CompareUiChecks.Run(store, evidence, Check);
+            GroupCUiChecks.Run(store, evidence, Check);
             // Middle click (press and release on the same tab) closes a server tab.
             var (middleTab, _) = AddTab(main, store, "Закрытие средней кнопкой"); Pump(); Layout(main);
             var allTabs = (TabControl)Field(main, "tabs");
