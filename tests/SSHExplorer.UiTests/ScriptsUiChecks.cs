@@ -46,7 +46,9 @@ internal static class ScriptsUiChecks
             check(view.Table.Items.Cast<ScriptRow>().Single(r => r.Name == "Обновление").Result == "Ошибка (код 100)" && store.Profiles.Single(p => p.Id == profile.Id).Scripts.Single(s => s.Name == "Обновление").LastExitCode == 100, "a failing run shows its exit code and is saved with the script");
             view.EditOverride = _ => new SavedScript { Name = "Перезапуск nginx", Body = "systemctl reload nginx", Trigger = ScriptTrigger.OnConnect };
             Cmd("Add").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            for (int i = 0; i < 50 && view.Table.Items.Count < 3; i++) Pump();
+            // The add waits for the previous run to finish and then saves the profile: wait by time, not by a pump count.
+            var addWatch = System.Diagnostics.Stopwatch.StartNew();
+            while (addWatch.Elapsed < TimeSpan.FromSeconds(10) && !(view.Table.Items.Count == 3 && store.Profiles.Single(p => p.Id == profile.Id).Scripts.Any(s => s.Name == "Перезапуск nginx"))) Pump();
             check(view.Table.Items.Count == 3 && store.Profiles.Single(p => p.Id == profile.Id).Scripts.Any(s => s.Name == "Перезапуск nginx" && s.Trigger == ScriptTrigger.OnConnect), "a new script is added to the list and saved in the profile");
             evidence.Capture(view, "scripts", new { theme = "Light", fixtureOnly = true });
             view.ConfirmOverride = _ => true; view.Table.SelectedItem = view.Table.Items.Cast<ScriptRow>().Single(r => r.Name == "Перезапуск nginx"); Pump();
