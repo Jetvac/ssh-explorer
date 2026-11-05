@@ -20,8 +20,9 @@ internal static class SidebarUiChecks
             Sidebar.Apply(settings, Sidebar.Defaults()); App.RaiseModulesChanged(); Pump();
             var side = (Panel)VisualTreeHelper.GetParent(navigation["server"]);
             var customize = Descendants<Button>(view).Single(b => b.Name == "SidebarCustomize");
-            check(customize.IsVisible && side.Children.IndexOf(customize) == side.Children.Count - 1 && !navigation["docker"].IsVisible && !navigation["scripts"].IsVisible,
-                "the panel ends with the «Настроить панель» button; modules are hidden by default");
+            var divider = (FrameworkElement)VisualTreeHelper.GetParent(customize);
+            check(customize.IsVisible && divider.Name == "SidebarDivider" && side.Children.IndexOf(divider) == side.Children.IndexOf(navigation["files"]) - 1 && !navigation["docker"].IsVisible && !navigation["scripts"].IsVisible,
+                "the «Настроить панель» gear sits at the end of the divider above «Файлы»; modules are hidden by default");
 
             customize.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
             var editor = view.SidebarEditorView!;
@@ -53,6 +54,10 @@ internal static class SidebarUiChecks
             Descendants<Button>(editor).Single(b => b.Name == "SidebarReset").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
             check(Sidebar.Resolve(settings).SequenceEqual(Sidebar.Defaults()) && Show("firewall").IsChecked == true && Show("docker").IsChecked == false, "«По умолчанию» restores the usual order and hides the modules");
             view.SidebarEditorView!.Done(); Pump();
+            Sidebar.Apply(settings, Sidebar.Move(Sidebar.Resolve(settings), "files", -100)); App.RaiseModulesChanged(); Pump();
+            side = (Panel)VisualTreeHelper.GetParent(navigation["server"]); divider = (FrameworkElement)VisualTreeHelper.GetParent(customize);
+            check(side.Children.IndexOf(navigation["files"]) == 0 && side.Children.IndexOf(divider) > side.Children.IndexOf(navigation["scripts"]), "with «Файлы» first the divider and its gear close the list");
+            Sidebar.Apply(settings, Sidebar.Defaults()); App.RaiseModulesChanged(); Pump();
 
             // The right-click menu hides one section without opening the editor.
             var menu = (ContextMenu)typeof(SessionView).GetMethod("SidebarMenu", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(view, [navigation["tunnels"]])!;

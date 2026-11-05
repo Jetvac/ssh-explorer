@@ -486,7 +486,8 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly bool presentationOnly;
     readonly Dictionary<string, Button> navigationButtons = [];
     readonly Dictionary<string, FrameworkElement[]> sideEntries = [];
-    readonly Border filesLine = new() { Height = 1, Margin = new Thickness(8, 10, 8, 10) };
+    readonly Border filesLine = new() { Height = 1, Margin = new Thickness(8, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
+    readonly Grid divider = new() { Name = "SidebarDivider", Margin = new Thickness(0, 4, 0, 4) };
     readonly Button customize;
     SidebarEditor? sidebarEditor;
     readonly string? startPath;
@@ -514,8 +515,11 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         monitorNavigation.Children.Add(Nav(IconCatalog.Services, "Службы", "services"));
         monitorNavigation.Visibility = Visibility.Collapsed; sideEntries["monitor"] = [sideEntries["monitor"][0], monitorNavigation];
         filesLine.SetResourceReference(Border.BackgroundProperty, "Edge");
-        customize = Ui.IconButton(IconCatalog.Settings, ToggleSidebarEditor, "Настроить панель: порядок и видимость разделов"); customize.Name = "SidebarCustomize"; customize.Height = 28; customize.Width = 32;
-        customize.HorizontalAlignment = HorizontalAlignment.Right; customize.Margin = new Thickness(0, 6, 2, 0); customize.Opacity = .75;
+        customize = Ui.IconButton(IconCatalog.Settings, ToggleSidebarEditor, "Настроить панель: порядок и видимость разделов"); customize.Name = "SidebarCustomize"; customize.Height = 24; customize.Width = 28;
+        // The gear is the trailing end of the divider under the sections, so it reads as part of the panel, not a loose button.
+        customize.Margin = new Thickness(0, 0, 2, 0); customize.Opacity = .7; customize.MouseEnter += (_, _) => customize.Opacity = 1; customize.MouseLeave += (_, _) => customize.Opacity = .7;
+        divider.ColumnDefinitions.Add(new ColumnDefinition()); divider.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        divider.Children.Add(filesLine); Grid.SetColumn(customize, 1); divider.Children.Add(customize);
         System.Windows.Automation.AutomationProperties.SetName(customize, "Настроить панель разделов");
         reconnect = Ui.AsyncButton("Переподключиться", () => main.Reconnect(this, files?.CurrentPath)); reconnect.Visibility = Visibility.Collapsed; reconnect.Margin = new Thickness(7, 8, 7, 4);
         reconnect.SetBinding(VisibilityProperty, new Binding(nameof(SessionViewModel.CanReconnect)) { Converter = new BooleanToVisibilityConverter() });
@@ -542,19 +546,21 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             bool anyBefore = false;
             foreach (var item in items)
             {
-                if (item.Key == Sidebar.Home && anyBefore) side.Children.Add(filesLine);
+                if (item.Key == Sidebar.Home && anyBefore) side.Children.Add(divider);
                 foreach (var element in sideEntries[item.Key]) side.Children.Add(element);
                 sideEntries[item.Key][0].Visibility = item.Visible ? Visibility.Visible : Visibility.Collapsed;
                 anyBefore |= item.Visible;
             }
-            side.Children.Add(reconnect); side.Children.Add(customize);
+            // With «Файлы» first there is no divider above it: it closes the list instead.
+            if (divider.Parent is null) side.Children.Add(divider);
+            side.Children.Add(reconnect);
         }
         var current = section is "services" ? "monitor" : section;
         if (SidebarCatalog.Entries.ContainsKey(current) && !Sidebar.IsVisible(settings, current)) ShowSection(Sidebar.Home);
     }
     void ToggleSidebarEditor()
     {
-        if (sidebarEditor is null) { sidebarEditor = new SidebarEditor(() => { sidebarEditor = null; ApplySidebar(); customize.Focus(); }); ApplySidebar(); sidebarEditor.FocusFirst(); }
+        if (sidebarEditor is null) { bool keyboard = InputManager.Current.MostRecentInputDevice is KeyboardDevice; sidebarEditor = new SidebarEditor(() => { bool byKeyboard = InputManager.Current.MostRecentInputDevice is KeyboardDevice; sidebarEditor = null; ApplySidebar(); if (byKeyboard) customize.Focus(); }); ApplySidebar(); if (keyboard) sidebarEditor.FocusFirst(); }
         else sidebarEditor.Done();
     }
     internal bool IsEditingSidebar => sidebarEditor is not null;
