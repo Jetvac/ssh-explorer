@@ -46,6 +46,14 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     long generation => viewModel.NavigationGeneration;
     bool disposed, restoringSelection;
     public string CurrentPath => viewModel.CurrentPath;
+    /// <summary>Opens the comparison of this folder with a chosen Windows folder (non-modal, so transfers stay visible).</summary>
+    Task CompareWithLocal()
+    {
+        var pick = new Microsoft.Win32.OpenFolderDialog { Title = "Папка на компьютере для сравнения с " + viewModel.CurrentPath };
+        if (pick.ShowDialog(Window.GetWindow(this)) != true) return Task.CompletedTask;
+        new CompareWindow(session, viewModel.CurrentPath, pick.FolderName) { Owner = Window.GetWindow(this) }.Show();
+        return Task.CompletedTask;
+    }
     public event Action? FileNavigationRequested;
     public event Action? NavigationCommitted;
     public UIElement Navigation => navigation;
@@ -180,6 +188,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         Action("Delete", Ui.DeleteGlyph, "Удалить окончательно", Delete, nameof(FileBrowserViewModel.HasSelection), 60, "Delete");
         Action("Upload", Ui.UploadGlyph, "Загрузить файлы…", Upload, nameof(FileBrowserViewModel.CanCreate), 10);
         Action("Download", Ui.DownloadGlyph, "Скачать…", Download, nameof(FileBrowserViewModel.HasSelection), 20);
+        Action("Compare", "", "Сравнить с папкой Windows…", CompareWithLocal, nameof(FileBrowserViewModel.CanCreate), 5);
         commands.Add("Sort", Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu), () => Submenu("Сортировать", Ui.SortGlyph, BuildSortMenu), 40);
         var viewButton = Ui.FlyoutButton(CommandGlyphs.View(mode), "Просмотреть", BuildViewMenu);
         viewModeRow = (Panel)viewButton.Content;
