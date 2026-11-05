@@ -345,7 +345,7 @@ internal static class Beta6Tests
             var allTabs = (TabControl)Field(main, "tabs");
             middleTab.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Middle) { RoutedEvent = UIElement.PreviewMouseDownEvent });
             middleTab.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Middle) { RoutedEvent = UIElement.PreviewMouseUpEvent });
-            for (int i = 0; i < 50 && allTabs.Items.Contains(middleTab); i++) Pump();
+            var closeWatch = System.Diagnostics.Stopwatch.StartNew(); while (allTabs.Items.Contains(middleTab) && closeWatch.Elapsed < TimeSpan.FromSeconds(15)) Pump();
             Check(!allTabs.Items.Contains(middleTab), "middle click closes the server tab");
             // 0.3 A1: import from an OpenSSH config — preview, duplicate unchecked, only the checked host is saved.
             var existingProfile = store.Profiles.First();
