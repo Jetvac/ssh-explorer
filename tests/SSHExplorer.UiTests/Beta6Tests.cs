@@ -328,6 +328,7 @@ internal static class Beta6Tests
             Check(navigation["scripts"].IsVisible && Descendants<ScriptsView>(sessionView).Any(v => v.IsVisible), "enabling «Скрипты» shows its section in an open tab");
             App.Store.Settings.ScriptsModule = false; App.RaiseModulesChanged(); Pump(); Ui.ErrorOverride = null;
             Check(!navigation["scripts"].IsVisible && scriptErrors.Count == 0, "disabling «Скрипты» hides it without errors: " + string.Join(" | ", scriptErrors));
+            SidebarUiChecks.Run(sessionView, navigation, evidence, Check);
             ScriptsUiChecks.Run(store, evidence, Check);
             CompareUiChecks.Run(store, evidence, Check);
             GroupCUiChecks.Run(store, evidence, Check);

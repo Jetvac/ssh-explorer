@@ -485,6 +485,10 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     readonly Border connectionStatus = new();
     readonly bool presentationOnly;
     readonly Dictionary<string, Button> navigationButtons = [];
+    readonly Dictionary<string, FrameworkElement[]> sideEntries = [];
+    readonly Border filesLine = new() { Height = 1, Margin = new Thickness(8, 10, 8, 10) };
+    readonly Button customize;
+    SidebarEditor? sidebarEditor;
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
     FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
@@ -502,30 +506,21 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var statusRow = new DockPanel { LastChildFill = true, MinHeight = 30 }; DockPanel.SetDock(state, Dock.Right); statusRow.Children.Add(state); statusRow.Children.Add(fileStatusHost); connectionStatus.Child = statusRow; connectionStatus.Padding = new Thickness(0); connectionStatus.SetResourceReference(StyleProperty, "StatusBarStyle"); Grid.SetRow(connectionStatus, 3); host.Children.Add(connectionStatus);
         var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Clamp(App.Store.Settings.TreeWidth, 190, 420)), MinWidth = 190, MaxWidth = 420 }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 340 });
         side.Margin = new Thickness(5, 8, 5, 8); side.SetResourceReference(Panel.BackgroundProperty, "NavigationSurface");
-        side.Children.Add(Nav(IconCatalog.Server, "Сервер", "server")); side.Children.Add(Nav(IconCatalog.Terminal, "Терминал", "terminal")); side.Children.Add(Nav(IconCatalog.Performance, "Диспетчер задач", "monitor"));
-
+        // Every top-level section is one entry; the task manager carries its pages with it. Order and visibility come
+        // from Sidebar (shared by all tabs) and are edited in place with the gear button under the list.
+        foreach (var (key, info) in SidebarCatalog.Entries) sideEntries[key] = [Nav(info.Glyph, info.Title, key)];
         monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
         monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
         monitorNavigation.Children.Add(Nav(IconCatalog.Services, "Службы", "services"));
-        monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
-        // After the task manager and its pages, so the module never splits them.
-        // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
-        side.Children.Add(Nav(IconCatalog.Network, "Туннели", "tunnels"));
-        side.Children.Add(Nav(IconCatalog.Firewall, "Файервол", "firewall"));
-        var dockerNav = Nav(IconCatalog.Docker, "Docker", "docker"); side.Children.Add(dockerNav);
-        var scriptsNav = Nav("", "Скрипты", "scripts"); side.Children.Add(scriptsNav);
-        void ApplyModules()
-        {
-            var settings = App.Store.Settings;
-            dockerNav.Visibility = settings.DockerModule ? Visibility.Visible : Visibility.Collapsed;
-            scriptsNav.Visibility = settings.ScriptsModule ? Visibility.Visible : Visibility.Collapsed;
-            if (!settings.DockerModule && section == "docker" || !settings.ScriptsModule && section == "scripts") ShowSection("files");
-        }
-        ApplyModules(); App.ModulesChanged += modulesChanged = (_, _) => ApplyModules();
-        var line = new Border { Height = 1, Margin = new Thickness(8, 10, 8, 10) }; line.SetResourceReference(Border.BackgroundProperty, "Edge"); side.Children.Add(line);
-        side.Children.Add(Nav("\uE8B7", "Файлы", "files"));
-        reconnect = Ui.AsyncButton("Переподключиться", () => main.Reconnect(this, files?.CurrentPath)); reconnect.Visibility = Visibility.Collapsed; reconnect.Margin = new Thickness(7, 8, 7, 4); side.Children.Add(reconnect);
+        monitorNavigation.Visibility = Visibility.Collapsed; sideEntries["monitor"] = [sideEntries["monitor"][0], monitorNavigation];
+        filesLine.SetResourceReference(Border.BackgroundProperty, "Edge");
+        customize = Ui.IconButton(IconCatalog.Settings, ToggleSidebarEditor, "Настроить панель: порядок и видимость разделов"); customize.Name = "SidebarCustomize"; customize.Height = 28; customize.Width = 32;
+        customize.HorizontalAlignment = HorizontalAlignment.Right; customize.Margin = new Thickness(0, 6, 2, 0); customize.Opacity = .75;
+        System.Windows.Automation.AutomationProperties.SetName(customize, "Настроить панель разделов");
+        reconnect = Ui.AsyncButton("Переподключиться", () => main.Reconnect(this, files?.CurrentPath)); reconnect.Visibility = Visibility.Collapsed; reconnect.Margin = new Thickness(7, 8, 7, 4);
         reconnect.SetBinding(VisibilityProperty, new Binding(nameof(SessionViewModel.CanReconnect)) { Converter = new BooleanToVisibilityConverter() });
+        side.ContextMenuOpening += (_, e) => side.ContextMenu = SidebarMenu(e.OriginalSource as DependencyObject);
+        ApplySidebar(); App.ModulesChanged += modulesChanged = (_, _) => Dispatcher.InvokeAsync(ApplySidebar);
         var sidebarLayout = new Grid(); sidebarLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); sidebarLayout.RowDefinitions.Add(new RowDefinition());
         sidebarLayout.Children.Add(side); Grid.SetRow(fileNavigationHost, 1); fileNavigationHost.Margin = new Thickness(5, 0, 5, 8); sidebarLayout.Children.Add(fileNavigationHost);
         var sidebar = new Border { Child = sidebarLayout, BorderThickness = new Thickness(0, 0, 1, 0) }; sidebar.SetResourceReference(Border.BackgroundProperty, "NavigationSurface"); sidebar.SetResourceReference(Border.BorderBrushProperty, "Edge"); body.Children.Add(sidebar);
@@ -534,6 +529,45 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         body.SizeChanged += (_, _) => { var width = Math.Clamp(preferredTreeWidth, 190, Math.Max(190, Math.Min(420, body.ActualWidth - 344))); if (Math.Abs(body.ColumnDefinitions[0].ActualWidth - width) > 1) body.ColumnDefinitions[0].Width = new GridLength(width); };
         Grid.SetColumn(screen, 2); body.Children.Add(screen); Grid.SetRow(body, 2); host.Children.Add(body); Content = host;
         Session.StateChanged += StateChanged;
+    }
+    /// <summary>Lays the panel out from the shared order; leaves a section that has just been hidden.</summary>
+    void ApplySidebar()
+    {
+        if (disposed) return;
+        var settings = App.Store.Settings; var items = Sidebar.Resolve(settings);
+        side.Children.Clear();
+        if (sidebarEditor is not null) { sidebarEditor.Refresh(items); side.Children.Add(sidebarEditor); }
+        else
+        {
+            bool anyBefore = false;
+            foreach (var item in items)
+            {
+                if (item.Key == Sidebar.Home && anyBefore) side.Children.Add(filesLine);
+                foreach (var element in sideEntries[item.Key]) side.Children.Add(element);
+                sideEntries[item.Key][0].Visibility = item.Visible ? Visibility.Visible : Visibility.Collapsed;
+                anyBefore |= item.Visible;
+            }
+            side.Children.Add(reconnect); side.Children.Add(customize);
+        }
+        var current = section is "services" ? "monitor" : section;
+        if (SidebarCatalog.Entries.ContainsKey(current) && !Sidebar.IsVisible(settings, current)) ShowSection(Sidebar.Home);
+    }
+    void ToggleSidebarEditor()
+    {
+        if (sidebarEditor is null) { sidebarEditor = new SidebarEditor(() => { sidebarEditor = null; ApplySidebar(); customize.Focus(); }); ApplySidebar(); sidebarEditor.FocusFirst(); }
+        else sidebarEditor.Done();
+    }
+    internal bool IsEditingSidebar => sidebarEditor is not null;
+    internal SidebarEditor? SidebarEditorView => sidebarEditor;
+    ContextMenu SidebarMenu(DependencyObject? source)
+    {
+        var menu = new ContextMenu();
+        var key = sideEntries.FirstOrDefault(p => source is not null && (ReferenceEquals(p.Value[0], source) || IsInside(source, p.Value[0]))).Key;
+        if (key is not null && Sidebar.CanHide(key) && sidebarEditor is null)
+            menu.Items.Add(Ui.Menu($"Скрыть «{SidebarCatalog.Entries[key].Title}»", () => SidebarEditor.Save(Sidebar.SetVisible(Sidebar.Resolve(App.Store.Settings), key, false))));
+        menu.Items.Add(Ui.Menu(sidebarEditor is null ? "Настроить панель…" : "Готово", ToggleSidebarEditor, "", IconCatalog.Settings));
+        return menu;
+        static bool IsInside(DependencyObject node, DependencyObject root) { for (var n = node; n is not null; n = n is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(n) : LogicalTreeHelper.GetParent(n)) if (ReferenceEquals(n, root)) return true; return false; }
     }
     Button Nav(string glyph, string text, string key)
     {

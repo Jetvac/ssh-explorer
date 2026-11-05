@@ -78,9 +78,12 @@ public sealed class AppSettings
     public int TransferParallelism { get; set; } = 2;
     /// <summary>Shared speed limit for all transfers in KiB/s; 0 — unlimited.</summary>
     public int TransferLimitKiBps { get; set; }
-    /// <summary>Optional modules shown in the server navigation.</summary>
+    /// <summary>Optional modules shown in the server navigation (off by default; toggled in the panel editor).</summary>
     public bool DockerModule { get; set; }
     public bool ScriptsModule { get; set; }
+    /// <summary>Server panel order and hidden non-module sections; see <see cref="Sidebar"/>.</summary>
+    public List<string> SidebarOrder { get; set; } = [];
+    public List<string> SidebarHidden { get; set; } = [];
     public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }
 }
 public sealed class TableSortSetting
