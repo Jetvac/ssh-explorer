@@ -67,6 +67,33 @@ internal static class CompareUiChecks
             evidence.Capture((FrameworkElement)rename.Content, "batch-rename", new { theme = "Light", fixtureOnly = true });
         }
         finally { rename.Close(); }
+
+        // 0.3 F3: read-only text viewer — explains an undetected encoding, decodes after a manual choice, searches.
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        var cp1251 = System.Text.Encoding.GetEncoding(1251).GetBytes("строка один\r\nвторая строка с ключом token=42\r\n");
+        var viewer = new TextViewerWindow("legacy.conf", _ => Task.FromResult(cp1251)) { ShowInTaskbar = false, Left = 80, Top = 60 };
+        viewer.Show(); Layout(viewer);
+        try
+        {
+            for (int i = 0; i < 50 && Descendants<TextBlock>(viewer).Single(b => b.Name == "ViewerState").Text == "Чтение…"; i++) Pump();
+            var viewerState = Descendants<TextBlock>(viewer).Single(b => b.Name == "ViewerState");
+            check(viewer.Shown.Length == 0 && viewerState.Text.Contains("кодировку вручную", StringComparison.Ordinal), "an encoding that is not UTF-8 is explained, not shown as garbage: " + viewerState.Text);
+            Descendants<ComboBox>(viewer).Single(c => c.Name == "ViewerEncoding").SelectedItem = "windows-1251"; Pump();
+            check(viewer.Shown.Contains("вторая строка", StringComparison.Ordinal) && viewerState.Text.Contains("CRLF", StringComparison.Ordinal) && viewerState.Text.Contains("строк: 2", StringComparison.Ordinal), "a chosen encoding decodes the text and the format is shown: " + viewerState.Text);
+            Descendants<TextBox>(viewer).Single(b => b.Name == "ViewerSearch").Text = "TOKEN";
+            var textBox = Descendants<TextBox>(viewer).Single(b => b.Name == "ViewerText");
+            check(viewer.Find() && textBox.SelectedText == "token", "search finds text case-insensitively and selects it");
+            evidence.Capture((FrameworkElement)viewer.Content, "text-viewer", new { theme = "Light", fixtureOnly = true });
+        }
+        finally { viewer.Close(); }
+        var binary = new TextViewerWindow("image.bin", _ => Task.FromResult(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0x0D, 1, 2, 3 })) { ShowInTaskbar = false, Left = 80, Top = 60 };
+        binary.Show(); Layout(binary);
+        try
+        {
+            for (int i = 0; i < 50 && Descendants<TextBlock>(binary).Single(b => b.Name == "ViewerState").Text == "Чтение…"; i++) Pump();
+            check(binary.Shown.Length == 0 && Descendants<TextBlock>(binary).Single(b => b.Name == "ViewerState").Text.Contains("двоичные", StringComparison.Ordinal), "binary content is refused with a reason");
+        }
+        finally { binary.Close(); }
     }
 
     static void Pump() { var frame = new DispatcherFrame(); Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, () => frame.Continue = false); Dispatcher.PushFrame(frame); }

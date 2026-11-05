@@ -46,6 +46,16 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     long generation => viewModel.NavigationGeneration;
     bool disposed, restoringSelection;
     public string CurrentPath => viewModel.CurrentPath;
+    /// <summary>Read-only text view of the selected regular file (up to 10 MiB); no external program, nothing is written.</summary>
+    Task ViewTextAsync()
+    {
+        var chosen = Selected();
+        if (chosen.Count != 1 || chosen[0].Entry is not { IsRegularFile: true, IsSymbolicLink: false } entry) { viewModel.Message = "Выберите один обычный файл для просмотра."; return Task.CompletedTask; }
+        if (entry.Length > TextViewerWindow.MaximumBytes) { viewModel.Message = $"Файл больше {Ui.Size(TextViewerWindow.MaximumBytes)}: скачайте его или откройте в редакторе."; return Task.CompletedTask; }
+        new TextViewerWindow(entry.Name, ct => session.Files.ReadBytesAsync(entry.FullPath, TextViewerWindow.MaximumBytes, ct)) { Owner = Window.GetWindow(this) }.Show();
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// Renames the selection by pattern after a checked preview. Blocked sources go through temporary names first, so a swap or
     /// chain never overwrites. Stops at the first failure and says exactly what was renamed and what is left.
@@ -212,6 +222,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         Action("Download", Ui.DownloadGlyph, "Скачать…", Download, nameof(FileBrowserViewModel.HasSelection), 20);
         Action("Compare", "", "Сравнить с папкой Windows…", CompareWithLocal, nameof(FileBrowserViewModel.CanCreate), 5);
         Action("BatchRename", Ui.RenameGlyph, "Переименовать несколько…", BatchRenameAsync, nameof(FileBrowserViewModel.HasSelection), 6);
+        Action("ViewText", "", "Просмотреть как текст", ViewTextAsync, nameof(FileBrowserViewModel.HasSelection), 7, "F3");
         commands.Add("Sort", Ui.FlyoutButton(Ui.SortGlyph, "Сортировать", BuildSortMenu), () => Submenu("Сортировать", Ui.SortGlyph, BuildSortMenu), 40);
         var viewButton = Ui.FlyoutButton(CommandGlyphs.View(mode), "Просмотреть", BuildViewMenu);
         viewModeRow = (Panel)viewButton.Content;
@@ -779,7 +790,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
             if (!(alt && key is Key.Left or Key.Right or Key.Up) && key != Key.F5 && key != Key.Escape) return;
         }
         Func<Task>? action = null;
-        if (key == Key.F5) action = RefreshAsync; else if (key == Key.F2) action = Rename; else if (key == Key.Delete) action = Delete; else if (key == Key.Enter && alt) action = Properties; else if (key == Key.Enter) action = Open; else if (key == Key.Left && alt) action = Back; else if (key == Key.Right && alt) action = Forward; else if (key == Key.Up && alt) action = Up; else if (ctrl && key == Key.C) action = () => CopySelection(false); else if (ctrl && key == Key.X) action = () => CopySelection(true); else if (ctrl && key == Key.V) action = Paste; else if (ctrl && key == Key.Z) action = Undo; else if (ctrl && shift && key == Key.N) action = () => Create(true);
+        if (key == Key.F5) action = RefreshAsync; else if (key == Key.F3) action = ViewTextAsync; else if (key == Key.F2) action = Rename; else if (key == Key.Delete) action = Delete; else if (key == Key.Enter && alt) action = Properties; else if (key == Key.Enter) action = Open; else if (key == Key.Left && alt) action = Back; else if (key == Key.Right && alt) action = Forward; else if (key == Key.Up && alt) action = Up; else if (ctrl && key == Key.C) action = () => CopySelection(false); else if (ctrl && key == Key.X) action = () => CopySelection(true); else if (ctrl && key == Key.V) action = Paste; else if (ctrl && key == Key.Z) action = Undo; else if (ctrl && shift && key == Key.N) action = () => Create(true);
         else if (ctrl && key == Key.A) { if (mode == "Details") table.SelectAll(); else tiles.SelectAll(); e.Handled = true; }
         else if (key == Key.Escape) { navigationCts.Cancel(); recursiveSearchCts?.Cancel(); viewModel.SearchQuery = ""; if (mode == "Details") table.UnselectAll(); else tiles.UnselectAll(); e.Handled = true; }
         else if (shift && key == Key.F10) { var menu = BuildContextMenu(Selected().Count > 0); Ui.OpenContextMenu(mode == "Details" ? table : tiles, menu); e.Handled = true; }
