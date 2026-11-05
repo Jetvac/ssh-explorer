@@ -67,7 +67,7 @@ public sealed class MonitorView : UserControl, IDisposable
         preferences=new(saved);publishPreferences=persist;
         session = owner; viewModel = model; DataContext = model;
         lifetime = owner is null ? new CancellationTokenSource() : CancellationTokenSource.CreateLinkedTokenSource(owner.Lifetime);
-        if (owner is not null) monitor = new LinuxMonitor(async (command, ct) => { var result = await owner.ExecuteAsync(command, ct); return new ExecResult(result.Output, result.Error, result.ExitStatus); }) { Windows = owner.IsWindows };
+        if (owner is not null) monitor = new LinuxMonitor(async (command, ct) => { var result = owner.IsWindows ? await owner.ExecuteLongAsync(command, TimeSpan.FromSeconds(30), ct) : await owner.ExecuteAsync(command, ct); return new ExecResult(result.Output, result.Error, result.ExitStatus); }) { Windows = owner.IsWindows };
         SetResourceReference(BackgroundProperty, "Paper");
         terminate = Ui.AsyncCommandButton(Ui.CloseGlyph, "Завершить задачу", () => Signal(15), "Завершить выбранный процесс (SIGTERM)");
         terminate.SetBinding(IsEnabledProperty, new Binding(nameof(MonitorViewModel.CanSignalSelected)));

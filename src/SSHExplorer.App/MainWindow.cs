@@ -755,7 +755,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         var settings = App.Store.Settings;
         if (healthBusy || disposed || !settings.AlertsEnabled || Session.State != SessionState.Connected || !Session.ShellAvailable) return;
         healthBusy = true;
-        try { AlertCenter.Report(Session.Profile.Id, Session.Profile.Name, ServerHealth.Parse((await Session.ExecuteAsync(Session.IsWindows ? ServerHealth.WindowsCommand : ServerHealth.Command, Session.Lifetime)).Output, Math.Clamp(settings.AlertDiskPercent, 50, 99))); }
+        try { AlertCenter.Report(Session.Profile.Id, Session.Profile.Name, ServerHealth.Parse((Session.IsWindows ? await Session.ExecuteLongAsync(ServerHealth.WindowsCommand, TimeSpan.FromSeconds(60), Session.Lifetime) : await Session.ExecuteAsync(ServerHealth.Command, Session.Lifetime)).Output, Math.Clamp(settings.AlertDiskPercent, 50, 99))); }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or OperationCanceledException or Renci.SshNet.Common.SshException) { }
         finally { healthBusy = false; }
     }

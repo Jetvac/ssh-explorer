@@ -43,9 +43,9 @@ internal static class WindowsHostIntegration
             TestSuite.True(s.System.CpuCount > 0 && s.System.MemoryTotalBytes > 1L << 30 && s.System.CpuPercent is >= 0 and <= 100 && s.Processes.Count > 10 && s.Processes.Any(p => p.Name.Equals("sshd", StringComparison.OrdinalIgnoreCase))
                 && s.Storage.Any(d => d.MountPoint.StartsWith("C:", StringComparison.OrdinalIgnoreCase) && d.TotalBytes > 0) && s.Networks.Count > 0 && monitor.History.Count == 1,
                 $"cpus={s.System.CpuCount} mem={s.System.MemoryTotalBytes} cpu={s.System.CpuPercent} procs={s.Processes.Count} disks={string.Join(",", s.Storage.Select(d => d.MountPoint))} nets={s.Networks.Count} dur={s.CollectionDuration.TotalMilliseconds:0} ms");
-            var notepad = await session.ExecuteAsync(WindowsHost.PowerShell("(Start-Process notepad -PassThru).Id"));
-            int pid = int.Parse(notepad.Output.Trim());
-            var again = await monitor.SampleAsync(); var proc = again.Processes.Single(p => p.Pid == pid);
+            var sleeper = await session.ExecuteAsync(WindowsHost.PowerShell("(Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep 300' -WindowStyle Hidden -PassThru).Id"));
+            int pid = int.Parse(sleeper.Output.Trim());
+            var again = await monitor.SampleAsync(); var proc = again.Processes.SingleOrDefault(p => p.Pid == pid) ?? throw new InvalidOperationException($"process {pid} not in the sample of {again.Processes.Count}");
             await monitor.SignalAsync(proc.Identity, 15);
             var gone = await session.ExecuteAsync(WindowsHost.PowerShell($"if(Get-Process -Id {pid} -ErrorAction SilentlyContinue){{'alive'}}else{{'gone'}}"));
             var stale = false; try { await monitor.SignalAsync(proc.Identity, 15); } catch (ProcessChangedException) { stale = true; }
@@ -60,7 +60,7 @@ internal static class WindowsHostIntegration
         });
         await t.Run("Windows host: health check in the df form; a stopped automatic service is reported", async () =>
         {
-            var issues = ServerHealth.Parse((await session.ExecuteAsync(ServerHealth.WindowsCommand)).Output, 1);
+            var issues = ServerHealth.Parse((await session.ExecuteLongAsync(ServerHealth.WindowsCommand, TimeSpan.FromSeconds(60))).Output, 1);
             TestSuite.True(issues.Any(i => i.Key.StartsWith("disk:C:", StringComparison.OrdinalIgnoreCase)), "with a 1% threshold the system disk is reported: " + string.Join(" | ", issues.Select(i => i.Text)));
         });
         await t.Run("Windows host: services list with states; start and stop a service; its events", async () =>

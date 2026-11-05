@@ -102,7 +102,7 @@ public sealed class ServerPanelView : UserControl
             if (session.State != SessionState.Connected || !session.ShellAvailable)
             { RenderPlaceholder(session.ShellAvailable ? "Нет подключения к серверу. Переподключитесь, чтобы обновить сведения." : "Сервер не разрешает выполнять команды (SSH exec): доступны только файлы. Сведения о системе и управление питанием недоступны."); state.Text = "Сведения недоступны"; return; }
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            var result = await session.ExecuteAsync(session.IsWindows ? WindowsInfo.Command : ServerInfoCollector.Command, cts.Token);
+            var result = session.IsWindows ? await session.ExecuteLongAsync(WindowsInfo.Command, TimeSpan.FromSeconds(45), cts.Token) : await session.ExecuteAsync(ServerInfoCollector.Command, cts.Token);
             cts.Token.ThrowIfCancellationRequested();
             updatesButton.Visibility = session.IsWindows ? Visibility.Collapsed : Visibility.Visible;
             Info = session.IsWindows ? WindowsInfo.Parse(result.Output, SteadyClock.Now) : ServerInfoCollector.Parse(result.Output, SteadyClock.Now);

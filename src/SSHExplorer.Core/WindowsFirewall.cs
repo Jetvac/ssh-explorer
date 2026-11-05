@@ -160,7 +160,7 @@ public sealed class WindowsFirewallService(ServerSession session)
         try
         {
             client = await session.CreateSshClientAsync(timeout.Token).ConfigureAwait(false);
-            using var cmd = client.CreateCommand(WindowsHost.DetectCommand); cmd.CommandTimeout = TimeSpan.FromSeconds(10);
+            using var cmd = client.CreateCommand(WindowsHost.PowerShell("'ok'")); cmd.CommandTimeout = TimeSpan.FromSeconds(20);
             await cmd.ExecuteAsync(timeout.Token).ConfigureAwait(false);
             if (cmd.ExitStatus != 0) LastVerifyError = $"проверочная команда завершилась с кодом {cmd.ExitStatus}";
             return cmd.ExitStatus == 0;
