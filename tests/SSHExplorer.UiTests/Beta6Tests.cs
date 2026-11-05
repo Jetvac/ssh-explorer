@@ -292,6 +292,19 @@ internal static class Beta6Tests
             navigation["files"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
             navigation["server"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main);
             Check(Descendants<ServerPanelView>(sessionView).Count(p => p.IsVisible) == 1, "returning to «Сервер» reuses its single panel");
+            // 0.3 C2 crash: «Службы» had a navigation button but no accepted section key. Every button must be a known section.
+            var unknown = navigation.Keys.Where(k => k is not ("processes" or "performance") && !SSHExplorer.App.ViewModels.SessionViewModel.IsSection(k)).ToArray();
+            Check(unknown.Length == 0, "every navigation button opens a known section: " + string.Join(",", unknown));
+            var servicesErrors = new List<string>(); Ui.ErrorOverride = servicesErrors.Add;
+            string? servicesCrash = null;
+            try { navigation["services"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(); Layout(main); } catch (Exception ex) { servicesCrash = ex.GetType().Name + ": " + ex.Message; }
+            var servicesInTab = Descendants<ServicesView>(sessionView).SingleOrDefault();
+            for (int i = 0; i < 50 && servicesInTab is not null && !Descendants<TextBlock>(servicesInTab).Any(b => b.Name == "ServicesProblem"); i++) Pump();
+            Check(servicesCrash is null && servicesInTab is { IsVisible: true } && Descendants<TextBlock>(servicesInTab).Any(b => b.Name == "ServicesProblem" && b.IsVisible),
+                "clicking the actual «Службы» button opens the page and explains an unconnected session in place" + (servicesCrash is null ? "" : ": " + servicesCrash));
+            Check(Ui.GetIsNavigationActive(navigation["services"]) && navigation["processes"].IsVisible, "«Службы» is highlighted and the task manager pages stay visible around it");
+            Ui.ErrorOverride = null; Check(servicesErrors.Count == 0, "opening «Службы» raised no error dialog" + (servicesErrors.Count > 0 ? ": " + string.Join(" | ", servicesErrors) : ""));
+            navigation["files"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump();
             // 0.3 G: the Docker module appears only when enabled, at once in open tabs; an unconnected session explains itself in place.
             App.Store.Settings.DockerModule = false; App.RaiseModulesChanged(); Pump();
             Check(!navigation["docker"].IsVisible, "Docker is hidden while the module is off");

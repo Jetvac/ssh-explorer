@@ -506,7 +506,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
 
         monitorNavigation.Children.Add(Nav(IconCatalog.Processes, "Процессы", "processes"));
         monitorNavigation.Children.Add(Nav(IconCatalog.Performance, "Производительность", "performance"));
-        monitorNavigation.Children.Add(Nav("", "Службы", "services"));
+        monitorNavigation.Children.Add(Nav(IconCatalog.Services, "Службы", "services"));
         monitorNavigation.Visibility = Visibility.Collapsed; side.Children.Add(monitorNavigation);
         // After the task manager and its pages, so the module never splits them.
         // Optional module: shown only when enabled in «Параметры» → «Модули»; applies to open tabs at once.
@@ -672,7 +672,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         }
         if (key == "services")
         {
-            if (!Session.ShellAvailable) return;
+            // Like Docker: an unconnected or shell-less session is explained inside the page, never by a dialog or crash.
             services ??= new ServicesView(new SystemdService(Session));
             screen.Content = services;
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);

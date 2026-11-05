@@ -14,6 +14,8 @@ public sealed class SystemdService(ServerSession session)
 
     public async Task<ServicesSnapshot> ListAsync(CancellationToken ct = default)
     {
+        // Without a live session the long-command path would try to open a new connection: say so at once instead.
+        if (ExecuteOverride is null && session.State != SessionState.Connected) throw new IOException("Сервер не подключён.");
         var result = await (ExecuteOverride?.Invoke(Systemd.ListCommand, ct) ?? session.ExecuteLongAsync(Systemd.ListCommand, TimeSpan.FromSeconds(45), ct)).ConfigureAwait(false);
         var snapshot = Systemd.Parse(result.Output);
         IsRoot = snapshot.IsRoot; Sudo = snapshot.Sudo;
