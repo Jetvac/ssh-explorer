@@ -11,7 +11,7 @@ public sealed record SidebarItem(string Key, bool Visible);
 /// </summary>
 public static class Sidebar
 {
-    public static readonly string[] DefaultOrder = ["server", "terminal", "monitor", "tunnels", "firewall", "docker", "scripts", "files"];
+    public static readonly string[] DefaultOrder = ["server", "terminal", "monitor", "tunnels", "firewall", "security", "docker", "scripts", "files"];
     public static readonly string[] Modules = ["docker", "scripts"];
     public const string Home = "files";
 

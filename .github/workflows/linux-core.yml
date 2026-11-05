@@ -97,6 +97,9 @@ jobs:
           command -v ufw > /dev/null || sudo apt-get install -y -q ufw > /dev/null
           dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --firewall-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-firewall.log
           sudo ufw --force reset > /dev/null 2>&1 || true; sudo ufw disable > /dev/null 2>&1 || true
+          # 0.4: key login (authorized_keys, a new key login) and sshd hardening with the safe apply on the runner's /etc/ssh.
+          # The test talks to the fixture sshd on 2222, so a change to /etc/ssh never cuts it; /etc/ssh is restored afterwards.
+          dotnet run --project tests/SSHExplorer.Tests/SSHExplorer.Tests.csproj -c Release --no-build -- --security-integration 127.0.0.1 2222 "$USER" 2>&1 | tee artifacts-security.log
           for pid in "$fixture"/*.pid; do sudo kill "$(cat "$pid")" || true; done
       - name: Collector benchmark beta.5 vs protocol 2 (same runner, +300 processes)
         run: |
@@ -120,5 +123,6 @@ jobs:
             artifacts-groupc.log
             artifacts-groupd.log
             artifacts-firewall.log
+            artifacts-security.log
             artifacts/collector-benchmark.json
           retention-days: 14

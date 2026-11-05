@@ -8,7 +8,7 @@ public sealed class SessionViewModel : ObservableObject
     bool isActive, canReconnect;
     public string CurrentSection { get => currentSection; set { if (!IsSection(value)) throw new ArgumentException("Неизвестный раздел сессии."); Set(ref currentSection, value); } }
     /// <summary>Every section reachable from the session navigation (Сервер, Терминал, Диспетчер задач, Файлы).</summary>
-    public static readonly string[] Sections = ["server", "terminal", "monitor", "services", "tunnels", "firewall", "docker", "scripts", "files"];
+    public static readonly string[] Sections = ["server", "terminal", "monitor", "services", "tunnels", "firewall", "security", "docker", "scripts", "files"];
     public static bool IsSection(string? value) => value is not null && Array.IndexOf(Sections, value) >= 0;
     public bool IsActive { get => isActive; set => Set(ref isActive, value); }
     public bool CanReconnect { get => canReconnect; private set => Set(ref canReconnect, value); }

@@ -21,6 +21,12 @@ if (args.Length == 4 && args[0] == "--firewall-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real ufw checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 4 && args[0] == "--security-integration")
+{
+    await SecurityIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
+    Console.WriteLine($"RESULT: {suite.Passed} real key and sshd checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 4 && args[0] == "--groupd-integration")
 {
     await GroupDIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
@@ -121,6 +127,7 @@ await GroupDTests.RunAsync(suite);
 await FirewallTests.RunAsync(suite);
 await SidebarTests.RunAsync(suite);
 await ExchangeTests.RunAsync(suite);
+await SecurityTests.RunAsync(suite);
 await DocumentEditTests.RunAsync(suite);
 if (args.Length == 2 && args[0] == "--linux-integration")
     await LinuxIntegration.RunAsync(suite, args[1]);

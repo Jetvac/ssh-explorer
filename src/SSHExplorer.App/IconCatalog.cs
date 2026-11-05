@@ -28,7 +28,7 @@ public static class IconCatalog
         ViewList = Prefix + "view-list", ViewDetails = Prefix + "view-details", ViewTiles = Prefix + "view-tiles", ViewContent = Prefix + "view-content",
         TabList = Prefix + "tab-list", NewTab = Prefix + "new-tab", Documents = Prefix + "documents", Transfers = Prefix + "transfers",
         Server = Prefix + "server", Processes = Prefix + "processes", Performance = Prefix + "performance", Terminal = Prefix + "terminal",
-        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage", Settings = Prefix + "settings", Docker = Prefix + "docker", Services = Prefix + "services", SplitRight = Prefix + "split-right", SplitDown = Prefix + "split-down", Firewall = Prefix + "firewall";
+        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage", Settings = Prefix + "settings", Docker = Prefix + "docker", Services = Prefix + "services", SplitRight = Prefix + "split-right", SplitDown = Prefix + "split-down", Firewall = Prefix + "firewall", Security = Prefix + "security";
 
     public sealed record Entry(string Key, string Purpose, string Source, string? Glyph, string? PathData, string Style = "stroke");
 
@@ -98,6 +98,7 @@ public static class IconCatalog
         new("services", "Службы", "SSH Explorer vector", null, "M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M7.5 8A1.5 1.5 0 1 1 4.5 8A1.5 1.5 0 1 1 7.5 8Z M6 4.75V5.75 M6 10.25V11.25 M2.75 8H3.75 M8.25 8H9.25 M10.5 6.5H12.5 M10.5 9.5H12.5"),
         new("split-right", "Разделить вправо", "SSH Explorer vector", null, "M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M8 2.5V13.5"),
         new("split-down", "Разделить вниз", "SSH Explorer vector", null, "M3 2.5H13A1.5 1.5 0 0 1 14.5 4V12A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5Z M1.5 8H14.5"),
+        new("security", "Защита SSH", "SSH Explorer vector", null, "M4.75 7V5.25A3.25 3.25 0 0 1 11.25 5.25V7 M3.5 7H12.5V14H3.5Z M8 9.75V11.75"),
         new("firewall", "Файервол", "SSH Explorer vector", null, "M8 1.75L13.5 3.75V7.5C13.5 10.9 11.2 13.4 8 14.5C4.8 13.4 2.5 10.9 2.5 7.5V3.75Z M5.5 8L7.25 9.75L10.75 6.25"),
         new("storage", "Хранилища", "SSH Explorer vector", null, "M3 4.5H13A1.5 1.5 0 0 1 14.5 6V10A1.5 1.5 0 0 1 13 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5Z M11 8H11.5 M4 8H8"),
     ];

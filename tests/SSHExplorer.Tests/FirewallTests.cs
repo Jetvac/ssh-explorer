@@ -103,12 +103,10 @@ internal static class FirewallTests
             var set = new FirewallRuleSet { Name = "веб", Rules = [new RuleDraft { Port = "22", Comment = "другой комментарий" }, new RuleDraft { Port = "80,443" }, new RuleDraft { From = "203.0.113.10", Port = "9000" }], DefaultIncoming = "reject" };
             var add = FirewallRuleSets.Plan(s, set, false);
             TestSuite.True(add.Present.Count == 1 && add.Added.Count == 2 && add.Removed.Count == 0 && add.Commands.SequenceEqual(["ufw allow in proto tcp from 'any' to any port '80,443'", "ufw allow in proto tcp from '203.0.113.10' to any port '9000'", "ufw default reject incoming"])
-                && add.Notes.Any(n => n.Contains("203.0.113.10", StringComparison.Ordinal)), string.Join("
-", add.Commands));
+                && add.Notes.Any(n => n.Contains("203.0.113.10", StringComparison.Ordinal)), string.Join(" | ", add.Commands));
             var exact = FirewallRuleSets.Plan(s, set, true);
             TestSuite.True(exact.Removed.Count == 4 && exact.Commands.Take(4).All(c => c.StartsWith("ufw --force delete", StringComparison.Ordinal)) && exact.Commands.Count == 7 && Ufw.CheckAfter(s, exact.Commands).Allowed == true
-                && exact.Notes.Any(n => n.Contains("тоже будут удалены", StringComparison.Ordinal)), string.Join("
-", exact.Commands));
+                && exact.Notes.Any(n => n.Contains("тоже будут удалены", StringComparison.Ordinal)), string.Join(" | ", exact.Commands));
             var same = FirewallRuleSets.Plan(s, FirewallRuleSets.FromSnapshot(s, "x", true).Set, false);
             TestSuite.True(same.Commands.Count == 0 && same.Present.Count == 3, "a set made from the server needs no change");
             var closing = new FirewallRuleSet { Name = "закрыть", Rules = [new RuleDraft { Action = FirewallAction.Deny, Port = "22" }] };

@@ -18,6 +18,9 @@ public partial class App : Application
     /// <summary>Raised after «Параметры» changes which optional modules are enabled.</summary>
     public static event EventHandler? ModulesChanged;
     internal static void RaiseModulesChanged() => ModulesChanged?.Invoke(null, EventArgs.Empty);
+    /// <summary>A profile was saved outside the Home dialogs (for example, switched to key login).</summary>
+    public static event EventHandler? ProfilesChanged;
+    internal static void RaiseProfilesChanged() => ProfilesChanged?.Invoke(null, EventArgs.Empty);
     protected override async void OnStartup(StartupEventArgs e)
     {
         StartupCallbackObserved = true;

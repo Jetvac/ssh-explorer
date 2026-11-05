@@ -15,7 +15,7 @@ internal static class SidebarTests
         {
             var s = new AppSettings { SidebarOrder = ["files", "terminal", "gone", "server", "terminal"] };
             var keys = Sidebar.Resolve(s).Select(i => i.Key).ToArray();
-            TestSuite.True(keys.SequenceEqual(["files", "terminal", "monitor", "tunnels", "firewall", "docker", "scripts", "server"]), string.Join(",", keys));
+            TestSuite.True(keys.SequenceEqual(["files", "terminal", "monitor", "tunnels", "firewall", "security", "docker", "scripts", "server"]), string.Join(",", keys));
         });
         await t.Run("sidebar: hiding, showing and moving are stored; modules follow their old on/off flags", () =>
         {

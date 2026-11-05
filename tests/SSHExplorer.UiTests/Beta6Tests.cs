@@ -335,6 +335,7 @@ internal static class Beta6Tests
             GroupCUiChecks.Run(store, evidence, Check);
             GroupDUiChecks.Run(store, evidence, Check);
             FirewallUiChecks.Run(store, evidence, Check);
+            SecurityUiChecks.Run(store, evidence, Check);
             // Middle click (press and release on the same tab) closes a server tab.
             var (middleTab, _) = AddTab(main, store, "Закрытие средней кнопкой"); Pump(); Layout(main);
             var allTabs = (TabControl)Field(main, "tabs");
