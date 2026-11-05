@@ -167,9 +167,9 @@ public sealed class KeyLoginWindow : Window
             KeyPath = path;
             Step(await service.InstallAsync(pub) ? "✓ Открытый ключ добавлен в ~/.ssh/authorized_keys на сервере." : "✓ Этот ключ уже был на сервере.");
             Step("… Проверка: новое подключение по ключу" + (service.Session.Route is { } route ? $" через {route}" : "") + "…");
-            if (await service.VerifyAsync(path, phrase) is { } failure)
+            if (await service.VerifyAsync(path, phrase) is { } why)
             {
-                Step("✗ Вход по ключу не прошёл: " + failure);
+                Step("✗ Вход по ключу не прошёл: " + why);
                 problem.Text = failure = "Профиль не изменён. Частые причины: на сервере запрещён вход по ключу (PubkeyAuthentication no) или неверные права ~/.ssh. Ключ на сервере остался — его можно удалить в списке.";
                 return;
             }
