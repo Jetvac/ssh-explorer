@@ -400,10 +400,45 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         // Destroying the control while it is still disconnecting can block inside it: let the session end first.
         for (int i = 0; i < 100 && client?.Ocx is { } ocx && IsConnected(ocx); i++) await Task.Delay(100);
         disposed = true; resize.Stop(); login?.TrySetResult(false); password = null;
-        layer.Children.Remove(host);
-        client?.Dispose(); client = null;
-        try { host.Dispose(); } catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException) { }
+        // Destroying the Windows control right after a session ends can block inside the control for minutes (seen
+        // on the CI runner after a quick reconnect). The tab closes now; the hidden control is destroyed later.
+        host.Visibility = Visibility.Collapsed;
+        RdpDisposal.Later(layer, host, client); client = null;
         if (tunnel is not null) { await tunnel.DisposeAsync(); tunnel = null; }
         State = SessionState.Closed; StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+/// <summary>
+/// Closed remote desktop controls waiting to be destroyed: the session has ended, the control is hidden, and after a
+/// pause (when Windows has finished tearing the session down) the control and its window are released.
+/// </summary>
+internal static class RdpDisposal
+{
+    sealed record Item(Canvas Layer, WindowsFormsHost Host, RdpClient? Client, DateTime Due);
+    static readonly List<Item> pending = [];
+    static DispatcherTimer? timer;
+    /// <summary>How long a closed control waits; shorter in tests.</summary>
+    internal static TimeSpan Delay { get; set; } = TimeSpan.FromSeconds(30);
+    internal static int Pending => pending.Count;
+
+    public static void Later(Canvas layer, WindowsFormsHost host, RdpClient? client)
+    {
+        pending.Add(new Item(layer, host, client, DateTime.UtcNow + Delay));
+        timer ??= new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => Sweep(false), Dispatcher.CurrentDispatcher);
+        timer.Start();
+    }
+
+    /// <summary>Destroys the controls that are due (all of them when <paramref name="all"/>).</summary>
+    internal static void Sweep(bool all)
+    {
+        foreach (var item in pending.Where(i => all || i.Due <= DateTime.UtcNow).ToArray())
+        {
+            pending.Remove(item);
+            item.Layer.Children.Remove(item.Host);
+            item.Client?.Dispose();
+            try { item.Host.Dispose(); } catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException) { }
+        }
+        if (pending.Count == 0) timer?.Stop();
     }
 }

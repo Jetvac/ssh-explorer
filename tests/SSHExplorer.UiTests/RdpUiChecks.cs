@@ -60,7 +60,9 @@ internal static class RdpUiChecks
         // Home lists RDP profiles with their own icon and the domain beside the user.
         var row = new ServerProfileViewModel(new ServerProfile { Name = "w", Host = "h", Port = 3389, Username = "admin", Protocol = ConnectionProtocol.Rdp, Rdp = new RdpOptions { Domain = "CORP" } }, []);
         check(row.ProtocolGlyph == IconCatalog.RemoteDesktop && row.Username == "CORP\\admin" && new ServerProfileViewModel(new ServerProfile { Name = "s", Host = "h", Username = "u" }, []).ProtocolGlyph == IconCatalog.Terminal, "Home shows the protocol and DOMAIN\\user");
-        check(Close(main, view) && !main.Desktops.Contains(view) && !Descendants<WindowsFormsHost>(layer).Any(), "closing the tab removes the control");
+        check(Close(main, view) && !main.Desktops.Contains(view) && Descendants<WindowsFormsHost>(layer).All(h => h.Visibility != Visibility.Visible) && RdpDisposal.Pending >= 1, "closing the tab hides the control at once and queues it for release");
+        RdpDisposal.Sweep(true);
+        check(!Descendants<WindowsFormsHost>(layer).Any() && RdpDisposal.Pending == 0, "the queued control is then destroyed");
         LiveCheck(main, store, check);
     }
 
@@ -123,7 +125,9 @@ internal static class RdpUiChecks
             for (int i = 0; i < 20; i++) Pump();
             stage = "disconnect again"; var disconnectAgain = view.DisconnectAsync(); watch.Restart(); while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
             live(view.State == SessionState.Disconnected, "live: the second session also ends before the tab is closed: " + view.State);
-            stage = "close"; live(Close(main, view), "live: the tab closes"); stage = "done";
+            stage = "close"; RdpDisposal.Delay = TimeSpan.FromSeconds(10); live(Close(main, view), "live: the tab closes at once; the control is released later");
+            stage = "release"; var release = Stopwatch.StartNew(); while (RdpDisposal.Pending > 0 && release.Elapsed < TimeSpan.FromSeconds(40)) Pump();
+            live(RdpDisposal.Pending == 0, $"live: the closed control is destroyed after the pause ({release.Elapsed.TotalSeconds:0} s)"); RdpDisposal.Delay = TimeSpan.FromSeconds(30); stage = "done";
         }
         finally { Dialogs.RdpCertificateOverride = null; main.DesktopCloseConfirmOverride = null; }
     }
