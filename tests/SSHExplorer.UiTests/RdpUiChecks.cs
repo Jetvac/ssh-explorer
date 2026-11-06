@@ -93,14 +93,26 @@ internal static class RdpUiChecks
             stage = "snapshot";
             var shot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sshx-rdp-" + Guid.NewGuid().ToString("N") + ".png");
             var shotErrors = new List<string>(); Ui.ErrorOverride = shotErrors.Add; RdpView.SnapshotPathOverride = () => shot;
-            try { view.StartMenu(); for (int i = 0; i < 10; i++) Pump(); view.Snapshot(); }
-            finally { Ui.ErrorOverride = null; RdpView.SnapshotPathOverride = null; }
             int colours = 0;
-            if (System.IO.File.Exists(shot))
+            try
             {
-                using var picture = new System.Drawing.Bitmap(shot);
-                colours = Enumerable.Range(0, 100).Select(i => picture.GetPixel(picture.Width * (i % 10) / 10, picture.Height * (i / 10) / 10).ToArgb()).Distinct().Count();
+                view.StartMenu();
+                // Right after sign-in the remote desktop may not be drawn yet: take pictures until it is (up to ~20 s).
+                var shotWatch = Stopwatch.StartNew();
+                do
+                {
+                    for (int i = 0; i < 10; i++) Pump();
+                    view.Snapshot();
+                    if (System.IO.File.Exists(shot))
+                    {
+                        using var picture = new System.Drawing.Bitmap(shot);
+                        colours = Enumerable.Range(0, 100).Select(i => picture.GetPixel(picture.Width * (i % 10) / 10, picture.Height * (i / 10) / 10).ToArgb()).Distinct().Count();
+                    }
+                    if (colours > 1) break;
+                    var pause = Stopwatch.StartNew(); while (pause.Elapsed < TimeSpan.FromSeconds(2)) Pump();
+                } while (shotWatch.Elapsed < TimeSpan.FromSeconds(20));
             }
+            finally { Ui.ErrorOverride = null; RdpView.SnapshotPathOverride = null; }
             live(colours > 1 && shotErrors.Count == 0, $"live: «Пуск» is sent and «Снимок» saves the desktop as PNG ({colours} colours in 100 samples) " + string.Join(" | ", shotErrors));
             stage = "disconnect"; var disconnect = view.DisconnectAsync(); watch.Restart();
             while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
