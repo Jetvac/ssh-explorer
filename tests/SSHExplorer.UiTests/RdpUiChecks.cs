@@ -89,6 +89,19 @@ internal static class RdpUiChecks
             live(connect.IsCompleted && connect.Result && view.State == SessionState.Connected, $"live: signed in to the runner over RDP in {watch.Elapsed.TotalSeconds:0} s: " + (view.LastError ?? view.StatusText));
             live(prompts.Count == 1 && prompts[0].Fingerprint.StartsWith("SHA256:", StringComparison.Ordinal) && store.Trust.Records.Any(r => r.Algorithm == RdpTrust.Algorithm), "live: the server key was confirmed before sign-in and saved");
             for (int i = 0; i < 20; i++) Pump();
+            // 0.6: the Windows key (Start menu) and a picture of the desktop.
+            stage = "snapshot";
+            var shot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sshx-rdp-" + Guid.NewGuid().ToString("N") + ".png");
+            var shotErrors = new List<string>(); Ui.ErrorOverride = shotErrors.Add; RdpView.SnapshotPathOverride = () => shot;
+            try { view.StartMenu(); for (int i = 0; i < 10; i++) Pump(); view.Snapshot(); }
+            finally { Ui.ErrorOverride = null; RdpView.SnapshotPathOverride = null; }
+            int colours = 0;
+            if (System.IO.File.Exists(shot))
+            {
+                using var picture = new System.Drawing.Bitmap(shot);
+                colours = Enumerable.Range(0, 100).Select(i => picture.GetPixel(picture.Width * (i % 10) / 10, picture.Height * (i / 10) / 10).ToArgb()).Distinct().Count();
+            }
+            live(colours > 1 && shotErrors.Count == 0, $"live: «Пуск» is sent and «Снимок» saves the desktop as PNG ({colours} colours in 100 samples) " + string.Join(" | ", shotErrors));
             stage = "disconnect"; var disconnect = view.DisconnectAsync(); watch.Restart();
             while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
             live(view.State == SessionState.Disconnected && view.MessageText == "Подключение завершено.", "live: «Отключить» ends the session: " + view.MessageText);

@@ -114,6 +114,31 @@ internal static class WindowsHostIntegration
             var last = results.Last();
             TestSuite.True(last.State == GroupRunState.Failed && last.ExitCode == 4 && last.Output.Contains("host=", StringComparison.Ordinal), $"{last.State} {last.ExitCode} {last.Output} {last.Problem}");
         });
+        await t.Run("Windows host: background metric history with the saved password — PowerShell sample, disks, custom metrics", async () =>
+        {
+            var stored = store.Profiles.Single(p => p.Id == profile.Id);
+            stored.RecordHistory = true;
+            stored.CustomMetrics = [new CustomMetricDefinition { Name = "procs", Command = "(Get-Process).Count", Approved = true }, new CustomMetricDefinition { Name = "broken", Command = "throw 'нет такого'", Approved = true }];
+            var metrics = new MetricsStore(Path.Combine(dir, "metrics"));
+            MetricsSampler? sampler = null; bool background = false;
+            await using var scheduler = new MetricsScheduler(store, async (target, ct) =>
+            {
+                background = target.Background;
+                sampler ??= new MetricsSampler(target.Profile.Id, metrics, async (c, timeout, k) => { var r = await target.Session.ExecuteLongAsync(c, timeout, k); return new ExecResult(r.Output, r.Error, r.ExitStatus); }, target.Session.IsWindows);
+                await sampler.SampleAsync(MetricsProfile.CustomMetrics(stored, store.Settings.Folders).Select(m => new CustomMetricSpec(m.Id, m.Name, m.Command, m.Unit, m.IntervalSeconds)).ToArray(), ct);
+            });
+            await scheduler.TickAsync(CancellationToken.None);
+            var latest = metrics.Latest(profile.Id, DateTimeOffset.UtcNow);
+            TestSuite.True(scheduler.StatusOf(profile.Id) is { Problem: null, LastSample: not null } && background && sampler!.Windows, scheduler.StatusOf(profile.Id)?.Problem ?? "no status");
+            TestSuite.True(latest.ContainsKey(MetricSeries.Cpu) && latest.ContainsKey(MetricSeries.Memory) && latest.Keys.Any(k => k.StartsWith("fs:C:", StringComparison.OrdinalIgnoreCase)) && latest.TryGetValue("custom:procs", out var procs) && procs.Value > 10,
+                "series: " + string.Join(", ", latest.Keys));
+            TestSuite.True(sampler!.CustomErrors.Values.SingleOrDefault() is { } e && e.StartsWith("Код завершения", StringComparison.Ordinal), string.Join(" | ", sampler.CustomErrors.Values));
+        });
+        await t.Run("Windows host: file properties show the owner and access rules (Get-Acl)", async () =>
+        {
+            var acl = WindowsHost.ParseAcl((await session.ExecuteLongAsync(WindowsHost.AclCommand(session.Files.HomeDirectory), TimeSpan.FromSeconds(60))).Output);
+            TestSuite.True(acl.Owner.Length > 0 && acl.Attributes.Contains("Directory", StringComparison.Ordinal) && acl.Rules.Count > 0 && acl.Rules.Any(r => r.Allow), $"{acl.Owner} {acl.Attributes} rules={acl.Rules.Count}");
+        });
         try { Directory.Delete(dir, true); } catch (IOException) { }
     }
 }

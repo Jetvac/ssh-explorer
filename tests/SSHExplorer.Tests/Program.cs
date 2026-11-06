@@ -27,6 +27,12 @@ if (args.Length == 4 && args[0] == "--windows-host-integration")
     Console.WriteLine($"RESULT: {suite.Passed} real Windows server checks passed, {suite.Failed} failed");
     return suite.Failed == 0 ? 0 : 1;
 }
+if (args.Length == 4 && args[0] == "--metrics-integration")
+{
+    await MetricsIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
+    Console.WriteLine($"RESULT: {suite.Passed} real metric history checks passed, {suite.Failed} failed");
+    return suite.Failed == 0 ? 0 : 1;
+}
 if (args.Length == 4 && args[0] == "--security-integration")
 {
     await SecurityIntegration.RunAsync(suite, args[1], int.Parse(args[2]), args[3]);
@@ -115,8 +121,10 @@ if (args.Length == 2 && args[0] == "--network-failure")
 await MonitorTests.RunAsync(suite);
 await MetricStateTests.RunAsync(suite);
 await ServerPanelTests.RunAsync(suite);
+await MetricsTests.RunAsync(suite);
 #if CORE_TESTS
 await CoreTests.RunAsync(suite);
+await MetricsCoreTests.RunAsync(suite);
 await SshConfigTests.RunAsync(suite);
 await AgentTests.RunAsync(suite);
 await ProxyJumpTests.RunAsync(suite);

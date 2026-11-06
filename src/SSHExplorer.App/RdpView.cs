@@ -22,7 +22,7 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
     readonly WindowsFormsHost host = new() { Visibility = Visibility.Collapsed };
     readonly TextBlock status = Ui.Text("", 12), message = Ui.Text("", 15);
     readonly StackPanel notice = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 520, Margin = new Thickness(24) };
-    readonly Button reconnectButton, fullScreenButton, keysButton, disconnectButton;
+    readonly Button reconnectButton, fullScreenButton, keysButton, disconnectButton, startButton, snapshotButton, filesButton;
     readonly DispatcherTimer resize = new() { Interval = TimeSpan.FromMilliseconds(700) };
     readonly HashSet<string> sessionTrusted = [];
     RdpClient? client;
@@ -39,6 +39,10 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
     public event EventHandler? StateChanged;
     /// <summary>Asks the main window to connect again (it reads the saved or entered password).</summary>
     internal Func<RdpView, Task>? ReconnectRequested { get; set; }
+    /// <summary>Asks the main window to open this server's files over SSH (Windows OpenSSH Server).</summary>
+    internal Func<RdpView, Task>? FilesRequested { get; set; }
+    /// <summary>Test hook: the PNG file a snapshot is saved to (null — cancel).</summary>
+    internal static Func<string?>? SnapshotPathOverride { get; set; }
     internal string StatusText => status.Text;
     internal string MessageText => message.Text;
     internal bool ControlCreated => client?.Ready == true;
@@ -54,10 +58,14 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         fullScreenButton = Ui.CommandButton(IconCatalog.ViewHuge, "Во весь экран", FullScreen, "Рабочий стол на весь экран; вернуться — кнопкой на панели вверху экрана");
         keysButton = Ui.CommandButton(IconCatalog.Settings, "Ctrl+Alt+Del", CtrlAltDel, "Отправить Ctrl+Alt+Del удалённому компьютеру");
         disconnectButton = Ui.AsyncCommandButton(Ui.CloseGlyph, "Отключить", DisconnectAsync, "Завершить подключение, вкладка останется");
+        startButton = Ui.CommandButton("", "Пуск", StartMenu, "Отправить клавишу Windows (меню «Пуск») удалённому компьютеру");
+        snapshotButton = Ui.CommandButton("", "Снимок", Snapshot, "Сохранить снимок рабочего стола в PNG");
+        filesButton = Ui.AsyncCommandButton(Ui.FileGlyph, "Файлы по SSH", () => FilesRequested?.Invoke(this) ?? Task.CompletedTask, "Открыть файлы этого сервера по SSH (нужен OpenSSH Server на Windows)");
+        startButton.Name = "RdpStartMenu"; snapshotButton.Name = "RdpSnapshot"; filesButton.Name = "RdpFiles";
         var mstsc = Ui.CommandButton(IconCatalog.RemoteDesktop, "Открыть в mstsc", OpenInMstsc, "Открыть этот сервер в «Подключении к удалённому рабочему столу» Windows (пароль не передаётся)");
         reconnectButton.Name = "RdpReconnect"; fullScreenButton.Name = "RdpFullScreen"; keysButton.Name = "RdpCtrlAltDel"; disconnectButton.Name = "RdpDisconnect"; mstsc.Name = "RdpMstsc";
         status.Name = "RdpStatus"; status.VerticalAlignment = VerticalAlignment.Center; status.Margin = new Thickness(12, 0, 0, 0); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); status.TextTrimming = TextTrimming.CharacterEllipsis;
-        var bar = new DockPanel { LastChildFill = true }; var buttons = Ui.Row(reconnectButton, fullScreenButton, keysButton, mstsc, disconnectButton); DockPanel.SetDock(buttons, Dock.Left); bar.Children.Add(buttons); bar.Children.Add(status);
+        var bar = new DockPanel { LastChildFill = true }; var buttons = Ui.Row(reconnectButton, fullScreenButton, keysButton, startButton, snapshotButton, filesButton, mstsc, disconnectButton); DockPanel.SetDock(buttons, Dock.Left); bar.Children.Add(buttons); bar.Children.Add(status);
         var barHost = new Border { Child = bar, Padding = new Thickness(10, 4, 10, 4) }; barHost.SetResourceReference(StyleProperty, "CommandBarStyle"); SetDock(barHost, Dock.Top); Children.Add(barHost);
         message.Name = "RdpMessage"; message.TextWrapping = TextWrapping.Wrap; message.TextAlignment = TextAlignment.Center; notice.Children.Add(message);
         var again = Ui.AsyncCommandButton(IconCatalog.Reconnect, "Подключиться снова", () => ReconnectRequested?.Invoke(this) ?? Task.CompletedTask); again.Name = "RdpConnectAgain"; again.HorizontalAlignment = HorizontalAlignment.Center; again.Margin = new Thickness(0, 14, 0, 0); notice.Children.Add(again);
@@ -76,7 +84,7 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         message.Text = problem ?? text;
         bool live = State is SessionState.Connecting or SessionState.Connected;
         notice.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
-        fullScreenButton.IsEnabled = keysButton.IsEnabled = State == SessionState.Connected;
+        fullScreenButton.IsEnabled = keysButton.IsEnabled = startButton.IsEnabled = snapshotButton.IsEnabled = State == SessionState.Connected;
         disconnectButton.IsEnabled = live;
         Place();
     }
@@ -291,6 +299,35 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         if (client?.Ocx is not { } ocx) return;
         try { Com.Set(ocx, "FullScreen", true); }
         catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or System.Reflection.TargetInvocationException) { Ui.Error("Не удалось включить полноэкранный режим: " + ErrorMessages.Describe(ex)); }
+    }
+
+    internal void StartMenu()
+    {
+        try { client?.SendStartMenu(); }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidCastException or InvalidOperationException) { Ui.Error("Клавиша не отправлена: " + ErrorMessages.Describe(ex)); }
+    }
+
+    /// <summary>Saves what the tab shows as PNG; the file name carries the server and the time.</summary>
+    internal void Snapshot()
+    {
+        if (client is null || State != SessionState.Connected) { Ui.Info("Снимок доступен, пока рабочий стол подключён."); return; }
+        System.Drawing.Bitmap picture;
+        try { picture = client.Snapshot(); }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or System.ComponentModel.Win32Exception or System.Runtime.InteropServices.ExternalException) { Ui.Error("Снимок не получен: " + ErrorMessages.Describe(ex)); return; }
+        using (picture)
+        {
+            string? path = SnapshotPathOverride is { } fake ? fake() : null;
+            if (SnapshotPathOverride is null)
+            {
+                var safe = string.Concat(Profile.Name.Select(c => System.IO.Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+                var dialog = new Microsoft.Win32.SaveFileDialog { Title = "Снимок рабочего стола", Filter = "Изображение PNG|*.png", FileName = $"{safe} {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png", InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) };
+                if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+                path = dialog.FileName;
+            }
+            if (string.IsNullOrEmpty(path)) return;
+            try { picture.Save(path, System.Drawing.Imaging.ImageFormat.Png); Update("Снимок сохранён: " + System.IO.Path.GetFileName(path), null); }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Runtime.InteropServices.ExternalException) { Ui.Error("Не удалось сохранить снимок: " + ex.Message); }
+        }
     }
 
     void CtrlAltDel()

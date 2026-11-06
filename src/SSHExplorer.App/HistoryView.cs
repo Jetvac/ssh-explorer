@@ -125,7 +125,9 @@ public sealed class HistoryView : UserControl, IDisposable
         Reload();
     }
 
-    void SetLive(TimeSpan span) { back.Clear(); live = span; Reload(); }
+    internal void SetLive(TimeSpan span) { back.Clear(); live = span; Reload(); }
+    internal void SetCompare(Guid? server, bool previous) { compareServer = server; comparePrevious = previous; Reload(); }
+    internal void Back() => ZoomBack();
 
     void ZoomBack()
     {
@@ -171,7 +173,7 @@ public sealed class HistoryView : UserControl, IDisposable
         return menu;
     }
 
-    void AddMark()
+    internal void AddMark()
     {
         var text = MarkTextOverride is { } fake ? fake() : Ui.Prompt("Отметка на графиках", "Что произошло (например, «обновил nginx»):");
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -179,7 +181,7 @@ public sealed class HistoryView : UserControl, IDisposable
         Reload();
     }
 
-    void ExportCsv()
+    internal void ExportCsv()
     {
         var shown = Charts.SelectMany(c => c.Series).Where(s => s.Shift == TimeSpan.Zero && !s.Dashed).GroupBy(s => s.Name).Select(g => g.First()).ToArray();
         if (shown.Length == 0) { Ui.Info("Нечего сохранять: за выбранный период нет записанных значений."); return; }

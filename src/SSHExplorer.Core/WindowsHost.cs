@@ -65,4 +65,43 @@ public static class WindowsHost
         }
         return t.Replace('\\', '/');
     }
+
+    /// <summary>Owner, attributes and access rules of a file or folder (Get-Acl); read only.</summary>
+    public static string AclCommand(string sftpPath)
+    {
+        var path = Quote(ToDisplay(sftpPath));
+        return PowerShell("$a=Get-Acl -LiteralPath " + path + ";$i=Get-Item -LiteralPath " + path + " -Force;" +
+            "[ordered]@{o=$a.Owner;at=$i.Attributes.ToString();r=@($a.Access|%{[ordered]@{i=$_.IdentityReference.Value;t=$_.AccessControlType.ToString();r=$_.FileSystemRights.ToString();h=$_.IsInherited}})}|ConvertTo-Json -Depth 4 -Compress");
+    }
+
+    public static WindowsAcl ParseAcl(string output)
+    {
+        int start = output.IndexOf('{');
+        if (start < 0) throw new FormatException("Нет ответа Get-Acl.");
+        using var doc = System.Text.Json.JsonDocument.Parse(output[start..]);
+        var r = doc.RootElement;
+        static string S(System.Text.Json.JsonElement e, string n) => e.TryGetProperty(n, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() ?? "" : "";
+        var rules = new List<WindowsAccessRule>();
+        if (r.TryGetProperty("r", out var list))
+        {
+            var items = list.ValueKind == System.Text.Json.JsonValueKind.Array ? list.EnumerateArray().ToArray() : list.ValueKind == System.Text.Json.JsonValueKind.Object ? new[] { list } : Array.Empty<System.Text.Json.JsonElement>();
+            foreach (var x in items)
+                rules.Add(new WindowsAccessRule(S(x, "i"), S(x, "t") == "Allow", S(x, "r"), x.TryGetProperty("h", out var h) && h.ValueKind == System.Text.Json.JsonValueKind.True));
+        }
+        return new WindowsAcl(S(r, "o"), S(r, "at"), rules);
+    }
+
+    /// <summary>Russian names of common file system rights.</summary>
+    public static string DescribeRights(string rights) => rights switch
+    {
+        "FullControl" => "Полный доступ",
+        "Modify, Synchronize" or "Modify" => "Изменение",
+        "ReadAndExecute, Synchronize" or "ReadAndExecute" => "Чтение и выполнение",
+        "Read, Synchronize" or "Read" => "Чтение",
+        "Write, Synchronize" or "Write" => "Запись",
+        _ => rights,
+    };
 }
+
+public sealed record WindowsAccessRule(string Identity, bool Allow, string Rights, bool Inherited);
+public sealed record WindowsAcl(string Owner, string Attributes, IReadOnlyList<WindowsAccessRule> Rules);

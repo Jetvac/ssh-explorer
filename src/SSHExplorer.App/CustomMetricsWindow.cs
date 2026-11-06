@@ -156,7 +156,7 @@ public sealed class CustomMetricsWindow : Window
         if (bad is not null) { list.SelectedItem = bad; ShowMetric(bad); return; }
         var duplicate = items.GroupBy(m => m.Name).FirstOrDefault(g => g.Count() > 1);
         if (duplicate is not null) { problem.Text = $"Имя «{duplicate.Key}» используется дважды."; return; }
-        DialogResult = true;
+        if (IsLoaded && IsVisible) DialogResult = true;
     }
 
     /// <summary>Edits a list; null when cancelled.</summary>
@@ -262,7 +262,7 @@ public sealed class MetricAlertsWindow : Window
         var m = App.Store.Settings.Metrics;
         m.Rules = rules; m.ForecastDays = days;
         try { await App.Store.SaveAsync(); } catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException) { problem.Text = "Не удалось сохранить: " + ex.Message; return; }
-        DialogResult = true;
+        if (IsLoaded && IsVisible) DialogResult = true;
     }
 
     public static void Open(Window? owner, Guid? server)

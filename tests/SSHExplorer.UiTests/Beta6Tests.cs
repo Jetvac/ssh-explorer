@@ -340,6 +340,7 @@ internal static class Beta6Tests
             SnippetUiChecks.Run(evidence, Check);
             RdpUiChecks.Run(main, store, evidence, Check);
             RdpImportUiChecks.Run(main, store, Check);
+            MetricsUiChecks.Run(main, store, evidence, Check);
             // Middle click (press and release on the same tab) closes a server tab.
             var (middleTab, _) = AddTab(main, store, "Закрытие средней кнопкой"); Pump(); Layout(main);
             var allTabs = (TabControl)Field(main, "tabs");

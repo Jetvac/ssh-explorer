@@ -753,6 +753,7 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
     {
         if (!viewModel.HasSelection || Selected().Count != 1) return;
         var entry = Selected().FirstOrDefault()?.Entry; if (entry is null) return; entry = await session.Files.StatAsync(entry.FullPath, lifetime.Token);
+        if (session.IsWindows) { await WindowsProperties(entry); return; }
         var w = new Window { Title = "Свойства: " + entry.Name, Width = 580, Height = 760, MinWidth = 420, MinHeight = 400, MaxHeight = 820, Owner = main, WindowStartupLocation = WindowStartupLocation.CenterOwner }; w.SetResourceReference(StyleProperty, "DialogWindowStyle"); var panel = new StackPanel { Margin = new Thickness(24) };
         var heading = Ui.Text("Свойства"); heading.SetResourceReference(StyleProperty, "DialogTitleStyle"); panel.Children.Add(heading);
         var text = Ui.Text($"{entry.Name}\n\nПуть: {entry.FullPath}\nТип: {entry.TypeName}\nРазмер: {entry.SizeText}\nИзменён (местное время): {TimeText(entry.LastWriteTimeUtc)}\nДоступ (местное время): {TimeText(entry.LastAccessTimeUtc)}\nUID: {IdText(entry.UserId)}   GID: {IdText(entry.GroupId)}" + (entry.IsSymbolicLink ? "\nЦель ссылки: " + (entry.LinkTarget ?? "Недоступно") : "")); text.TextWrapping = TextWrapping.Wrap; panel.Children.Add(text);
@@ -804,6 +805,43 @@ public sealed partial class FileBrowserView : UserControl, IDisposable
         panel.Children.Add(error);
         var sizeCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); var sizeLabel = Ui.Text(""); if (entry.IsDirectory) { panel.Children.Add(Ui.AsyncButton("Рассчитать размер дерева", async () => { sizeLabel.Text = "Подсчёт…"; sizeLabel.Text = Ui.Size(await session.Files.CalculateSizeAsync(entry.FullPath, sizeCts.Token)); })); panel.Children.Add(Ui.Button("Отменить подсчёт", () => sizeCts.Cancel())); panel.Children.Add(sizeLabel); }
         var note = Ui.Text("Доступ ограничен правами SSH-учётной записи. sudo в терминале не повышает права SFTP.", 12); note.TextWrapping = TextWrapping.Wrap; panel.Children.Add(new Expander { Header = "О доступе", Content = note, Margin = new Thickness(0, 12, 0, 0) }); var close = Ui.Button("Закрыть", w.Close); close.IsCancel = true; w.Content = Ui.DialogSurface(panel, close); w.Closed += (_, _) => { sizeCts.Cancel(); sizeCts.Dispose(); }; TrackWindow(w); w.Show();
+    }
+    /// <summary>Test hook: receives the Windows properties window instead of showing it.</summary>
+    internal Action<Window>? WindowsPropertiesOverride { get; set; }
+    /// <summary>
+    /// Windows server (0.6): owner, attributes and access rules from Get-Acl instead of POSIX mode bits. Read only;
+    /// rights are changed on the server itself (Проводник или icacls).
+    /// </summary>
+    async Task WindowsProperties(RemoteEntry entry)
+    {
+        var w = new Window { Title = "Свойства: " + entry.Name, Width = 600, Height = 640, MinWidth = 420, MinHeight = 360, Owner = main, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        w.SetResourceReference(StyleProperty, "DialogWindowStyle");
+        var panel = new StackPanel { Margin = new Thickness(22) };
+        var heading = Ui.Text("Свойства"); heading.SetResourceReference(StyleProperty, "DialogTitleStyle"); panel.Children.Add(heading);
+        var text = Ui.Text($"{entry.Name}\n\nПуть: {WindowsHost.ToDisplay(entry.FullPath)}\nТип: {entry.TypeName}\nРазмер: {entry.SizeText}\nИзменён (местное время): {TimeText(entry.LastWriteTimeUtc)}");
+        text.TextWrapping = TextWrapping.Wrap; panel.Children.Add(text);
+        var owner = Ui.Text("Владелец: …"); owner.Name = "WindowsOwner"; owner.Margin = new Thickness(0, 14, 0, 4); owner.TextWrapping = TextWrapping.Wrap; panel.Children.Add(owner);
+        var attributes = Ui.Text(""); attributes.Name = "WindowsAttributes"; attributes.TextWrapping = TextWrapping.Wrap; attributes.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); panel.Children.Add(attributes);
+        panel.Children.Add(new TextBlock { Text = "Разрешения", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 14, 0, 6) });
+        var rules = new ListBox { Name = "WindowsAccessRules", MinHeight = 120, MaxHeight = 300 }; panel.Children.Add(rules);
+        var note = Ui.Text("Права Windows здесь только показываются. Изменить их можно на сервере: «Свойства» → «Безопасность» в Проводнике или командой icacls в терминале.", 12);
+        note.TextWrapping = TextWrapping.Wrap; note.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); note.Margin = new Thickness(0, 10, 0, 0); panel.Children.Add(note);
+        var close = Ui.Button("Закрыть", () => w.Close()); close.IsCancel = true; close.IsDefault = true;
+        w.Content = Ui.DialogSurface(panel, close);
+        if (session.ShellAvailable)
+        {
+            try
+            {
+                var acl = WindowsHost.ParseAcl((await session.ExecuteLongAsync(WindowsHost.AclCommand(entry.FullPath), TimeSpan.FromSeconds(30), lifetime.Token)).Output);
+                owner.Text = "Владелец: " + (acl.Owner.Length > 0 ? acl.Owner : "не определён");
+                attributes.Text = "Атрибуты: " + acl.Attributes;
+                foreach (var r in acl.Rules) rules.Items.Add($"{(r.Allow ? "Разрешить" : "Запретить")} · {r.Identity} · {WindowsHost.DescribeRights(r.Rights)}" + (r.Inherited ? " (унаследовано)" : ""));
+                if (rules.Items.Count == 0) rules.Items.Add("Правил доступа нет.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException) { owner.Text = "Права не получены: " + ErrorMessages.Describe(ex); }
+        }
+        else owner.Text = "Права недоступны: на сервере нет SSH exec.";
+        if (WindowsPropertiesOverride is { } fake) fake(w); else { TrackWindow(w); w.Show(); }
     }
     static string ConvertOctal(string text) { try { return Convert.ToInt16(text, 8).ToString(); } catch { return ""; } }
     void UpdatePreviewVisibility()

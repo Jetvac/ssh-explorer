@@ -566,7 +566,7 @@ public sealed partial class MainWindow : Window
         TabItem? tab = null; var view = previous;
         if (view is null)
         {
-            view = new RdpView(profile, desktopLayer) { ReconnectRequested = v => ReconnectDesktopAsync(v) };
+            view = new RdpView(profile, desktopLayer) { ReconnectRequested = v => ReconnectDesktopAsync(v), FilesRequested = v => OpenFilesOverSshAsync(v.Profile) };
             view.StateChanged += (_, _) => { if (!closing && !Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(RefreshHome); };
             tab = AddDesktopTab(stored, view);
         }

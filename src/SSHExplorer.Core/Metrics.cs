@@ -240,11 +240,6 @@ public sealed class MetricsScheduler : IAsyncDisposable
         var resolved = ProfileInheritance.Resolve(stored, store.Settings.Folders);
         if (resolved.Missing.Count > 0) return (null, "В папке не задано: " + string.Join(", ", resolved.Missing) + ".", false);
         var profile = resolved.Profile;
-        if (ConnectOverride is { } fake)
-        {
-            try { return (await fake(profile, ct).ConfigureAwait(false), null, true); }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { return (null, ErrorMessages.Describe(ex), true); }
-        }
         string? secret = null;
         try
         {
@@ -254,6 +249,11 @@ public sealed class MetricsScheduler : IAsyncDisposable
         catch (Exception ex) when (ex is IOException or System.Security.Cryptography.CryptographicException or UnauthorizedAccessException or FormatException or PlatformNotSupportedException) { }
         if (profile.Authentication is AuthenticationKind.Password or AuthenticationKind.KeyboardInteractive && secret is null)
             return (null, "Пароль не сохранён: для записи в фоне сохраните пароль в профиле.", false);
+        if (ConnectOverride is { } fake)
+        {
+            try { return (await fake(profile, ct).ConfigureAwait(false), null, true); }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { return (null, ErrorMessages.Describe(ex), true); }
+        }
         bool untrusted = false;
         var session = new ServerSession(profile, store);
         try

@@ -144,6 +144,37 @@ public sealed partial class MainWindow
     }
 
     /// <summary>«Параметры папки…»: the user, domain, password and RDP options the folder's servers may inherit.</summary>
+    /// <summary>Test hook: receives the SSH profile and credentials «Файлы по SSH» would open.</summary>
+    internal Func<ServerProfile, SessionCredentials?, Task>? FilesOverSshOverride;
+
+    /// <summary>
+    /// «Файлы по SSH» from a remote desktop (0.6): the SSH profile of the same server when there is one, otherwise a
+    /// temporary SSH profile (port 22, the same user and saved password) that is not added to «Главная».
+    /// </summary>
+    internal async Task OpenFilesOverSshAsync(ServerProfile rdp)
+    {
+        var stored = App.Store.Profiles.FirstOrDefault(p => p.Id == rdp.Id);
+        if (stored is { IsRdp: false }) { await OpenOrFake(stored, null); return; }
+        var host = HostTrustStore.NormalizeHost(rdp.Host);
+        var twin = App.Store.Profiles.FirstOrDefault(p => !p.IsRdp && HostTrustStore.NormalizeHost(p.Host) == host);
+        if (twin is not null) { await OpenOrFake(twin, null); return; }
+        var source = stored ?? rdp;
+        var resolved = ProfileInheritance.Resolve(source, App.Store.Settings.Folders);
+        var profile = resolved.Profile;
+        string? saved = null;
+        try
+        {
+            if (resolved.PasswordFolder is { } folder) saved = await App.Store.ReadSecretAsync(folder, windowLifetime.Token);
+            else if (source.SaveSecret) saved = await App.Store.ReadSecretAsync(source.Id, windowLifetime.Token);
+        }
+        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or System.IO.IOException or UnauthorizedAccessException or FormatException) { }
+        var user = profile.Rdp.Domain.Length > 0 && !profile.Username.Contains('\\') && !profile.Username.Contains('@') ? profile.Rdp.Domain + "\\" + profile.Username : profile.Username;
+        var ssh = new ServerProfile { Id = Guid.NewGuid(), Name = profile.Name + " · SSH", Host = profile.Host, Port = 22, Username = user, Authentication = AuthenticationKind.Password, Group = profile.Group, ProxyJump = profile.ProxyJump, TimeoutSeconds = profile.TimeoutSeconds };
+        await OpenOrFake(ssh, saved is null ? null : new SessionCredentials(saved));
+
+        Task OpenOrFake(ServerProfile target, SessionCredentials? credentials) => FilesOverSshOverride is { } fake ? fake(target, credentials) : OpenServer(target, null, credentials);
+    }
+
     internal async Task EditFolderAsync(string group)
     {
         group = ProfileInheritance.Normalize(group);

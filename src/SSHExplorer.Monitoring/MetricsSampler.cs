@@ -75,6 +75,18 @@ public sealed class MetricsSampler
         return new SampleOutcome(time, values, events, CustomErrors);
     }
 
+    /// <summary>The first line of an error; PowerShell's CLIXML error stream is reduced to its error texts.</summary>
+    internal static string? FirstError(string text)
+    {
+        if (text.Contains("#< CLIXML", StringComparison.Ordinal))
+        {
+            var found = System.Text.RegularExpressions.Regex.Matches(text, "<S S=\"Error\">(.*?)</S>")
+                .Select(m => System.Net.WebUtility.HtmlDecode(m.Groups[1].Value).Replace("_x000D__x000A_", " ").Trim()).FirstOrDefault(x => x.Length > 0);
+            if (found is not null) return found;
+        }
+        return text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0 && !l.StartsWith("#< CLIXML", StringComparison.Ordinal) && !l.StartsWith("<Objs", StringComparison.Ordinal));
+    }
+
     /// <summary>Runs one custom metric now (also «Проверить» in its editor). The command runs with the SSH user's rights.</summary>
     public async Task<CustomMetricResult> RunCustomAsync(CustomMetricSpec spec, CancellationToken ct)
     {
@@ -84,7 +96,7 @@ public sealed class MetricsSampler
             var r = await execute(command, CommandTimeout, ct).ConfigureAwait(false);
             if (r.ExitStatus != 0)
             {
-                var error = (r.Error.Length > 0 ? r.Error : r.Output).Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0 && !l.StartsWith("#< CLIXML", StringComparison.Ordinal));
+                var error = FirstError(r.Error.Length > 0 ? r.Error : r.Output);
                 return new([], $"Код завершения {r.ExitStatus}" + (error is null ? "." : ": " + (error.Length > 160 ? error[..160] + "…" : error)));
             }
             return CustomMetricParser.Parse(r.Output, spec.Name, spec.Unit);

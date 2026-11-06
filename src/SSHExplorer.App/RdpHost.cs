@@ -235,6 +235,34 @@ internal sealed class RdpClient : IDisposable
         ((IMsRdpClientNonScriptable)ocx).SetClearTextPassword(password);
     }
 
+    /// <summary>
+    /// The Windows key's usual job — the Start menu — on the remote computer: Ctrl+Esc (scan codes 1D, 01). Unlike the
+    /// extended Win scan code, this works the same on every server version.
+    /// </summary>
+    public void SendStartMenu()
+    {
+        var ocx = Ocx ?? throw new InvalidOperationException("Нет подключения.");
+        ((IMsRdpClientNonScriptable)ocx).SendKeys(4, [0, 0, -1, -1], [0x1D, 0x01, 0x01, 0x1D]);
+    }
+
+    [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+
+    /// <summary>
+    /// A picture of the remote desktop as shown in the tab (PrintWindow with full content; the screen area as a fallback).
+    /// </summary>
+    public System.Drawing.Bitmap Snapshot()
+    {
+        if (!host.IsHandleCreated || host.Width <= 0 || host.Height <= 0) throw new InvalidOperationException("Рабочий стол не показан.");
+        var bitmap = new System.Drawing.Bitmap(host.Width, host.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = System.Drawing.Graphics.FromImage(bitmap))
+        {
+            var hdc = g.GetHdc(); bool ok;
+            try { ok = PrintWindow(host.Handle, hdc, 2); } finally { g.ReleaseHdc(hdc); }
+            if (!ok) g.CopyFromScreen(host.PointToScreen(System.Drawing.Point.Empty), System.Drawing.Point.Empty, host.Size);
+        }
+        return bitmap;
+    }
+
     /// <summary>Ctrl+Alt+Del to the remote computer (scan codes Ctrl 1D, Alt 38, Del 53).</summary>
     public void SendCtrlAltDel()
     {
