@@ -17,7 +17,7 @@ public sealed class CustomMetricsWindow : Window
 {
     readonly ObservableCollection<CustomMetricDefinition> items;
     readonly ListBox list = new() { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
-    readonly TextBox name = new(), command = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 110, FontFamily = new FontFamily("Cascadia Mono, Consolas"), VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, unit = new();
+    readonly TextBox name = new(), command = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 110, FontFamily = new FontFamily("Cascadia Mono, Consolas"), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalContentAlignment = VerticalAlignment.Top }, unit = new();
     readonly ComboBox interval = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly TextBlock result = Ui.Text("", 12), problem = Ui.Text("", 12), commandLabel;
     readonly Border unconfirmed = new() { CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 12), BorderThickness = new Thickness(1) };
@@ -25,6 +25,7 @@ public sealed class CustomMetricsWindow : Window
     readonly bool windows;
     readonly StackPanel editor = new(), empty = new() { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 440, Margin = new Thickness(8, 0, 8, 40) };
     readonly Button remove;
+    readonly Border card;
     bool loading;
     static readonly (string Label, int Seconds)[] Intervals = [("1 минута", 60), ("5 минут", 300), ("15 минут", 900), ("1 час", 3600), ("1 день", 86400)];
 
@@ -38,7 +39,7 @@ public sealed class CustomMetricsWindow : Window
     {
         this.session = session; this.windows = windows;
         items = new(source.Select(m => m.Clone()));
-        Title = title; Width = 840; Height = 580; MinWidth = 660; MinHeight = 480; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = title; Width = 860; Height = 640; MinWidth = 660; MinHeight = 480; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         SetResourceReference(StyleProperty, "DialogWindowStyle");
         list.ItemsSource = items; list.DisplayMemberPath = nameof(CustomMetricDefinition.Name); list.Name = "CustomMetricList";
         list.SelectionChanged += (_, _) => ShowMetric(list.SelectedItem as CustomMetricDefinition);
@@ -52,7 +53,7 @@ public sealed class CustomMetricsWindow : Window
         var left = new DockPanel(); DockPanel.SetDock(listTitle, Dock.Top); left.Children.Add(listTitle);
         var line = new Border { Height = 1 }; line.SetResourceReference(Border.BackgroundProperty, "Edge"); DockPanel.SetDock(line, Dock.Bottom);
         DockPanel.SetDock(listCommands, Dock.Bottom); left.Children.Add(listCommands); left.Children.Add(line); left.Children.Add(list);
-        var card = new Border { Child = left, Width = 220, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 18, 0) };
+        card = new Border { Child = left, Width = 220, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 18, 0) };
         card.SetResourceReference(Border.BackgroundProperty, "Surface"); card.SetResourceReference(Border.BorderBrushProperty, "Edge");
 
         // Right: the editor, or — while there is nothing to edit — what a custom metric is and the usual starting points.
@@ -85,7 +86,7 @@ public sealed class CustomMetricsWindow : Window
         foreach (var key in new[] { "nginx", "http", "service", "docker-cpu", "postgres" })
         {
             var t = CustomMetricTemplates.All.First(x => x.Key == key);
-            var b = Ui.Button(t.Title, () => FromTemplate(t)); b.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(b);
+            var b = Ui.Button("", () => FromTemplate(t)); b.Content = new TextBlock { Text = t.Title }; b.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(b);
         }
         var own = Ui.Button("Своя команда", AddOwn); own.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(own);
         empty.Children.Add(quick);
@@ -93,6 +94,7 @@ public sealed class CustomMetricsWindow : Window
         name.TextChanged += (_, _) => Store(); command.TextChanged += (_, _) => Store(); unit.TextChanged += (_, _) => Store();
         interval.SelectionChanged += (_, _) => Store();
 
+        editor.Margin = new Thickness(0, 0, 16, 0);
         var right = new Grid(); right.Children.Add(new ScrollViewer { Content = editor, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }); right.Children.Add(empty);
         var body = new Grid { Margin = new Thickness(22, 18, 22, 16) };
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); body.ColumnDefinitions.Add(new ColumnDefinition());
@@ -117,6 +119,7 @@ public sealed class CustomMetricsWindow : Window
         bool any = items.Count > 0;
         editor.Visibility = any && m is not null ? Visibility.Visible : Visibility.Collapsed;
         empty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
+        card.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
         remove.IsEnabled = m is not null;
         unconfirmed.Visibility = m is { Approved: false } ? Visibility.Visible : Visibility.Collapsed;
         name.Text = m?.Name ?? ""; command.Text = m?.Command ?? ""; unit.Text = m?.Unit ?? "";
@@ -144,7 +147,7 @@ public sealed class CustomMetricsWindow : Window
     {
         var menu = new ContextMenu();
         foreach (var t in CustomMetricTemplates.All)
-            menu.Items.Add(Ui.Menu(t.Title + (t.Parameter is null ? "" : "…"), () => FromTemplate(t)));
+            { var item = Ui.Menu("", () => FromTemplate(t)); item.Header = new TextBlock { Text = t.Title + (t.Parameter is null ? "" : "…") }; menu.Items.Add(item); }
         menu.Items.Add(new Separator());
         menu.Items.Add(Ui.Menu("Своя команда", AddOwn));
         return menu;
@@ -246,9 +249,9 @@ public sealed class MetricAlertsWindow : Window
         problem.SetResourceReference(TextBlock.ForegroundProperty, "ValidationInk"); problem.TextWrapping = TextWrapping.Wrap; body.Children.Add(problem);
         foreach (var r in m.Rules) AddRow(r.Clone());
         if (entries.Count == 0) AddRow(new MetricAlertRule { ServerId = focus, Series = MetricSeries.Cpu, Threshold = 90, Minutes = 15, Enabled = false });
-        var ok = Ui.AsyncButton("Сохранить", SaveAsync); ok.IsDefault = true; ok.Name = "MetricAlertsSave";
+        var ok = Ui.AsyncButton("Сохранить", SaveAsync); ok.IsDefault = true; ok.Name = "MetricAlertsSave"; ok.SetResourceReference(StyleProperty, "PrimaryButtonStyle");
         var cancel = Ui.Button("Отмена", () => DialogResult = false); cancel.IsCancel = true;
-        Content = Ui.DialogSurface(body, ok, cancel);
+        Content = Ui.DialogSurface(body, cancel, ok);
     }
 
     internal static readonly (string Series, string Label)[] SeriesChoices =
