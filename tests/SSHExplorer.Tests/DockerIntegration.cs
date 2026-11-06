@@ -55,7 +55,8 @@ internal static class DockerIntegration
             });
             await t.Run("docker integration: stop, start, restart and remove change the real state", async () =>
             {
-                await docker.StopAsync(name); TestSuite.True((await docker.ListAsync()).Single(c => c.Name == name) is { IsRunning: false }, "stopped");
+                await docker.StopAsync(name); var afterStop = (await docker.ListAsync()).Single(c => c.Name == name); var raw = (await session.ExecuteAsync("docker ps -a --no-trunc --filter name=" + name + " --format '{{.State}} | {{.Status}} | {{.ID}}'; docker version --format '{{.Server.Version}}'")).Output.Trim();
+                TestSuite.True(afterStop is { IsRunning: false }, $"stopped: parsed state «{afterStop.State}»; docker says: {raw}");
                 await docker.StartAsync(name); TestSuite.True((await docker.ListAsync()).Single(c => c.Name == name) is { IsRunning: true }, "started");
                 await docker.RestartAsync(name); TestSuite.True((await docker.ListAsync()).Single(c => c.Name == name) is { IsRunning: true }, "restarted");
                 await docker.RemoveAsync(name, force: true); TestSuite.True((await docker.ListAsync()).All(c => c.Name != name), "removed");
