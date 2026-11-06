@@ -143,6 +143,9 @@ public sealed class CronView : UserControl, IDisposable
     async Task ToggleAsync()
     {
         if (Selected is not { } row) return;
+        if (!Confirm(row.Line.Enabled
+            ? $"Выключить задание?\n\n{row.When}\n{row.Command}\n\nОно перестанет запускаться, пока его не включат снова. Прежний crontab сохранится в ~/.cache/sshexplorer."
+            : $"Включить задание?\n\n{row.When}\n{row.Command}\n\nОно снова начнёт запускаться по расписанию.")) return;
         await ChangeAsync(t => IndexOf(t, row.Line) is var i and >= 0 ? Cron.Edit(t, i, Cron.Toggle(row.Line)) : null, row.Line.Enabled ? "Задание выключено." : "Задание включено.");
     }
 

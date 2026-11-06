@@ -988,6 +988,8 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             if (disposed) return;
             try { await App.Store.SaveAsync(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { await LocalDiagnostics.RecordAsync("scripts.save.failed", ex); }
+            // A script that ran by itself (on connect or on schedule) leaves a mark in «История», whatever its result.
+            if (run.Reason != "Вручную") MetricsHub.Note(Session.Profile.Id, "change", $"Скрипт «{run.ScriptName}» ({run.Reason.ToLowerInvariant()}) — {(run.Succeeded ? "выполнен" : run.TimedOut ? "таймаут" : "ошибка, код " + run.ExitCode)}");
             if (!run.Succeeded && run.Reason != "Вручную") AlertCenter.Raise(Session.Profile.Id, Session.Profile.Name, $"Скрипт «{run.ScriptName}» завершился с ошибкой ({(run.TimedOut ? "таймаут" : "код " + run.ExitCode)})");
             if (!run.Succeeded && run.Reason != "Вручную") SetNotice($"Скрипт «{run.ScriptName}» ({run.Reason.ToLowerInvariant()}) завершился с ошибкой: {(run.TimedOut ? "таймаут" : "код " + run.ExitCode)}. Подробности — в разделе «Скрипты».");
         });

@@ -132,6 +132,11 @@ public sealed class ScriptsView : UserControl
     async Task RunSelectedAsync()
     {
         if (Selected?.Script is not { } s) return;
+        // The commands are shown before they run: a saved script may have been written long ago or imported.
+        var lines = s.Body.Replace("\r\n", "\n").Split('\n');
+        var preview = string.Join("\n", lines.Take(8)) + (lines.Length > 8 ? "\n…" : "");
+        var question = $"Выполнить скрипт «{s.Name}» на {session.Profile.Name}?\n\n{preview}";
+        if (!(ConfirmOverride?.Invoke(question) ?? Ui.Confirm(question))) return;
         var task = runner.RunAsync(s); OnRunnerChanged(this, EventArgs.Empty);
         await task; await SaveAsync();
     }

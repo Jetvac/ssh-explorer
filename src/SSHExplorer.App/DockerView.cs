@@ -48,11 +48,11 @@ public sealed class DockerView : UserControl, IDisposable
             bar.Add(key, b, () => Ui.AsyncMenu(label, () => Run(action), glyph: glyph), priority);
         }
         Command("Refresh", Ui.RefreshGlyph, "Обновить", () => RefreshAsync(), "Обновить список контейнеров", 100);
-        Command("Start", "", "Запустить", () => Act(c => docker.StartAsync(c.Id, lifetime.Token)), "docker start", 90);
-        Command("Stop", "", "Остановить", () => Act(c => docker.StopAsync(c.Id, lifetime.Token)), "docker stop", 90);
+        Command("Start", "", "Запустить", () => Act(c => docker.StartAsync(c.Id, lifetime.Token), "Запустить", "Контейнер начнёт работать с прежними параметрами."), "docker start", 90);
+        Command("Stop", "", "Остановить", () => Act(c => docker.StopAsync(c.Id, lifetime.Token), "Остановить", "Службы в контейнере перестанут отвечать, пока его не запустят снова."), "docker stop", 90);
         Command("Recreate", IconCatalog.Reconnect, "Пересоздать с параметрами", RecreateAsync, "Удалить и запустить заново по сохранённым параметрам", 80);
         Command("Edit", IconCatalog.Settings, "Параметры запуска…", EditAsync, "Изменить env, порты, тома и образ; сохранить и пересоздать", 70);
-        Command("Restart", IconCatalog.Restart, "Перезапустить", () => Act(c => docker.RestartAsync(c.Id, lifetime.Token)), "docker restart — те же параметры", 60);
+        Command("Restart", IconCatalog.Restart, "Перезапустить", () => Act(c => docker.RestartAsync(c.Id, lifetime.Token), "Перезапустить", "Контейнер будет остановлен и запущен снова; его клиенты на время потеряют соединение."), "docker restart — те же параметры", 60);
         Command("New", Ui.AddGlyph, "Новый контейнер…", NewAsync, "Задать параметры и запустить новый контейнер", 50);
         Command("Remove", Ui.DeleteGlyph, "Удалить…", RemoveAsync, "Удалить контейнер (данные в его слое будут потеряны)", 10);
         var barRow = new DockPanel(); DockPanel.SetDock(heading, Dock.Left); barRow.Children.Add(heading); var divider = Ui.Line(); DockPanel.SetDock(divider, Dock.Left); barRow.Children.Add(divider); barRow.Children.Add(bar);
@@ -155,7 +155,13 @@ public sealed class DockerView : UserControl, IDisposable
         commands["Recreate"].ToolTip = c is not null && TemplateFor(c.Name) is null ? "Сначала сохраните параметры запуска этого контейнера («Параметры запуска…»)" : "Удалить и запустить заново по сохранённым параметрам";
     }
 
-    async Task Act(Func<DockerContainer, Task> action) { if (Selected is { } c) { await action(c); await RefreshAsync(); } }
+    /// <summary>Start, stop and restart change what the server is doing, so each one is confirmed first.</summary>
+    async Task Act(Func<DockerContainer, Task> action, string verb, string effect)
+    {
+        if (Selected is not { } c) return;
+        if (!Confirm($"{verb} контейнер «{c.Name}» ({c.Image}) на {docker.Session.Profile.Name}?\n\n{effect}")) return;
+        await action(c); await RefreshAsync();
+    }
 
     async Task RemoveAsync()
     {

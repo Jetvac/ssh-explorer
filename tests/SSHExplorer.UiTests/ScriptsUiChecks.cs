@@ -35,11 +35,13 @@ internal static class ScriptsUiChecks
             var names = view.Table.Items.Cast<ScriptRow>().Select(r => r.Name).ToArray();
             check(names.SequenceEqual(["Место на дисках", "Обновление"]) && view.Table.Items.Cast<ScriptRow>().Single(r => r.Name == "Обновление").Schedule == "Ежедневно в 03:30", "scripts list shows names and schedules: " + string.Join(",", names));
             view.Table.SelectedItem = view.Table.Items.Cast<ScriptRow>().Single(r => r.Name == "Место на дисках"); Pump();
+            var questions = new List<string>(); view.ConfirmOverride = q => { questions.Add(q); return true; };
             Cmd("Run").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             var output = Descendants<TextBox>(view).Single(b => b.Name == "ScriptOutput");
             for (int i = 0; i < 100 && !output.Text.Contains("/dev/sda1", StringComparison.Ordinal); i++) Pump();
             var row = view.Table.Items.Cast<ScriptRow>().Single(r => r.Name == "Место на дисках");
             check(output.Text.Contains("/dev/sda1", StringComparison.Ordinal) && row.Result == "Успешно" && row.LastRun != "—", "running a script shows its output and a successful result");
+            check(questions.Count == 1 && questions[0].StartsWith("Выполнить скрипт «Место на дисках»", StringComparison.Ordinal) && questions[0].Contains(view.Table.Items.Cast<ScriptRow>().Single(r => r.Name == "Место на дисках").Script.Body.Split('\n')[0], StringComparison.Ordinal), "a script asks before it runs and shows its commands: " + questions.FirstOrDefault());
             view.Table.SelectedItem = view.Table.Items.Cast<ScriptRow>().Single(r => r.Name == "Обновление"); Pump();
             Cmd("Run").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             for (int i = 0; i < 100 && !output.Text.Contains("lock file", StringComparison.Ordinal); i++) Pump();
