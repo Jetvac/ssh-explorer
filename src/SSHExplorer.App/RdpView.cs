@@ -394,7 +394,9 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (disposed) return;
-        userDisconnect = true; TryCall("Disconnect");
+        userDisconnect = true;
+        // A control that has already ended its session is not asked to disconnect again.
+        if (client?.Ocx is { } live && IsConnected(live)) TryCall("Disconnect");
         // Destroying the control while it is still disconnecting can block inside it: let the session end first.
         for (int i = 0; i < 100 && client?.Ocx is { } ocx && IsConnected(ocx); i++) await Task.Delay(100);
         disposed = true; resize.Stop(); login?.TrySetResult(false); password = null;

@@ -120,7 +120,9 @@ internal static class RdpUiChecks
             // A second sign-in reuses the saved key without asking.
             stage = "reconnect"; var again = view.ConnectAsync(password, CancellationToken.None); watch.Restart(); while (!again.IsCompleted && watch.Elapsed < TimeSpan.FromSeconds(120)) Pump();
             live(again.IsCompleted && again.Result && prompts.Count == 1, "live: the saved key is accepted next time without a prompt");
+            for (int i = 0; i < 20; i++) Pump();
             stage = "disconnect again"; var disconnectAgain = view.DisconnectAsync(); watch.Restart(); while (view.State != SessionState.Disconnected && watch.Elapsed < TimeSpan.FromSeconds(30)) Pump();
+            live(view.State == SessionState.Disconnected, "live: the second session also ends before the tab is closed: " + view.State);
             stage = "close"; live(Close(main, view), "live: the tab closes"); stage = "done";
         }
         finally { Dialogs.RdpCertificateOverride = null; main.DesktopCloseConfirmOverride = null; }
