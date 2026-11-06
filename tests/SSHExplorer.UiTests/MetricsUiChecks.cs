@@ -89,7 +89,7 @@ internal static class MetricsUiChecks
             CustomMetricsWindow.TemplateValueOverride = _ => "nginx";
             CustomMetricsWindow.DialogOverride = w => { w.FromTemplate(CustomMetricTemplates.All.Single(x => x.Key == "service")); return true; };
             var edited = CustomMetricsWindow.Edit(main, [], null, false, "проверка");
-            check(edited is [{ Name: "service", Approved: true } m] && m.Command == "systemctl is-active --quiet 'nginx' && echo 1 || echo 0", "a template becomes a custom metric: " + edited?.FirstOrDefault()?.Command);
+            check(edited is [{ Name: "service", Approved: true } made] && made.Command == "systemctl is-active --quiet 'nginx' && echo 1 || echo 0", "a template becomes a custom metric: " + edited?.FirstOrDefault()?.Command);
 
             // Profile dialog model keeps the history options when the profile is saved again.
             profile.RecordHistory = true; profile.CustomMetrics = [new CustomMetricDefinition { Name = "queue", Command = "echo 1", Approved = true }];

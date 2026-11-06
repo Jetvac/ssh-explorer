@@ -91,13 +91,13 @@ public sealed class CustomMetricsWindow : Window
     void Store()
     {
         if (loading || Current is not { } m) return;
-        bool commandChanged = m.Command != command.Text;
+        bool commandChanged = m.Command != command.Text, nameChanged = m.Name != name.Text.Trim();
         m.Name = name.Text.Trim(); m.Command = command.Text; m.Unit = unit.Text.Trim();
         m.IntervalSeconds = interval.SelectedItem is ComboBoxItem { Tag: int s } ? s : 60;
         m.Approved = approved.IsChecked == true;
         problem.Text = m.Validate() ?? "";
         if (commandChanged) result.Text = "";
-        list.Items.Refresh();
+        if (nameChanged) list.Items.Refresh();
     }
 
     ContextMenu AddMenu()

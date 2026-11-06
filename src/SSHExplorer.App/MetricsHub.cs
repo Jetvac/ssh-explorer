@@ -195,6 +195,6 @@ internal static class MetricsHub
     {
         compaction?.Dispose(); compaction = null;
         endpoint?.Dispose(); endpoint = null;
-        if (scheduler is { } s) await s.DisposeAsync();
+        if (scheduler is { } s) await s.DisposeAsync().ConfigureAwait(false);
     }
 }
