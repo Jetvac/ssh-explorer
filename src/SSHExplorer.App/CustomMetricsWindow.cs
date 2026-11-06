@@ -86,7 +86,7 @@ public sealed class CustomMetricsWindow : Window
         foreach (var key in new[] { "nginx", "http", "service", "docker-cpu", "postgres" })
         {
             var t = CustomMetricTemplates.All.First(x => x.Key == key);
-            var b = Ui.Button("", () => FromTemplate(t)); b.Content = new TextBlock { Text = t.Title }; b.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(b);
+            var b = Ui.Button(t.Title, () => FromTemplate(t)); b.Content = new TextBlock { Text = t.Title }; b.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(b);
         }
         var own = Ui.Button("Своя команда", AddOwn); own.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(own);
         empty.Children.Add(quick);
