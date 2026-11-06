@@ -98,7 +98,6 @@ public sealed class HistoryView : UserControl, IDisposable
         root.Children.Add(new ScrollViewer { Content = charts, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         Content = root;
 
-        foreach (var g in SystemGroups.Where(g => g.Default)) selected.Add(g.Key);
         updated = id => { if (id == server && live is not null && !disposed && DateTimeOffset.UtcNow - lastAutoLoad > TimeSpan.FromSeconds(20)) Reload(); };
         MetricsHub.Updated += updated;
         Loaded += (_, _) => { if (charts.Children.Count == 0) Reload(); };
@@ -225,13 +224,14 @@ public sealed class HistoryView : UserControl, IDisposable
         groupPanel.Children.Clear();
         foreach (var g in groups)
         {
-            if (g.Key.StartsWith("custom:", StringComparison.Ordinal) && !seenCustom.Contains(g.Key)) { seenCustom.Add(g.Key); selected.Add(g.Key); }
-            var box = new CheckBox { Content = g.Title, IsChecked = selected.Contains(g.Key), Margin = new Thickness(0, 2, 14, 2), Tag = g.Key };
-            box.Click += (_, _) => { if (box.IsChecked == true) selected.Add(g.Key); else selected.Remove(g.Key); Reload(); };
+            var box = new CheckBox { Content = g.Title, IsChecked = Shown(g, selected, hidden), Margin = new Thickness(0, 2, 14, 2), Tag = g.Key };
+            box.Click += (_, _) => { if (box.IsChecked == true) { selected.Add(g.Key); hidden.Remove(g.Key); } else { selected.Remove(g.Key); hidden.Add(g.Key); } Reload(); };
             groupPanel.Children.Add(box);
         }
     }
-    readonly HashSet<string> seenCustom = new(StringComparer.Ordinal);
+    /// <summary>Groups shown by default (system basics and every custom metric) unless hidden; others only when ticked.</summary>
+    readonly HashSet<string> hidden = new(StringComparer.Ordinal);
+    static bool Shown(Group g, HashSet<string> shown, HashSet<string> hiddenKeys) => g.Default ? !hiddenKeys.Contains(g.Key) : shown.Contains(g.Key);
 
     TimeSpan StepOf(MetricResolution resolution) => resolution switch
     {
@@ -253,7 +253,7 @@ public sealed class HistoryView : UserControl, IDisposable
         var step = StepOf(resolution);
         var store = MetricsHub.Store;
         var other = compareServer; var previous = comparePrevious;
-        var wanted = selected.ToHashSet(StringComparer.Ordinal);
+        var wanted = selected.ToHashSet(StringComparer.Ordinal); var unwanted = hidden.ToHashSet(StringComparer.Ordinal);
         Loading = LoadAsync();
         async Task LoadAsync()
         {
@@ -261,7 +261,7 @@ public sealed class HistoryView : UserControl, IDisposable
             {
                 var units = store.SeriesOf(server);
                 var groups = Groups(units.Keys.ToArray()).ToArray();
-                var names = units.Keys.Where(n => groups.Any(g => wanted.Contains(g.Key) && g.Match(n))).ToArray();
+                var names = units.Keys.Where(n => groups.Any(g => Shown(g, wanted, unwanted) && g.Match(n))).ToArray();
                 var data = store.Read(server, names, start, end, resolution);
                 IReadOnlyDictionary<string, IReadOnlyList<MetricPoint>>? extra = null;
                 if (other is { } o) extra = store.Read(o, names, start, end, resolution);
@@ -282,7 +282,7 @@ public sealed class HistoryView : UserControl, IDisposable
         string detail = resolution switch { MetricResolution.Raw => "каждый замер", MetricResolution.FiveMinutes => "средние за 5 минут, полоса — мин–макс", _ => "средние за час, полоса — мин–макс" };
         periodText.Text = $"{start.ToLocalTime():dd.MM.yyyy HH:mm} — {end.ToLocalTime():dd.MM.yyyy HH:mm} · {detail}" + (otherName is not null ? $" · пунктир — «{otherName}»" : comparePrevious ? " · пунктир — прошлый период" : "") + ". Выделите участок графика мышью, чтобы увеличить.";
         charts.Children.Clear();
-        foreach (var g in groups.Where(g => selected.Contains(g.Key)))
+        foreach (var g in groups.Where(g => Shown(g, selected, hidden)))
         {
             var names = data.Keys.Where(g.Match).Order(StringComparer.Ordinal).ToArray();
             if (names.Length == 0) continue;
