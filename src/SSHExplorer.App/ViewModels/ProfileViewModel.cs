@@ -86,7 +86,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     public ProfileViewModel(IProfilePersistence persistence,ServerProfile? old=null)
     {
-        _persistence=persistence;_id=old?.Id??Guid.NewGuid();_bookmarks=old?.Bookmarks.ToList()??[];ProxyJump=old?.ProxyJump??"";Group=old?.Group??"";_dockerTemplates=old?.DockerTemplates.Select(t=>t.Clone()).ToList()??[];_scripts=old?.Scripts.Select(s=>s.Clone()).ToList()??[];_tunnels=old?.Tunnels.Select(t=>t.Clone()).ToList()??[];
+        _persistence=persistence;_id=old?.Id??Guid.NewGuid();_bookmarks=old?.Bookmarks.ToList()??[];ProxyJump=old?.ProxyJump??"";Group=old?.Group??"";_dockerTemplates=old?.DockerTemplates.Select(t=>t.Clone()).ToList()??[];_scripts=old?.Scripts.Select(s=>s.Clone()).ToList()??[];_tunnels=old?.Tunnels.Select(t=>t.Clone()).ToList()??[];_customMetrics=old?.CustomMetrics.Select(m=>m.Clone()).ToList()??[];_recordHistory=old?.RecordHistory??false;
         _profileName=old?.Name??"";_host=old?.Host??"";_port=(old?.Port??22).ToString(CultureInfo.InvariantCulture);
         _username=old?.Username??"";_keyPath=old?.PrivateKeyPath??"";_initialPath=old?.InitialPath??"~";
         _timeout=(old?.TimeoutSeconds??20).ToString(CultureInfo.InvariantCulture);_authenticationIndex=(int)(old?.Authentication??AuthenticationKind.Password);_saveSecret=old?.SaveSecret??false;
@@ -111,6 +111,12 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
     public string Username{get=>_username;set=>Set(ref _username,value);}
     public string PrivateKeyPath{get=>_keyPath;set=>Set(ref _keyPath,value);}
     public string InitialPath{get=>_initialPath;set=>Set(ref _initialPath,value);}
+    List<CustomMetricDefinition> _customMetrics=[];bool _recordHistory;
+    /// <summary>Record metric history in the background, without an open tab (0.6).</summary>
+    public bool RecordHistory{get=>_recordHistory;set=>Set(ref _recordHistory,value);}
+    /// <summary>The server's own custom metrics (0.6), edited in «Свои метрики…».</summary>
+    public IReadOnlyList<CustomMetricDefinition> CustomMetrics{get=>_customMetrics;set{_customMetrics=value.Select(m=>m.Clone()).ToList();PropertyChanged?.Invoke(this,new(nameof(CustomMetrics)));PropertyChanged?.Invoke(this,new(nameof(CustomMetricsLabel)));}}
+    public string CustomMetricsLabel=>_customMetrics.Count==0?"Свои метрики…":$"Свои метрики ({_customMetrics.Count})…";
     public string Timeout{get=>_timeout;set=>Set(ref _timeout,value);}
     public int AuthenticationIndex
     {
@@ -192,7 +198,7 @@ public sealed class ProfileViewModel:System.ComponentModel.INotifyPropertyChange
         try
         {
             TryNormalizeHost(Host,out string host);
-            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=IsRdp?AuthenticationKind.Password:(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret&&UsesSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim(),DockerTemplates=_dockerTemplates.Select(t=>t.Clone()).ToList(),Scripts=_scripts.Select(s=>s.Clone()).ToList(),Tunnels=_tunnels.Select(t=>t.Clone()).ToList(),Protocol=IsRdp?ConnectionProtocol.Rdp:ConnectionProtocol.Ssh,Rdp=BuildRdp(),Inherit=BuildInherit()};
+            var profile=new ServerProfile{Id=_id,Name=ProfileName.Trim(),Host=host,Port=int.Parse(Port.Trim(),CultureInfo.InvariantCulture),Username=Username.Trim(),Authentication=IsRdp?AuthenticationKind.Password:(AuthenticationKind)AuthenticationIndex,PrivateKeyPath=IsKeyAuthentication?PrivateKeyPath.Trim():"",InitialPath=string.IsNullOrWhiteSpace(InitialPath)?"~":InitialPath.Trim(),TimeoutSeconds=int.Parse(Timeout.Trim(),CultureInfo.InvariantCulture),SaveSecret=SaveSecret&&UsesSecret,Bookmarks=_bookmarks.ToList(),ProxyJump=ProxyJump.Trim(),Group=Group.Trim(),DockerTemplates=_dockerTemplates.Select(t=>t.Clone()).ToList(),Scripts=_scripts.Select(s=>s.Clone()).ToList(),Tunnels=_tunnels.Select(t=>t.Clone()).ToList(),Protocol=IsRdp?ConnectionProtocol.Rdp:ConnectionProtocol.Ssh,Rdp=BuildRdp(),Inherit=BuildInherit(),RecordHistory=RecordHistory&&!IsRdp,CustomMetrics=_customMetrics.Select(m=>m.Clone()).ToList()};
             var result=deferSecretUntilAuthentication
                 ?await _persistence.SaveForConnectionAsync(profile,ct)
                 :await _persistence.SaveAsync(profile,SaveSecret&&!(secret.Length==0&&_hasStoredSecret)?secret:null,ct);

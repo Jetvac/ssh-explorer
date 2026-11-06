@@ -165,6 +165,8 @@ public sealed class GroupRunWindow : Window
         {
             await Dispatcher.InvokeAsync(() => { });
             running.Dispose(); running = null; stop.IsEnabled = false; Count(); Update();
+            foreach (var t in targets.Where(t => t.Result?.State is GroupRunState.Succeeded or GroupRunState.Failed))
+                MetricsHub.Note(t.Profile.Id, "change", $"«Выполнить на нескольких»: {(script.Name.Length > 0 ? script.Name : "команды")} — {(t.Result!.State == GroupRunState.Succeeded ? "успешно" : "с ошибкой")}");
             if (table.SelectedItem is null) table.SelectedItem = targets.FirstOrDefault(t => t.Result?.State != GroupRunState.Succeeded) ?? targets.FirstOrDefault();
             ShowOutput();
         }

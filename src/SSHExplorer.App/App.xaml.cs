@@ -47,6 +47,8 @@ public partial class App : Application
             Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) => Dispatcher.BeginInvoke(() => { SystemFileIconProvider.Invalidate(); Theme.Apply(Store.Settings.Theme); });
             Transfers.ResolveConflict = conflict => Dispatcher.InvokeAsync(() => Dialogs.Conflict(conflict)).Task;
             MainWindow = new MainWindow(); MainWindow.Show();
+            // Metric history: open tabs and servers marked for background recording, compaction, optional Prometheus endpoint.
+            MetricsHub.Start();
             await LocalDiagnostics.RecordAsync("app.started");
             await TestSessionHarness.StartAsync(this, e.Args);
         }
@@ -55,6 +57,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         if (startDesktop) LocalDiagnostics.RecordSynchronous("app.exit", e.ApplicationExitCode.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (startDesktop) { try { MetricsHub.StopAsync().Wait(TimeSpan.FromSeconds(3)); } catch (AggregateException) { } }
         base.OnExit(e);
     }
 }

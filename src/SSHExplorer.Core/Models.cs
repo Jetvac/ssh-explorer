@@ -34,6 +34,10 @@ public sealed class ServerProfile
     public RdpOptions Rdp { get; set; } = new();
     /// <summary>Values taken from the nearest Home folder that defines them (as in mRemoteNG); see <see cref="ProfileInheritance"/>.</summary>
     public InheritFlags Inherit { get; set; }
+    /// <summary>Record metric history once a minute even when no tab of this server is open (0.6).</summary>
+    public bool RecordHistory { get; set; }
+    /// <summary>Own metrics: a command on the server prints a number or name=value lines (0.6).</summary>
+    public List<CustomMetricDefinition> CustomMetrics { get; set; } = [];
     public bool IsRdp => Protocol == ConnectionProtocol.Rdp;
     public string Endpoint => $"{(Host.Contains(':') ? $"[{Host}]" : Host)}:{Port}";
     public void Validate()
@@ -105,6 +109,8 @@ public sealed class AppSettings
     public List<FolderDefaults> Folders { get; set; } = [];
     /// <summary>Once a day at start: ask GitHub whether a newer release exists (nothing is downloaded).</summary>
     public bool CheckUpdates { get; set; } = true;
+    /// <summary>Metric history: recording, retention, alert rules and the Prometheus endpoint (0.6).</summary>
+    public MetricsSettings Metrics { get; set; } = new();
     public DateTime? LastUpdateCheckUtc { get; set; }
     public string? LatestKnownVersion { get; set; }
     public void ApplyTo(TransferQueue queue) { queue.Parallelism = Math.Clamp(TransferParallelism, 1, 8); queue.Limiter.BytesPerSecond = Math.Max(0, TransferLimitKiBps) * 1024L; }

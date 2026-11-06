@@ -131,7 +131,9 @@ public static class ProfileExchange
         if (doc.Version > FormatVersion) throw new InvalidDataException($"Файл создан более новой версией приложения (формат {doc.Version}). Обновите SSH Explorer.");
         if (doc.Seal is { } seal && (seal.Kdf != "PBKDF2-SHA256" || seal.Iterations is < 100_000 or > 10_000_000)) throw new InvalidDataException("Неизвестный способ защиты секретов в файле.");
         doc.Servers ??= [];
-        foreach (var s in doc.Servers) { s.Profile ??= new(); s.Profile.Bookmarks ??= []; s.Profile.Scripts ??= []; s.Profile.DockerTemplates ??= []; s.Profile.Tunnels ??= []; }
+        foreach (var s in doc.Servers) { s.Profile ??= new(); s.Profile.Bookmarks ??= []; s.Profile.Scripts ??= []; s.Profile.DockerTemplates ??= []; s.Profile.Tunnels ??= []; s.Profile.CustomMetrics ??= []; }
+        // Commands that came from a file do not run until the user has read and confirmed them.
+        foreach (var m in doc.Servers.SelectMany(s => s.Profile.CustomMetrics).Concat((doc.Folders ?? []).SelectMany(f => f.CustomMetrics ??= []))) m.Approved = false;
         return doc;
     }
 

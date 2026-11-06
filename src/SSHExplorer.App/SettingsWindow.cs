@@ -24,6 +24,7 @@ public sealed class SettingsWindow : Window
         new("connections", "Подключения", IconCatalog.Server, "Доверенные ключи серверов и локальные копии"),
         new("terminal", "Терминал и редактор", IconCatalog.Terminal, "Шрифт терминала и редактор для текстовых файлов"),
         new("monitoring", "Мониторинг", IconCatalog.Performance, "Частота обновления диспетчера задач"),
+        new("history", "История метрик", IconCatalog.Clock, "Запись, срок хранения, оповещения и Prometheus"),
         new("preview", "Предпросмотр и кэш", Ui.FileGlyph, "Лимиты изображений и миниатюр"),
         new("about", "О приложении", Ui.PropertiesGlyph, "Версия, сборка, диагностика и лицензии"),
     ];
@@ -44,6 +45,13 @@ public sealed class SettingsWindow : Window
     readonly NumberField alertDisk = new("Диск заполнен не меньше чем на", "%", 50, 99, 1) { Name = "SettingsAlertDisk" };
     readonly NumberField alertInterval = new("Проверять каждые", "мин", 1, 120, 1) { Name = "SettingsAlertInterval" };
     readonly NumberField font = new("Размер шрифта терминала", "пт", 8, 36, 1);
+    readonly CheckBox recordOpen = new() { Name = "SettingsMetricsOpenTabs", Content = "Записывать историю серверов, пока открыта их вкладка" };
+    readonly CheckBox recordProcesses = new() { Name = "SettingsMetricsProcesses", Content = "Записывать самые загруженные процессы (по 5 по ЦП и памяти)" };
+    readonly NumberField rawDays = new("Каждый замер хранить", "дн", 1, 90, 1) { Name = "SettingsMetricsRawDays" };
+    readonly NumberField fiveDays = new("Средние за 5 минут хранить", "дн", 1, 400, 1) { Name = "SettingsMetricsFiveDays" };
+    readonly NumberField hourDays = new("Средние за час хранить", "дн", 1, 3660, 1) { Name = "SettingsMetricsHourDays" };
+    readonly CheckBox prometheus = new() { Name = "SettingsPrometheus", Content = "Отдавать последние значения для Prometheus (GET /metrics)" };
+    readonly NumberField prometheusPort = new("Порт на 127.0.0.1", "", 1024, 65535, 1) { Name = "SettingsPrometheusPort" };
     readonly NumberField maxBytes = new("Наибольший размер изображения для предпросмотра", "МБ", 1, 200, 1);
     readonly NumberField pixels = new("Наибольшее разрешение изображения", "Мпикс", 1, 100, 1);
     readonly NumberField parallel = new("Одновременных запросов миниатюр", "запросов", 1, 4, 1);
@@ -70,6 +78,9 @@ public sealed class SettingsWindow : Window
         parallel.Value = settings.PreviewParallelism; cache.Value = settings.PreviewCacheBytes / 1024 / 1024;
         transfers.Value = Math.Clamp(settings.TransferParallelism, 1, 8); speed.Value = Math.Max(0, settings.TransferLimitKiBps);
         editor.Text = settings.ExternalEditorPath; AutomationProperties.SetName(editor, "Путь к редактору");
+        var metrics = settings.Metrics;
+        recordOpen.IsChecked = metrics.RecordOpenTabs; recordProcesses.IsChecked = metrics.RecordProcesses; rawDays.Value = metrics.RawDays; fiveDays.Value = metrics.FiveMinuteDays; hourDays.Value = metrics.HourDays;
+        prometheus.IsChecked = metrics.PrometheusEnabled; prometheusPort.Value = metrics.PrometheusPort;
         BuildPages();
 
         var layout = new Grid(); layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) }); layout.ColumnDefinitions.Add(new ColumnDefinition());
@@ -150,6 +161,18 @@ public sealed class SettingsWindow : Window
         pages["monitoring"] = Page("Мониторинг",
             Group("Диспетчер задач", poll, Note("Новый замер начинается не раньше окончания предыдущего. Если сервер собирает данные дольше интервала, графики остаются непрерывными, а фактическое время сбора видно в «Сведениях». Скрытые разделы не опрашиваются.")),
             Group("Оповещения", Setting(null, "Пока приложение открыто: почти заполненный диск, служба в состоянии failed и ошибка автоматического скрипта на подключённых серверах. Сообщается только о новых проблемах.", alerts), alertDisk, alertInterval, Setting(null, "Иначе мигает значок на панели задач. Список — «Главная» → «Оповещения».", alertWindows)));
+
+        var metricsFolder = System.IO.Path.Combine(App.Store.DirectoryPath, "metrics");
+        long metricsSize = 0;
+        try { metricsSize = MetricsHub.Store.Servers().Sum(MetricsHub.Store.SizeOf); } catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException) { }
+        var endpointState = Ui.Text(MetricsHub.EndpointError ?? (MetricsHub.EndpointPort is { } port ? $"Работает: http://127.0.0.1:{port}/metrics" : "Выключено."), 12);
+        endpointState.TextWrapping = TextWrapping.Wrap; endpointState.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); endpointState.Name = "SettingsPrometheusState";
+        var rules = Ui.Button("Правила оповещений…", () => MetricAlertsWindow.Open(this, null)); rules.Name = "SettingsMetricRules";
+        pages["history"] = Page("История метрик",
+            Group("Запись", Setting(null, "Раз в минуту: ЦП, память, подкачка, нагрузка, сеть, диски и свои метрики. Для записи без открытой вкладки отметьте «Записывать в фоне» в «Истории» сервера или в параметрах папки.", recordOpen), Setting(null, null, recordProcesses)),
+            Group("Хранение", rawDays, fiveDays, hourDays, Note($"Только числа и тексты событий, без паролей и вывода команд. Сейчас занято {Ui.Size(metricsSize)}."), Buttons(Ui.Button("Открыть папку", () => { System.IO.Directory.CreateDirectory(metricsFolder); OpenFolder(metricsFolder); }))),
+            Group("Оповещения по истории", Note("Значение выше или ниже порога дольше заданного времени и прогноз заполнения дисков. Сообщения появляются в «Оповещениях» на «Главной» и в уведомлениях Windows."), Buttons(rules)),
+            Group("Prometheus", Setting(null, "Только на этом компьютере (127.0.0.1); метки — имя профиля, без адресов и пользователей. Выключено по умолчанию.", prometheus), prometheusPort, endpointState));
 
         pages["preview"] = Page("Предпросмотр и кэш",
             Group("Изображения", maxBytes, pixels, Note("Большие файлы не скачиваются для миниатюры; их можно открыть отдельно.")),
@@ -235,10 +258,10 @@ public sealed class SettingsWindow : Window
     async Task SaveAsync()
     {
         NumberField? invalid = null;
-        foreach (var field in new[] { poll, alertDisk, alertInterval, font, maxBytes, pixels, parallel, cache, transfers, speed }) if (!field.Validate()) invalid ??= field;
+        foreach (var field in new[] { poll, alertDisk, alertInterval, font, maxBytes, pixels, parallel, cache, transfers, speed, rawDays, fiveDays, hourDays, prometheusPort }) if (!field.Validate()) invalid ??= field;
         if (invalid is not null)
         {
-            Show(invalid == poll || invalid == alertDisk || invalid == alertInterval ? "monitoring" : invalid == font ? "terminal" : invalid == transfers || invalid == speed ? "connections" : "preview");
+            Show(invalid == rawDays || invalid == fiveDays || invalid == hourDays || invalid == prometheusPort ? "history" : invalid == poll || invalid == alertDisk || invalid == alertInterval ? "monitoring" : invalid == font ? "terminal" : invalid == transfers || invalid == speed ? "connections" : "preview");
             invalid.FocusInput(); return;
         }
         var path = editor.Text.Trim();
@@ -253,7 +276,13 @@ public sealed class SettingsWindow : Window
         settings.ShowHidden = showHidden.IsChecked == true; settings.ShowExtensions = showExtensions.IsChecked == true;
         settings.ReduceMotion = reduceMotion.IsChecked == true; UiMotion.UserReduced = settings.ReduceMotion;
         settings.Theme = theme.SelectedIndex == 1 ? "Light" : theme.SelectedIndex == 2 ? "Dark" : "System"; Theme.Apply(settings.Theme);
+        var metrics = settings.Metrics;
+        metrics.RecordOpenTabs = recordOpen.IsChecked == true; metrics.RecordProcesses = recordProcesses.IsChecked == true;
+        metrics.RawDays = (int)rawDays.Value; metrics.FiveMinuteDays = Math.Max((int)fiveDays.Value, metrics.RawDays); metrics.HourDays = Math.Max((int)hourDays.Value, metrics.FiveMinuteDays);
+        metrics.PrometheusEnabled = prometheus.IsChecked == true; metrics.PrometheusPort = (int)prometheusPort.Value;
         await App.Store.SaveAsync();
+        MetricsHub.ApplySettings();
+        if (MetricsHub.EndpointError is { } endpointError) Ui.Error("Точка Prometheus не запущена. " + endpointError);
         DialogResult = true;
     }
 

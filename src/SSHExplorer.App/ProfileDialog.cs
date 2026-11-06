@@ -94,6 +94,14 @@ public sealed class ProfileDialog:Window,ICancellableModal
         inheritRow.Children.Add(Check("Пароль",nameof(_model.InheritPassword)));
         var inheritRdp=Check("Параметры RDP",nameof(_model.InheritRdp));inheritRdp.SetBinding(VisibilityProperty,new Binding(nameof(_model.IsRdp)){Converter=new BooleanToVisibilityConverter()});inheritRow.Children.Add(inheritRdp);
         advanced.Children.Add(inheritRow);
+        // Metric history (0.6): background recording and the server's own metrics; SSH profiles only.
+        var historyRow=new WrapPanel{Margin=new(0,4,0,6)};
+        var recordHistory=Check("Записывать историю метрик в фоне",nameof(_model.RecordHistory));recordHistory.Name="ProfileRecordHistory";
+        recordHistory.ToolTip="Раз в минуту, даже без открытой вкладки: отдельное подключение без терминала. Нужны сохранённый пароль или ключ.";historyRow.Children.Add(recordHistory);
+        var customMetrics=Ui.Button("",()=>{var edited=CustomMetricsWindow.Edit(this,_model.CustomMetrics,null,false,"Свои метрики — "+(_model.ProfileName.Length>0?_model.ProfileName:"новый сервер"));if(edited is not null)_model.CustomMetrics=edited;});
+        customMetrics.Name="ProfileCustomMetrics";customMetrics.SetBinding(ContentProperty,new Binding(nameof(_model.CustomMetricsLabel)));customMetrics.Margin=new(12,0,0,0);historyRow.Children.Add(customMetrics);
+        historyRow.SetBinding(VisibilityProperty,new Binding(nameof(_model.IsSsh)){Converter=new BooleanToVisibilityConverter()});
+        advanced.Children.Add(historyRow);
         // Picking a saved server is the usual case; typing user@host:port or a chain stays possible.
         Button? pickJump=null;
         pickJump=Ui.Button("Выбрать…",()=>

@@ -47,6 +47,13 @@ public sealed class ServerProfileViewModel(ServerProfile profile, SessionState[]
     public string Username => profile.IsRdp && profile.Rdp.Domain.Length > 0 ? profile.Rdp.Domain + "\\" + profile.Username : profile.Username;
     public string ProtocolGlyph => profile.IsRdp ? IconCatalog.RemoteDesktop : IconCatalog.Terminal;
     public string ProtocolName => profile.IsRdp ? "Удалённый рабочий стол (RDP)" : "SSH: файлы и терминал";
+    readonly HomeMetrics.Summary? metrics = HomeMetrics.Get(profile.Id);
+    /// <summary>CPU over the last 24 hours in half-hour averages (NaN — not recorded); null without history.</summary>
+    public double[]? LoadHistory => metrics?.Cpu;
+    public string LoadText => metrics?.Text ?? "";
+    public string LoadToolTip => metrics is null ? "История не записывается" : "ЦП за последние 24 часа; справа — последние значения";
+    /// <summary>Sort key of «Нагрузка»: current CPU, servers without data last.</summary>
+    public double LoadRank => metrics?.CpuNow ?? -1;
     /// <summary>Null when ungrouped: sorts after named groups and shows as «Без группы».</summary>
     public string? GroupKey => string.IsNullOrWhiteSpace(profile.Group) ? null : profile.Group.Trim();
     public string GroupName => GroupKey ?? "Без группы";

@@ -96,6 +96,9 @@ public sealed partial class MainWindow : Window
         alertsButton = Ui.FlyoutButton(IconCatalog.Performance, "Оповещения", AlertsMenu, "Заполненные диски, упавшие службы и ошибки скриптов на подключённых серверах"); alertsButton.Name = "HomeAlerts";
         commands.Add("alerts", alertsButton, () => Ui.Menu(AlertCenter.ActiveCount > 0 ? $"Оповещения ({AlertCenter.ActiveCount})…" : "Оповещения…", ShowAlerts), 25);
         AlertCenter.Changed += (_, _) => Dispatcher.InvokeAsync(UpdateAlertsButton); UpdateAlertsButton();
+        // Load column: recomputed in the background after new samples (at most once a minute), then the list refreshes.
+        Action<Guid> metricsUpdated = _ => HomeMetrics.Refresh(); HomeMetrics.Changed += RefreshHome; MetricsHub.Updated += metricsUpdated; HomeMetrics.Refresh(true);
+        Closed += (_, _) => { HomeMetrics.Changed -= RefreshHome; MetricsHub.Updated -= metricsUpdated; };
         var group = Ui.AsyncCommandButton(IconCatalog.Terminal, "Выполнить на нескольких…", () => RunOnGroupAsync()); group.Name = "HomeGroupRun"; group.ToolTip = "Выполнить команды или скрипт сразу на нескольких серверах";
         commands.Add("group", group, () => Ui.AsyncMenu("Выполнить на нескольких…", () => RunOnGroupAsync(), glyph: IconCatalog.Terminal), 30);
         foreach (var (key,glyph,label,action,priority) in new (string,string,string,Func<Task>,int)[] { ("connect","\uE768","Подключиться",ConnectSelected,80), ("edit",Ui.RenameGlyph,"Изменить",EditSelected,50), ("remove",Ui.DeleteGlyph,"Удалить профиль",RemoveSelected,10) })
@@ -109,12 +112,12 @@ public sealed partial class MainWindow : Window
         servers.Margin = new Thickness(12, 4, 12, 0); servers.SelectionMode = DataGridSelectionMode.Single;
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
-        servers.Columns.Add(ProtocolColumn()); AddColumn(servers, "Название", "Name", 240); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
-        TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank)], "Name",
+        servers.Columns.Add(ProtocolColumn()); AddColumn(servers, "Название", "Name", 240); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); servers.Columns.Add(LoadColumn()); AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+        TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank), new("Load", r => ((ServerProfileViewModel)r).LoadRank)], "Name",
             group: new("Group", r => ((ServerProfileViewModel)r).GroupKey, true));
         HomeGrouping.Attach(servers, () => viewModel.HasGroups);
         servers.MouseDoubleClick += async (_, e) => { if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(servers, source) is DataGridRow { Item: ServerProfileViewModel }) await Ui.Guard(ConnectSelected); };
-        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Открыть по RDP", () => viewModel.SelectedProfile is { } chosen ? OpenDesktopAsync(chosen.Profile, asDesktop: true) : Task.CompletedTask, glyph: IconCatalog.RemoteDesktop), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Выполнить на группе…", () => RunOnGroupAsync(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.Terminal), Ui.AsyncMenu("Параметры папки…", () => EditFolderAsync(viewModel.SelectedProfile?.Profile.Group ?? ""), glyph: Ui.SettingsGlyph), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
+        var menu = new ContextMenu { DataContext = viewModel }; foreach (var item in new[] { Ui.AsyncMenu("Подключиться", ConnectSelected, "Enter", Ui.TerminalGlyph), Ui.AsyncMenu("Открыть по RDP", () => viewModel.SelectedProfile is { } chosen ? OpenDesktopAsync(chosen.Profile, asDesktop: true) : Task.CompletedTask, glyph: IconCatalog.RemoteDesktop), Ui.Menu("История…", () => ShowHistory(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.History), Ui.AsyncMenu("Изменить профиль", EditSelected, glyph: Ui.RenameGlyph), Ui.AsyncMenu("Удалить профиль", RemoveSelected, glyph: Ui.DeleteGlyph), Ui.AsyncMenu("Выполнить на группе…", () => RunOnGroupAsync(viewModel.SelectedProfile?.Profile), glyph: IconCatalog.Terminal), Ui.AsyncMenu("Параметры папки…", () => EditFolderAsync(viewModel.SelectedProfile?.Profile.Group ?? ""), glyph: Ui.SettingsGlyph), Ui.AsyncMenu("Экспортировать…", () => ExportProfilesAsync(viewModel.SelectedProfile is { } chosen ? new[] { chosen.Profile.Id } : Array.Empty<Guid>()), glyph: ExportGlyph) }) { item.SetBinding(IsEnabledProperty, new Binding(nameof(HomeViewModel.HasSelectedProfile))); menu.Items.Add(item); } menu.Items.Add(new Separator()); menu.Items.Add(Ui.AsyncMenu("Добавить сервер…", AddProfile, glyph: Ui.AddGlyph)); Ui.AttachContextMenu(servers, menu);
         servers.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await Ui.Guard(ConnectSelected); } };
         var body = new Grid(); body.Children.Add(servers); var empty = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 390, Margin = new Thickness(24) }; var emptyTitle = Ui.Text("", 18, true); emptyTitle.HorizontalAlignment = HorizontalAlignment.Center; emptyTitle.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateTitle))); empty.Children.Add(emptyTitle); var emptyText = Ui.Text(""); emptyText.TextWrapping = TextWrapping.Wrap; emptyText.TextAlignment = TextAlignment.Center; emptyText.Margin = new Thickness(0, 10, 0, 16); emptyText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); emptyText.SetBinding(TextBlock.TextProperty, new Binding(nameof(HomeViewModel.EmptyStateMessage))); empty.Children.Add(emptyText); empty.SetBinding(VisibilityProperty, new Binding(nameof(HomeViewModel.ShowEmptyState)) { Converter = new BooleanToVisibilityConverter() }); body.Children.Add(empty); p.Children.Add(body); return p;
     }
@@ -378,6 +381,10 @@ public sealed partial class MainWindow : Window
     {
         if (viewModel.SelectedProfile is not { } row || !Ui.Confirm($"Удалить локальный профиль «{row.Name}»?\n\nФайлы сервера и открытые сессии сохранятся.")) return;
         await App.Store.DeleteProfileAsync(row.Profile.Id); RefreshHome(); if (App.Store.LastProfileCleanupWarning is { } warning) Ui.Error(warning);
+        // The metric history stays unless the user agrees to delete it too (it may still be wanted for a report).
+        long history = MetricsHub.Store.SizeOf(row.Profile.Id);
+        if (history > 0 && (DeleteHistoryOverride?.Invoke() ?? Ui.Confirm($"Удалить и записанную историю метрик «{row.Name}» ({Ui.Size(history)})?")))
+            MetricsHub.Delete(row.Profile.Id);
     }
     Task ConnectSelected() => viewModel.SelectedProfile is { } row ? OpenServer(row.Profile) : Task.CompletedTask;
     void AddMenu() => Ui.OpenFlyout(openServerButton!, BuildAddMenu());
@@ -479,6 +486,35 @@ public sealed partial class MainWindow : Window
         {
             interaction?.InitialFinished(); await attempt.FlushAsync(); RefreshHome();
         }
+    }
+    /// <summary>Test hook: answers «удалить и историю?» after a profile is deleted.</summary>
+    internal Func<bool>? DeleteHistoryOverride;
+    /// <summary>Test hook: receives the history window instead of showing it.</summary>
+    internal Action<HistoryWindow>? HistoryWindowOverride;
+    internal void ShowHistory(ServerProfile? profile)
+    {
+        if (profile is null) return;
+        if (profile.IsRdp) { Ui.Info("История метрик записывается для серверов SSH (Linux и Windows с OpenSSH)."); return; }
+        var window = new HistoryWindow(profile, this);
+        if (HistoryWindowOverride is { } fake) fake(window); else window.Show();
+    }
+    /// <summary>«Нагрузка»: CPU over 24 hours and the latest CPU, memory and fullest disk of recorded servers.</summary>
+    static DataGridTemplateColumn LoadColumn()
+    {
+        var panel = new FrameworkElementFactory(typeof(StackPanel));
+        panel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        panel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        panel.SetBinding(FrameworkElement.ToolTipProperty, new Binding(nameof(ServerProfileViewModel.LoadToolTip)));
+        var line = new FrameworkElementFactory(typeof(Sparkline));
+        line.SetBinding(Sparkline.ValuesProperty, new Binding(nameof(ServerProfileViewModel.LoadHistory)));
+        panel.AppendChild(line);
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.SetBinding(TextBlock.TextProperty, new Binding(nameof(ServerProfileViewModel.LoadText)));
+        text.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        text.SetValue(TextBlock.FontSizeProperty, 12d);
+        text.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        panel.AppendChild(text);
+        return new DataGridTemplateColumn { Header = "Нагрузка", Width = 250, SortMemberPath = "Load", CellTemplate = new DataTemplate { VisualTree = panel } };
     }
     static DataGridTemplateColumn ProtocolColumn()
     {
@@ -787,7 +823,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     SidebarEditor? sidebarEditor;
     readonly string? startPath;
     readonly SessionViewModel viewModel = new();
-    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; WindowsFirewallView? windowsFirewallView; SecurityView? securityView; CronView? cronView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
+    FileBrowserView? files; SplitWorkspace? terminals; MonitorView? monitor; HistoryView? historyView; SessionState? recordedState; ServerPanelView? serverPanel; DockerView? docker; ScriptsView? scriptsView; ServicesView? services; TunnelsView? tunnelsView; FirewallView? firewallView; WindowsFirewallView? windowsFirewallView; SecurityView? securityView; CronView? cronView; TunnelManager? tunnelManager; bool tunnelsAutoStarted; ScriptRunner? scriptRunner; EventHandler? modulesChanged; readonly Button reconnect;
     ConnectionInteraction? interaction; EventHandler<ConnectionStageEvent>? diagnostics; ConnectionAttempt? connecting;
     bool disposed, failed, initialFolderFailed, hasNotice;
     bool active { get => viewModel.IsActive; set => viewModel.IsActive = value; }
@@ -914,6 +950,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
             if (disposed || failed) return;
             viewModel.Update(Session); files?.SetAvailability(Session.SftpAvailable && Session.State == SessionState.Connected); UpdateConnectionStatusVisibility();
             // Scheduled scripts run while this server is connected, whether or not their section is open.
+            if (!presentationOnly && Session.State != recordedState)
+            {
+                // Metric history: this tab's connection records once a minute; connects and drops are marks on the graphs.
+                if (Session.State == SessionState.Connected) { MetricsHub.Attach(Session); MetricsHub.Note(Session.Profile.Id, "connect", "Подключение из приложения"); }
+                else if (recordedState == SessionState.Connected && Session.State == SessionState.Disconnected) MetricsHub.Note(Session.Profile.Id, "disconnect", "Связь с сервером потеряна");
+                recordedState = Session.State;
+            }
             if (Session.State == SessionState.Connected && !presentationOnly)
             {
                 if (!Session.IsWindows) EnsureScriptRunner();
@@ -1027,6 +1070,13 @@ public sealed class SessionView : UserControl, IAsyncDisposable
         {
             scriptsView ??= new ScriptsView(Session, EnsureScriptRunner());
             screen.Content = scriptsView;
+            if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
+            return;
+        }
+        if (key == "history")
+        {
+            historyView ??= new HistoryView(Session.Profile.Id, Session);
+            screen.Content = historyView; historyView.Reload();
             if (!ReferenceEquals(previousContent, screen.Content)) UiMotion.SurfaceChanged(screen);
             return;
         }
@@ -1149,7 +1199,7 @@ public sealed class SessionView : UserControl, IAsyncDisposable
     public void RestoreContext(object? context) => files?.RestoreContext(context);
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return; disposed = true; healthTimer?.Stop(); AlertCenter.Forget(Session.Profile.Id); if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); windowsFirewallView?.Dispose(); securityView?.Dispose(); cronView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
+        if (disposed) return; disposed = true; healthTimer?.Stop(); AlertCenter.Forget(Session.Profile.Id); MetricsHub.Detach(Session); historyView?.Dispose(); if (modulesChanged is not null) App.ModulesChanged -= modulesChanged; docker?.Dispose(); services?.Dispose(); tunnelsView?.Dispose(); firewallView?.Dispose(); windowsFirewallView?.Dispose(); securityView?.Dispose(); cronView?.Dispose(); if (tunnelManager is not null) _ = tunnelManager.DisposeAsync().AsTask(); scriptRunner?.Dispose(); connecting?.Cancel(); interaction?.Dispose(); UiMotion.Stop(screen);
         Session.StateChanged -= StateChanged;
         monitor?.Dispose(); files?.Dispose(); terminals?.Dispose();
         try { await Session.DisposeAsync(); }

@@ -155,7 +155,7 @@ public sealed partial class MainWindow
         if ((FolderWindowOverride?.Invoke(window) ?? ModalRunner.Show(window, this, windowLifetime.Token)) != true) return;
         var result = window.Result!;
         if (existing is null) { result.Path = group; folders.Add(result); }
-        else { existing.Username = result.Username; existing.Domain = result.Domain; existing.Rdp = result.Rdp; result = existing; }
+        else { existing.Username = result.Username; existing.Domain = result.Domain; existing.Rdp = result.Rdp; existing.RecordHistory = result.RecordHistory; existing.CustomMetrics = result.CustomMetrics; result = existing; }
         if (window.NewPassword is { Length: > 0 } password) { await App.Store.SaveSecretAsync(result.Id, password, windowLifetime.Token); result.HasPassword = true; }
         else if (window.ClearPassword) { try { App.Store.DeleteSecret(result.Id); } catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException) { } result.HasPassword = false; }
         window.ForgetPassword();
@@ -171,6 +171,10 @@ public sealed class FolderSettingsWindow : Window
     readonly SecretEntry password = new("Пароль папки") { MinHeight = 34 };
     readonly CheckBox clear = new() { Content = "Удалить сохранённый пароль папки", Margin = new Thickness(0, 6, 0, 0) };
     readonly ComboBox rdpFrom = new() { MinHeight = 34 };
+    readonly CheckBox recordHistory = new() { Name = "FolderRecordHistory", Content = "Записывать историю метрик серверов папки в фоне", Margin = new Thickness(0, 12, 0, 0) };
+    readonly Button customMetrics = new() { Name = "FolderCustomMetrics", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
+    List<CustomMetricDefinition> metrics;
+    internal CheckBox RecordHistoryBox => recordHistory;
     readonly ServerProfile[] rdpSources;
     readonly FolderDefaults? existing;
     public FolderDefaults? Result { get; private set; }
@@ -203,6 +207,13 @@ public sealed class FolderSettingsWindow : Window
         items.AddRange(rdpSources.Select(s => "Как у «" + s.Name + "»"));
         rdpFrom.ItemsSource = items; rdpFrom.SelectedIndex = 0;
         Field("Параметры удалённого рабочего стола для наследования", rdpFrom);
+        // Metric history (0.6): every SSH server of the folder records in the background and runs the folder's metrics.
+        recordHistory.IsChecked = current?.RecordHistory == true; p.Children.Add(recordHistory);
+        metrics = current?.CustomMetrics.Select(m => m.Clone()).ToList() ?? [];
+        void UpdateMetricsLabel() => customMetrics.Content = metrics.Count == 0 ? "Свои метрики папки…" : $"Свои метрики папки ({metrics.Count})…";
+        UpdateMetricsLabel();
+        customMetrics.Click += (_, _) => { if (CustomMetricsWindow.Edit(this, metrics, null, false, "Свои метрики — папка «" + path + "»") is { } edited) { metrics = edited.ToList(); UpdateMetricsLabel(); } };
+        p.Children.Add(customMetrics);
         var note = Ui.Text("Пароль папки хранится с защитой Windows, как пароли серверов.", 12); note.TextWrapping = TextWrapping.Wrap; note.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); note.Margin = new Thickness(0, 10, 0, 0); p.Children.Add(note);
         var save = Ui.Button("Сохранить", Accept); save.IsDefault = true; save.SetResourceReference(StyleProperty, "PrimaryButtonStyle"); save.Name = "FolderSave";
         var cancel = Ui.Button("Отмена", () => DialogResult = false); cancel.IsCancel = true;
@@ -216,7 +227,7 @@ public sealed class FolderSettingsWindow : Window
         if (d.Any(c => char.IsControl(c) || c is '\\' or '/' or '@')) { Ui.SetValidationMessage(domain, "Домен: имя без \\, / и @."); return; }
         int index = rdpFrom.SelectedIndex; int offset = existing?.Rdp is not null ? 2 : 1;
         RdpOptions? rdp = existing?.Rdp is not null && index == 0 ? existing.Rdp : index >= offset ? rdpSources[index - offset].Rdp.Clone() : null;
-        Result = new FolderDefaults { Id = existing?.Id ?? Guid.NewGuid(), Path = existing?.Path ?? "", Username = user.Text.Trim(), Domain = d, HasPassword = existing?.HasPassword == true, Rdp = rdp };
+        Result = new FolderDefaults { Id = existing?.Id ?? Guid.NewGuid(), Path = existing?.Path ?? "", Username = user.Text.Trim(), Domain = d, HasPassword = existing?.HasPassword == true, Rdp = rdp, RecordHistory = recordHistory.IsChecked == true, CustomMetrics = metrics.Select(m => m.Clone()).ToList() };
         NewPassword = password.Password.Length > 0 ? password.Password : null; ClearPassword = clear.IsChecked == true;
         if (IsLoaded && IsVisible) DialogResult = true;
     }

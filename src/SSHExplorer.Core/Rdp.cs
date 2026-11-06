@@ -59,7 +59,11 @@ public sealed class FolderDefaults
     public string Domain { get; set; } = "";
     public bool HasPassword { get; set; }
     public RdpOptions? Rdp { get; set; }
-    public FolderDefaults Clone() { var c = (FolderDefaults)MemberwiseClone(); c.Rdp = Rdp?.Clone(); return c; }
+    /// <summary>Servers of this folder record metric history in the background (0.6).</summary>
+    public bool RecordHistory { get; set; }
+    /// <summary>Custom metrics every server of the folder runs, besides its own (0.6).</summary>
+    public List<CustomMetricDefinition> CustomMetrics { get; set; } = [];
+    public FolderDefaults Clone() { var c = (FolderDefaults)MemberwiseClone(); c.Rdp = Rdp?.Clone(); c.CustomMetrics = CustomMetrics.Select(m => m.Clone()).ToList(); return c; }
 }
 
 /// <summary>mRemoteNG-style inheritance: a server marked «наследовать» takes the value from the nearest folder that has one.</summary>
@@ -103,6 +107,7 @@ public static class ProfileInheritance
         Id = p.Id, Name = p.Name, Host = p.Host, Port = p.Port, Username = p.Username, Authentication = p.Authentication, PrivateKeyPath = p.PrivateKeyPath,
         InitialPath = p.InitialPath, TimeoutSeconds = p.TimeoutSeconds, SaveSecret = p.SaveSecret, Bookmarks = p.Bookmarks, ProxyJump = p.ProxyJump, Group = p.Group,
         DockerTemplates = p.DockerTemplates, Scripts = p.Scripts, Tunnels = p.Tunnels, Protocol = p.Protocol, Rdp = p.Rdp.Clone(), Inherit = p.Inherit,
+        RecordHistory = p.RecordHistory, CustomMetrics = p.CustomMetrics,
     };
 }
 

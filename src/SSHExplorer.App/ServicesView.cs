@@ -168,6 +168,7 @@ public sealed class ServicesView : UserControl, IDisposable
         if (!Confirm($"{Systemd.Label(action)} «{u.Name}» на {systemd.Session.Profile.Name}?\n\n{effect}{warning}\n\nВыполняется {(systemd.IsRoot ? "от root" : systemd.Sudo ? "через sudo без пароля" : "от вашей учётной записи")}.")) return;
         state.Text = Systemd.Label(action) + " «" + u.Name + "»…";
         await systemd.ActAsync(u.Name, action, lifetime.Token);
+        MetricsHub.Note(systemd.Session.Profile.Id, "change", $"{Systemd.Label(action)} «{u.Name}»");
         await RefreshAsync();
         state.Text = $"{Systemd.Label(action)} «{u.Name}» — выполнено · " + Rights;
     }

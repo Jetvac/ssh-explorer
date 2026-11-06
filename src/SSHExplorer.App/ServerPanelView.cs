@@ -238,6 +238,7 @@ public sealed class ServerPanelView : UserControl
         if (capability.Action == PowerAction.Reboot) PowerVerificationRegistry.Register(session.Profile.Id, session.Profile.Endpoint, before);
         var id = Guid.NewGuid();
         await LocalDiagnostics.RecordOperationAsync(id, "server.power." + capability.Method, "requested");
+        MetricsHub.Note(session.Profile.Id, "change", capability.Action == PowerAction.Reboot ? "Перезагрузка из приложения" : "Выключение из приложения");
         var final = await operation.RunAsync(powerWait.Token);
         await LocalDiagnostics.RecordOperationAsync(id, "server.power." + capability.Method, final.ToString());
     }

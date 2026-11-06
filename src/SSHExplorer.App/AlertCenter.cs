@@ -25,7 +25,7 @@ public sealed class AlertItem(DateTime time, Guid server, string serverName, str
 /// </summary>
 public static class AlertCenter
 {
-    static readonly Dictionary<Guid, HashSet<string>> active = [];
+    static readonly Dictionary<(Guid Server, string Source), HashSet<string>> active = [];
     public static ObservableCollection<AlertItem> Items { get; } = [];
     public static event EventHandler? Changed;
     /// <summary>Test hook: receives what would be shown as a Windows notification.</summary>
@@ -33,14 +33,16 @@ public static class AlertCenter
     public static int ActiveCount => Items.Count(i => !i.Resolved);
 
     /// <summary>The server's issues now: new ones are added and notified, missing ones marked resolved.</summary>
-    public static void Report(Guid server, string serverName, IReadOnlyList<HealthIssue> issues)
+    /// <remarks>Each source (health check, metric history) reports its own set; one source never resolves another's.</remarks>
+    public static IReadOnlyList<HealthIssue> Report(Guid server, string serverName, IReadOnlyList<HealthIssue> issues, string source = "health")
     {
-        if (!active.TryGetValue(server, out var previous)) active[server] = previous = [];
+        if (!active.TryGetValue((server, source), out var previous)) active[(server, source)] = previous = [];
         var (fresh, resolved) = ServerHealth.Diff(previous, issues);
         foreach (var key in resolved) { previous.Remove(key); foreach (var item in Items.Where(i => i.Server == server && i.Key == key && !i.Resolved)) item.Resolved = true; }
         foreach (var issue in fresh) { previous.Add(issue.Key); Add(server, serverName, issue.Key, issue.Text); }
         if (fresh.Count > 0) Notify(serverName, fresh.Count == 1 ? fresh[0].Text : $"{fresh[0].Text} и ещё {fresh.Count - 1}");
         if (fresh.Count + resolved.Count > 0) Changed?.Invoke(null, EventArgs.Empty);
+        return fresh;
     }
 
     /// <summary>A one-off event (for example, a failed automatic script).</summary>
@@ -52,7 +54,7 @@ public static class AlertCenter
 
     public static void ClearResolved() { foreach (var i in Items.Where(i => i.Resolved).ToArray()) Items.Remove(i); Changed?.Invoke(null, EventArgs.Empty); }
     public static void ClearAll() { foreach (var i in Items.Where(i => i.Key.StartsWith("event:", StringComparison.Ordinal)).ToArray()) Items.Remove(i); ClearResolved(); }
-    public static void Forget(Guid server) { if (active.Remove(server)) { foreach (var item in Items.Where(i => i.Server == server && !i.Resolved && !i.Key.StartsWith("event:", StringComparison.Ordinal))) item.Resolved = true; Changed?.Invoke(null, EventArgs.Empty); } }
+    public static void Forget(Guid server, string source = "health") { if (active.Remove((server, source), out var keys)) { foreach (var item in Items.Where(i => i.Server == server && !i.Resolved && keys.Contains(i.Key))) item.Resolved = true; Changed?.Invoke(null, EventArgs.Empty); } }
     internal static void Reset() { active.Clear(); Items.Clear(); }
 
     static void Add(Guid server, string name, string key, string text)

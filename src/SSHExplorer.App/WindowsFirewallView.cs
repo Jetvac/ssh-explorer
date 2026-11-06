@@ -106,6 +106,7 @@ public sealed class WindowsFirewallView : UserControl, IDisposable
     async Task Apply(string change, string what, string? select = null)
     {
         var result = await firewall.ApplyAsync(change, p => Dispatcher.Invoke(() => state.Text = p), lifetime.Token);
+        MetricsHub.Note(firewall.Session.Profile.Id, "change", "Брандмауэр: " + what + " — " + result.Message);
         await RefreshAsync(select);
         state.Text = what + ": " + result.Message + (result.Outcome == ApplyOutcome.Failed && result.Output.Length > 0 ? " " + result.Output : "");
     }

@@ -17,6 +17,7 @@ public static class SidebarCatalog
         ["server"] = new(IconCatalog.Server, "Сервер", "Сводка, питание и состояние сервера"),
         ["terminal"] = new(IconCatalog.Terminal, "Терминал", "Терминалы, в том числе разделённые"),
         ["monitor"] = new(IconCatalog.Performance, "Диспетчер задач", "Процессы, производительность и службы"),
+        ["history"] = new(IconCatalog.History, "История", "Записанные метрики сервера: графики за часы, дни и месяцы, события и свои метрики"),
         ["tunnels"] = new(IconCatalog.Network, "Туннели", "Проброс портов через SSH"),
         ["firewall"] = new(IconCatalog.Firewall, "Файервол", "Правила ufw и доступ только через промежуточный сервер"),
         ["security"] = new(IconCatalog.Security, "Защита SSH", "Вход по ключу, ключи сервера и проверка настроек SSH"),

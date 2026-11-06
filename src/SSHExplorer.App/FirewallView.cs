@@ -165,6 +165,7 @@ public sealed class FirewallView : UserControl, IDisposable
             : verdict.Allowed is null ? "\n\nНе удаётся точно предсказать, пройдёт ли ваше SSH-подключение. Проверка покажет; при неудаче изменение откатится." : "";
         if (!Confirm($"{what} на {firewall.Session.Profile.Name}?\n\nКоманды:\n{string.Join("\n", commandList)}\n\nПосле изменения: {verdict.Reason}{danger}\n\nЕсли новое SSH-подключение не пройдёт, прежние правила вернутся сразу, а при потере связи — сами через {FirewallService.RollbackSeconds} с.")) return;
         var result = await firewall.ApplyAsync(commandList, text => Dispatcher.Invoke(() => state.Text = text), lifetime.Token);
+        MetricsHub.Note(firewall.Session.Profile.Id, "change", "Файервол: " + what + " — " + result.Message);
         await RefreshAsync();
         state.Text = result.Message;
         if (result.Outcome != ApplyOutcome.Confirmed) Ui.Error(result.Message + (result.Output.Length > 0 ? "\n\nОтвет ufw:\n" + result.Output : ""));

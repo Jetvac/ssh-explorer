@@ -28,7 +28,7 @@ public static class IconCatalog
         ViewList = Prefix + "view-list", ViewDetails = Prefix + "view-details", ViewTiles = Prefix + "view-tiles", ViewContent = Prefix + "view-content",
         TabList = Prefix + "tab-list", NewTab = Prefix + "new-tab", Documents = Prefix + "documents", Transfers = Prefix + "transfers",
         Server = Prefix + "server", Processes = Prefix + "processes", Performance = Prefix + "performance", Terminal = Prefix + "terminal",
-        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage", Settings = Prefix + "settings", Docker = Prefix + "docker", Services = Prefix + "services", SplitRight = Prefix + "split-right", SplitDown = Prefix + "split-down", Firewall = Prefix + "firewall", Security = Prefix + "security", Clock = Prefix + "clock", RemoteDesktop = Prefix + "remote-desktop";
+        Power = Prefix + "power", Restart = Prefix + "restart", Reconnect = Prefix + "reconnect", Network = Prefix + "network", Storage = Prefix + "storage", Settings = Prefix + "settings", Docker = Prefix + "docker", Services = Prefix + "services", SplitRight = Prefix + "split-right", SplitDown = Prefix + "split-down", Firewall = Prefix + "firewall", Security = Prefix + "security", Clock = Prefix + "clock", RemoteDesktop = Prefix + "remote-desktop", History = Prefix + "performance";
 
     public sealed record Entry(string Key, string Purpose, string Source, string? Glyph, string? PathData, string Style = "stroke");
 
