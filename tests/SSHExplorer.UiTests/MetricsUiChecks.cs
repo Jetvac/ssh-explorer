@@ -84,7 +84,7 @@ internal static class MetricsUiChecks
             check(issues.Any(i => i.Key.StartsWith("metric:", StringComparison.Ordinal) && i.Text.StartsWith("ЦП выше 80 % дольше 15 мин", StringComparison.Ordinal)), "CPU above 80 % for 15 minutes raises a history alert: " + string.Join(" | ", issues.Select(i => i.Text)));
             store.Settings.Metrics.Rules[0].Threshold = 90;
             check(!MetricsHub.Evaluate(profile.Id, DateTimeOffset.UtcNow).Any(i => i.Key.StartsWith("metric:", StringComparison.Ordinal)), "below the threshold there is no alert");
-            MetricAlertsWindow.DialogOverride = w => { ShowOffscreen(w); evidence.Capture((FrameworkElement)w.Content, "metric-alerts", new { theme = "Light", fixtureOnly = true }); Wait(w.SaveAsync()); w.Close(); return true; };
+            MetricAlertsWindow.DialogOverride = w => { ShowOffscreen(w); evidence.Capture((FrameworkElement)w.Content, "metric-alerts", new { theme = "Light", fixtureOnly = true }); w.Close(); Wait(w.SaveAsync()); return true; };
             MetricAlertsWindow.Open(main, profile.Id);
             check(store.Settings.Metrics.Rules.Count == 1 && store.Settings.Metrics.Rules[0].Threshold == 90 && store.Settings.Metrics.ForecastDays == 14, "the rules window saves the rules as shown");
 
