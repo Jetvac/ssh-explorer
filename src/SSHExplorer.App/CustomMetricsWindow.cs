@@ -23,7 +23,7 @@ public sealed class CustomMetricsWindow : Window
     readonly Border unconfirmed = new() { CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 12), BorderThickness = new Thickness(1) };
     readonly ServerSession? session;
     readonly bool windows;
-    readonly StackPanel editor = new(), empty = new() { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 440, Margin = new Thickness(8, 0, 8, 40) };
+    readonly StackPanel editor = new(), empty = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Width = 560, Margin = new Thickness(8, 0, 8, 40) };
     readonly Button remove;
     readonly Border card;
     bool loading;
@@ -82,13 +82,14 @@ public sealed class CustomMetricsWindow : Window
         var emptyTitle = Ui.Text("Своих метрик пока нет", 16, true); emptyTitle.Margin = new Thickness(0, 0, 0, 8); empty.Children.Add(emptyTitle);
         var emptyText = Ui.Text("Своя метрика — команда на сервере, вывод которой записывается в историю рядом с ЦП и памятью: очередь, соединения nginx, время ответа сайта. Начните с шаблона:", 13);
         emptyText.TextWrapping = TextWrapping.Wrap; emptyText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); emptyText.Margin = new Thickness(0, 0, 0, 12); empty.Children.Add(emptyText);
-        var quick = new WrapPanel();
+        // Starting points as an even two-column grid: same width, text from the left edge, the same gap everywhere.
+        var quick = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(-4, 0, -4, 0) };
         foreach (var key in new[] { "nginx", "http", "service", "docker-cpu", "postgres" })
         {
             var t = CustomMetricTemplates.All.First(x => x.Key == key);
-            var b = Ui.Button(t.Title, () => FromTemplate(t)); b.Content = new TextBlock { Text = t.Title }; b.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(b);
+            quick.Children.Add(StartButton(t.Title, () => FromTemplate(t)));
         }
-        var own = Ui.Button("Своя команда", AddOwn); own.Margin = new Thickness(0, 0, 8, 8); quick.Children.Add(own);
+        quick.Children.Add(StartButton("Своя команда…", AddOwn));
         empty.Children.Add(quick);
 
         name.TextChanged += (_, _) => Store(); command.TextChanged += (_, _) => Store(); unit.TextChanged += (_, _) => Store();
@@ -106,6 +107,15 @@ public sealed class CustomMetricsWindow : Window
         root.Children.Add(body);
         Content = root;
         if (items.Count > 0) list.SelectedIndex = 0; else ShowMetric(null);
+    }
+
+    static Button StartButton(string title, Action action)
+    {
+        var b = Ui.Button(title, action);
+        b.Content = new TextBlock { Text = title, TextTrimming = TextTrimming.CharacterEllipsis };
+        b.HorizontalAlignment = HorizontalAlignment.Stretch; b.HorizontalContentAlignment = HorizontalAlignment.Left;
+        b.Margin = new Thickness(4); b.Padding = new Thickness(12, 8, 12, 8);
+        return b;
     }
 
     static TextBlock Label(string text) { var t = Ui.Text(text, 13); t.Margin = new Thickness(0, 0, 0, 4); return t; }
