@@ -49,7 +49,10 @@ internal static class MetricsUiChecks
             check(view.EventLines.Any(l => l.Contains("релиз 1.2", StringComparison.Ordinal)) && view.StatusText.Length > 0, "events of the period are listed; the recording state is explained: " + view.StatusText);
             evidence.Capture((FrameworkElement)window.Content, "history-24h", new { theme = "Light", fixtureOnly = true });
 
+            check(!view.BackVisible, "«Назад» is hidden until a part of a graph is zoomed");
             view.Zoom(now - TimeSpan.FromMinutes(30), now); Wait(view.Loading!);
+            check(view.BackVisible, "after zooming «Назад» appears next to the period");
+            Pump(); window.UpdateLayout(); evidence.Capture((FrameworkElement)window.Content, "history-zoomed", new { theme = "Light", fixtureOnly = true });
             var zoomed = view.Charts.First(c => c.Title == "ЦП").Series[0].Points;
             check(zoomed.Count is >= 28 and <= 32, "selecting a part of a graph shows only that time: " + zoomed.Count);
             view.Back(); Wait(view.Loading!);
@@ -81,10 +84,17 @@ internal static class MetricsUiChecks
             check(issues.Any(i => i.Key.StartsWith("metric:", StringComparison.Ordinal) && i.Text.StartsWith("ЦП выше 80 % дольше 15 мин", StringComparison.Ordinal)), "CPU above 80 % for 15 minutes raises a history alert: " + string.Join(" | ", issues.Select(i => i.Text)));
             store.Settings.Metrics.Rules[0].Threshold = 90;
             check(!MetricsHub.Evaluate(profile.Id, DateTimeOffset.UtcNow).Any(i => i.Key.StartsWith("metric:", StringComparison.Ordinal)), "below the threshold there is no alert");
-            MetricAlertsWindow.DialogOverride = w => { Wait(w.SaveAsync()); return true; };
+            MetricAlertsWindow.DialogOverride = w => { ShowOffscreen(w); evidence.Capture((FrameworkElement)w.Content, "metric-alerts", new { theme = "Light", fixtureOnly = true }); Wait(w.SaveAsync()); w.Close(); return true; };
             MetricAlertsWindow.Open(main, profile.Id);
             check(store.Settings.Metrics.Rules.Count == 1 && store.Settings.Metrics.Rules[0].Threshold == 90 && store.Settings.Metrics.ForecastDays == 14, "the rules window saves the rules as shown");
 
+            // Custom metrics editor: an empty list explains itself with starting points; an imported command asks for confirmation.
+            bool emptyShown = false, bannerShown = false;
+            CustomMetricsWindow.DialogOverride = w => { ShowOffscreen(w); emptyShown = w.EmptyStateVisible && !w.UnconfirmedVisible; evidence.Capture((FrameworkElement)w.Content, "custom-metrics-empty", new { theme = "Light", fixtureOnly = true }); w.Close(); return false; };
+            CustomMetricsWindow.Edit(main, [], null, false, "Свои метрики — пусто");
+            CustomMetricsWindow.DialogOverride = w => { ShowOffscreen(w); bannerShown = w.UnconfirmedVisible && !w.EmptyStateVisible; evidence.Capture((FrameworkElement)w.Content, "custom-metrics-unconfirmed", new { theme = "Light", fixtureOnly = true }); w.Close(); return false; };
+            CustomMetricsWindow.Edit(main, [new CustomMetricDefinition { Name = "imported", Command = "echo 1", Approved = false }], null, false, "Свои метрики — из файла");
+            check(emptyShown && bannerShown, $"the editor shows starting points when empty ({emptyShown}) and a confirmation for an imported command ({bannerShown})");
             // Custom metrics editor: a template with a parameter becomes a confirmed metric with a quoted command.
             CustomMetricsWindow.TemplateValueOverride = _ => "nginx";
             CustomMetricsWindow.DialogOverride = w => { w.FromTemplate(CustomMetricTemplates.All.Single(x => x.Key == "service")); return true; };
@@ -143,6 +153,8 @@ internal static class MetricsUiChecks
             try { Directory.Delete(temp, true); } catch (IOException) { }
         }
     }
+
+    static void ShowOffscreen(Window w) { w.WindowStartupLocation = WindowStartupLocation.Manual; w.Left = -10000; w.Top = -10000; w.ShowInTaskbar = false; w.Show(); Pump(); w.UpdateLayout(); Pump(); }
 
     static T? FindName<T>(DependencyObject root, string name) where T : FrameworkElement
     {

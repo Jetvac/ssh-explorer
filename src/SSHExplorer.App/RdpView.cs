@@ -22,7 +22,7 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
     readonly WindowsFormsHost host = new() { Visibility = Visibility.Collapsed };
     readonly TextBlock status = Ui.Text("", 12), message = Ui.Text("", 15);
     readonly StackPanel notice = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 520, Margin = new Thickness(24) };
-    readonly Button reconnectButton, fullScreenButton, keysButton, disconnectButton, startButton, snapshotButton, filesButton;
+    readonly Button reconnectButton, fullScreenButton, keysButton, disconnectButton, snapshotButton, filesButton;
     readonly DispatcherTimer resize = new() { Interval = TimeSpan.FromMilliseconds(700) };
     readonly HashSet<string> sessionTrusted = [];
     RdpClient? client;
@@ -56,16 +56,24 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         SetResourceReference(BackgroundProperty, "Paper");
         reconnectButton = Ui.AsyncCommandButton(IconCatalog.Reconnect, "Переподключить", () => ReconnectRequested?.Invoke(this) ?? Task.CompletedTask, "Подключиться заново");
         fullScreenButton = Ui.CommandButton(IconCatalog.ViewHuge, "Во весь экран", FullScreen, "Рабочий стол на весь экран; вернуться — кнопкой на панели вверху экрана");
-        keysButton = Ui.CommandButton(IconCatalog.Settings, "Ctrl+Alt+Del", CtrlAltDel, "Отправить Ctrl+Alt+Del удалённому компьютеру");
+        // Keys go to the remote computer, so they share one menu instead of looking like local commands.
+        keysButton = Ui.FlyoutButton("\uE765", "Клавиши", KeysMenu, "Отправить сочетание клавиш удалённому компьютеру");
         disconnectButton = Ui.AsyncCommandButton(Ui.CloseGlyph, "Отключить", DisconnectAsync, "Завершить подключение, вкладка останется");
-        startButton = Ui.CommandButton("", "Пуск", StartMenu, "Отправить клавишу Windows (меню «Пуск») удалённому компьютеру");
-        snapshotButton = Ui.CommandButton("", "Снимок", Snapshot, "Сохранить снимок рабочего стола в PNG");
+        snapshotButton = Ui.CommandButton("\uE722", "Снимок", Snapshot, "Сохранить снимок рабочего стола в PNG");
         filesButton = Ui.AsyncCommandButton(Ui.FileGlyph, "Файлы по SSH", () => FilesRequested?.Invoke(this) ?? Task.CompletedTask, "Открыть файлы этого сервера по SSH (нужен OpenSSH Server на Windows)");
-        startButton.Name = "RdpStartMenu"; snapshotButton.Name = "RdpSnapshot"; filesButton.Name = "RdpFiles";
+        snapshotButton.Name = "RdpSnapshot"; filesButton.Name = "RdpFiles";
         var mstsc = Ui.CommandButton(IconCatalog.RemoteDesktop, "Открыть в mstsc", OpenInMstsc, "Открыть этот сервер в «Подключении к удалённому рабочему столу» Windows (пароль не передаётся)");
-        reconnectButton.Name = "RdpReconnect"; fullScreenButton.Name = "RdpFullScreen"; keysButton.Name = "RdpCtrlAltDel"; disconnectButton.Name = "RdpDisconnect"; mstsc.Name = "RdpMstsc";
-        status.Name = "RdpStatus"; status.VerticalAlignment = VerticalAlignment.Center; status.Margin = new Thickness(12, 0, 0, 0); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); status.TextTrimming = TextTrimming.CharacterEllipsis;
-        var bar = new DockPanel { LastChildFill = true }; var buttons = Ui.Row(reconnectButton, fullScreenButton, keysButton, startButton, snapshotButton, filesButton, mstsc, disconnectButton); DockPanel.SetDock(buttons, Dock.Left); bar.Children.Add(buttons); bar.Children.Add(status);
+        reconnectButton.Name = "RdpReconnect"; fullScreenButton.Name = "RdpFullScreen"; keysButton.Name = "RdpKeys"; disconnectButton.Name = "RdpDisconnect"; mstsc.Name = "RdpMstsc";
+        status.Name = "RdpStatus"; status.VerticalAlignment = VerticalAlignment.Center; status.Margin = new Thickness(12, 0, 0, 0); status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); status.TextTrimming = TextTrimming.CharacterEllipsis; status.MaxWidth = 360;
+        var commands = new ResponsiveCommandBar { Name = "RdpCommands" };
+        commands.Add("reconnect", reconnectButton, () => Ui.AsyncMenu("Переподключить", () => ReconnectRequested?.Invoke(this) ?? Task.CompletedTask, glyph: IconCatalog.Reconnect), 90);
+        commands.Add("disconnect", disconnectButton, () => Ui.AsyncMenu("Отключить", DisconnectAsync, glyph: Ui.CloseGlyph), 80);
+        commands.Add("fullscreen", fullScreenButton, () => Ui.Menu("Во весь экран", FullScreen, glyph: IconCatalog.ViewHuge), 70);
+        commands.Add("keys", keysButton, () => { var m = new MenuItem { Header = "Клавиши" }; m.Items.Add(Ui.Menu("Ctrl+Alt+Del", CtrlAltDel)); m.Items.Add(Ui.Menu("Пуск (клавиша Windows)", StartMenu)); return m; }, 60);
+        commands.Add("snapshot", snapshotButton, () => Ui.Menu("Снимок", Snapshot, glyph: "\uE722"), 40);
+        commands.Add("files", filesButton, () => Ui.AsyncMenu("Файлы по SSH", () => FilesRequested?.Invoke(this) ?? Task.CompletedTask, glyph: Ui.FileGlyph), 30);
+        commands.Add("mstsc", mstsc, () => Ui.Menu("Открыть в mstsc", OpenInMstsc, glyph: IconCatalog.RemoteDesktop), 20);
+        var bar = new DockPanel { LastChildFill = true }; DockPanel.SetDock(status, Dock.Right); bar.Children.Add(status); bar.Children.Add(commands);
         var barHost = new Border { Child = bar, Padding = new Thickness(10, 4, 10, 4) }; barHost.SetResourceReference(StyleProperty, "CommandBarStyle"); SetDock(barHost, Dock.Top); Children.Add(barHost);
         message.Name = "RdpMessage"; message.TextWrapping = TextWrapping.Wrap; message.TextAlignment = TextAlignment.Center; notice.Children.Add(message);
         var again = Ui.AsyncCommandButton(IconCatalog.Reconnect, "Подключиться снова", () => ReconnectRequested?.Invoke(this) ?? Task.CompletedTask); again.Name = "RdpConnectAgain"; again.HorizontalAlignment = HorizontalAlignment.Center; again.Margin = new Thickness(0, 14, 0, 0); notice.Children.Add(again);
@@ -84,7 +92,7 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         message.Text = problem ?? text;
         bool live = State is SessionState.Connecting or SessionState.Connected;
         notice.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
-        fullScreenButton.IsEnabled = keysButton.IsEnabled = startButton.IsEnabled = snapshotButton.IsEnabled = State == SessionState.Connected;
+        fullScreenButton.IsEnabled = keysButton.IsEnabled = snapshotButton.IsEnabled = State == SessionState.Connected;
         disconnectButton.IsEnabled = live;
         Place();
     }
@@ -299,6 +307,14 @@ public sealed class RdpView : DockPanel, IAsyncDisposable
         if (client?.Ocx is not { } ocx) return;
         try { Com.Set(ocx, "FullScreen", true); }
         catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or System.Reflection.TargetInvocationException) { Ui.Error("Не удалось включить полноэкранный режим: " + ErrorMessages.Describe(ex)); }
+    }
+
+    ContextMenu KeysMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(Ui.Menu("Ctrl+Alt+Del", CtrlAltDel));
+        menu.Items.Add(Ui.Menu("Пуск (клавиша Windows)", StartMenu));
+        return menu;
     }
 
     internal void StartMenu()

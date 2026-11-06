@@ -31,10 +31,11 @@ public sealed class HistoryView : UserControl, IDisposable
     readonly ServerSession? session;
     readonly StackPanel charts = new() { Margin = new Thickness(12, 4, 12, 12) };
     readonly WrapPanel groupPanel = new() { Margin = new Thickness(12, 2, 12, 4) };
-    readonly WrapPanel rangePanel = new() { Margin = new Thickness(0) };
-    readonly TextBlock status = Ui.Text("", 12), periodText = Ui.Text("", 12), processTitle = Ui.Text("Процессы", 13, true), errors = Ui.Text("", 12);
-    readonly ListBox processes = new() { MinHeight = 80, MaxHeight = 260 }, eventList = new() { MinHeight = 80 };
-    readonly CheckBox background = new() { Content = "Записывать в фоне", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+    readonly StackPanel rangePanel = new() { Orientation = Orientation.Horizontal };
+    readonly TextBlock status = Ui.Text("", 12), periodText = Ui.Text("", 12), processTitle = Ui.Text("Процессы", 13, true), errors = Ui.Text("", 12), processHint = Ui.Text("Щёлкните по графику — здесь появятся самые загруженные процессы той минуты.", 12);
+    readonly StackPanel processes = new(), eventList = new();
+    readonly CheckBox background = new() { Content = "Записывать в фоне", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
+    readonly Button backButton, compareChip;
     readonly HashSet<string> selected = new(StringComparer.Ordinal);
     readonly Stack<(DateTimeOffset From, DateTimeOffset To, TimeSpan? Live)> back = new();
     readonly Action<Guid> updated;
@@ -50,8 +51,19 @@ public sealed class HistoryView : UserControl, IDisposable
     internal Task? Loading { get; private set; }
     internal IReadOnlyList<HistoryChart> Charts => charts.Children.OfType<HistoryChart>().ToArray();
     internal string StatusText => status.Text;
-    internal IReadOnlyList<string> ProcessLines => processes.Items.OfType<string>().ToArray();
-    internal IReadOnlyList<string> EventLines => eventList.Items.OfType<string>().ToArray();
+    internal IReadOnlyList<string> ProcessLines => processes.Children.OfType<TextBlock>().Select(t => t.Text).ToArray();
+    internal IReadOnlyList<string> EventLines => eventList.Children.OfType<TextBlock>().Select(t => t.Text).ToArray();
+    internal bool BackVisible => backButton.Visibility == Visibility.Visible;
+
+    static void SetLines(StackPanel panel, IEnumerable<string> lines)
+    {
+        panel.Children.Clear();
+        foreach (var line in lines)
+        {
+            var t = Ui.Text(line, 12); t.TextWrapping = TextWrapping.Wrap; t.Margin = new Thickness(0, 0, 0, 6);
+            panel.Children.Add(t);
+        }
+    }
 
     public HistoryView(Guid server, ServerSession? session = null)
     {
@@ -59,42 +71,55 @@ public sealed class HistoryView : UserControl, IDisposable
         Name = "HistoryView";
         var root = new DockPanel(); root.SetResourceReference(Panel.BackgroundProperty, "Paper");
 
-        var commands = new WrapPanel { Margin = new Thickness(10, 4, 10, 4) };
+        // Toolbar: the period as one segmented group on the left, the other commands in a bar that folds into «…» when narrow.
         foreach (var (label, span) in new (string, TimeSpan)[] { ("1 ч", TimeSpan.FromHours(1)), ("24 ч", TimeSpan.FromHours(24)), ("7 дн", TimeSpan.FromDays(7)), ("30 дн", TimeSpan.FromDays(30)) })
         {
-            var b = Ui.Button(label, () => SetLive(span), $"Последние {label}"); b.Margin = new Thickness(0, 0, 4, 0); b.Tag = span; rangePanel.Children.Add(b);
+            var b = Ui.Button(label, () => SetLive(span), $"Последние {label}"); b.Tag = span; b.MinWidth = 52; rangePanel.Children.Add(b);
         }
-        var period = Ui.Button("Период…", ChoosePeriod, "Показать выбранные дни"); period.Margin = new Thickness(0, 0, 4, 0); rangePanel.Children.Add(period);
-        var zoomOut = Ui.Button("Назад", ZoomBack, "Вернуться к предыдущему периоду после увеличения"); zoomOut.Name = "HistoryBack"; rangePanel.Children.Add(zoomOut);
-        commands.Children.Add(rangePanel);
-        commands.Children.Add(Ui.Line());
-        var compare = Ui.FlyoutButton(IconCatalog.Performance, "Сравнить", CompareMenu, "Другой сервер или прошлый период на тех же графиках"); compare.Name = "HistoryCompare"; commands.Children.Add(compare);
-        commands.Children.Add(Ui.CommandButton(Ui.AddGlyph, "Отметка…", AddMark, "Своя отметка на графиках (например, «обновил nginx»)"));
-        commands.Children.Add(Ui.CommandButton(Ui.FileGlyph, "Экспорт CSV…", ExportCsv, "Сохранить показанные ряды в CSV"));
-        commands.Children.Add(Ui.CommandButton(IconCatalog.Settings, "Свои метрики…", EditCustomMetrics, "Команды на сервере, вывод которых записывается как метрика"));
-        commands.Children.Add(Ui.CommandButton(IconCatalog.Clock, "Оповещения…", () => MetricAlertsWindow.Open(Window.GetWindow(this), server), "Правила оповещений по истории"));
-        commands.Children.Add(Ui.CommandButton("", "Обновить", () => { MetricsHub.Scheduler.Wake(server); Reload(); }, "Перечитать историю и записать точку сейчас"));
-        background.Name = "HistoryBackground"; background.ToolTip = "Раз в минуту, даже если вкладка сервера закрыта: отдельное подключение без терминала, с сохранённым паролем или ключом.";
-        background.Click += async (_, _) => await SetBackgroundAsync(background.IsChecked == true);
-        commands.Children.Add(background);
-        var commandBorder = new Border { Child = commands, BorderThickness = new Thickness(0, 0, 0, 1) }; commandBorder.SetResourceReference(StyleProperty, "CommandBarStyle");
+        var period = Ui.Button("Период…", ChoosePeriod, "Показать выбранные дни"); period.Name = "HistoryPeriod"; rangePanel.Children.Add(period);
+        foreach (var b in rangePanel.Children.OfType<Button>()) { b.Margin = new Thickness(0, 0, 2, 0); b.Padding = new Thickness(10, 4, 10, 4); }
+        var commands = new ResponsiveCommandBar { Name = "HistoryCommands", Margin = new Thickness(12, 0, 0, 0) };
+        var compare = Ui.FlyoutButton(IconCatalog.Performance, "Сравнить", CompareMenu, "Другой сервер или прошлый период на тех же графиках"); compare.Name = "HistoryCompare";
+        commands.Add("compare", compare, () => { var m = new MenuItem { Header = "Сравнить" }; foreach (var i in CompareMenu().Items.OfType<Control>().ToArray()) { ((ItemsControl)i.Parent).Items.Remove(i); m.Items.Add(i); } return m; }, 60);
+        commands.Add("mark", Ui.CommandButton(Ui.AddGlyph, "Отметка…", AddMark, "Своя отметка на графиках (например, «обновил nginx»)"), () => Ui.Menu("Отметка…", AddMark, glyph: Ui.AddGlyph), 40);
+        commands.Add("export", Ui.CommandButton(Ui.FileGlyph, "Экспорт CSV…", ExportCsv, "Сохранить показанные ряды в CSV"), () => Ui.Menu("Экспорт CSV…", ExportCsv, glyph: Ui.FileGlyph), 30);
+        commands.Add("custom", Ui.CommandButton(IconCatalog.Settings, "Свои метрики…", EditCustomMetrics, "Команды на сервере, вывод которых записывается как метрика"), () => Ui.Menu("Свои метрики…", EditCustomMetrics, glyph: IconCatalog.Settings), 20);
+        commands.Add("alerts", Ui.CommandButton(IconCatalog.Clock, "Оповещения…", () => MetricAlertsWindow.Open(Window.GetWindow(this), server), "Правила оповещений по истории"), () => Ui.Menu("Оповещения…", () => MetricAlertsWindow.Open(Window.GetWindow(this), server), glyph: IconCatalog.Clock), 10);
+        var refresh = Ui.IconButton(Ui.RefreshGlyph, () => { MetricsHub.Scheduler.Wake(server); Reload(); }, "Обновить: перечитать историю и записать точку сейчас"); refresh.Name = "HistoryRefresh";
+        var bar = new DockPanel { Margin = new Thickness(10, 4, 10, 4), LastChildFill = true };
+        DockPanel.SetDock(rangePanel, Dock.Left); bar.Children.Add(rangePanel);
+        DockPanel.SetDock(refresh, Dock.Right); bar.Children.Add(refresh);
+        bar.Children.Add(commands);
+        var commandBorder = new Border { Child = bar, BorderThickness = new Thickness(0, 0, 0, 1) }; commandBorder.SetResourceReference(StyleProperty, "CommandBarStyle");
         DockPanel.SetDock(commandBorder, Dock.Top); root.Children.Add(commandBorder);
 
-        var info = new StackPanel { Margin = new Thickness(12, 6, 12, 0) };
-        periodText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); status.TextWrapping = TextWrapping.Wrap; status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); errors.TextWrapping = TextWrapping.Wrap; errors.SetResourceReference(TextBlock.ForegroundProperty, "ValidationInk");
-        status.Name = "HistoryStatus";
-        info.Children.Add(periodText); info.Children.Add(status); info.Children.Add(errors);
+        // What is shown and whether it is recorded; «Назад» and the comparison appear only while they apply.
+        backButton = Ui.Button("← Назад", ZoomBack, "Вернуться к периоду до увеличения"); backButton.Name = "HistoryBack"; backButton.Margin = new Thickness(0, 0, 8, 0); backButton.Padding = new Thickness(8, 2, 8, 2);
+        compareChip = Ui.Button("", () => SetCompare(null, false), "Убрать сравнение"); compareChip.Name = "HistoryCompareChip"; compareChip.Margin = new Thickness(0, 0, 8, 0); compareChip.Padding = new Thickness(8, 2, 8, 2);
+        background.Name = "HistoryBackground"; background.ToolTip = "Раз в минуту, даже если вкладка сервера закрыта: отдельное подключение без терминала, с сохранённым паролем или ключом.";
+        background.Click += async (_, _) => await SetBackgroundAsync(background.IsChecked == true);
+        periodText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); periodText.VerticalAlignment = VerticalAlignment.Center; periodText.TextTrimming = TextTrimming.CharacterEllipsis;
+        status.TextWrapping = TextWrapping.Wrap; status.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); status.Name = "HistoryStatus";
+        errors.TextWrapping = TextWrapping.Wrap; errors.SetResourceReference(TextBlock.ForegroundProperty, "ValidationInk");
+        var periodRow = new DockPanel(); DockPanel.SetDock(backButton, Dock.Left); periodRow.Children.Add(backButton); DockPanel.SetDock(compareChip, Dock.Left); periodRow.Children.Add(compareChip); periodRow.Children.Add(periodText);
+        var statusRow = new DockPanel { Margin = new Thickness(0, 4, 0, 0) }; DockPanel.SetDock(background, Dock.Right); statusRow.Children.Add(background); statusRow.Children.Add(status);
+        var info = new StackPanel { Margin = new Thickness(14, 8, 14, 0) };
+        info.Children.Add(periodRow); info.Children.Add(statusRow); info.Children.Add(errors);
         DockPanel.SetDock(info, Dock.Top); root.Children.Add(info);
+        groupPanel.Margin = new Thickness(14, 6, 14, 2);
         DockPanel.SetDock(groupPanel, Dock.Top); root.Children.Add(groupPanel);
 
-        var side = new StackPanel { Width = 300, Margin = new Thickness(4, 8, 12, 12) };
+        // Body: graphs on the left; the processes of a picked minute and the events of the period in a side column.
+        var side = new StackPanel { Margin = new Thickness(16, 10, 14, 14) };
         side.Children.Add(processTitle);
-        var hint = Ui.Text("Щёлкните по графику — здесь появятся самые загруженные процессы в ту минуту.", 12); hint.TextWrapping = TextWrapping.Wrap; hint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); hint.Margin = new Thickness(0, 2, 0, 6);
-        side.Children.Add(hint); processes.Name = "HistoryProcesses"; side.Children.Add(processes);
-        var eventsTitle = Ui.Text("События", 13, true); eventsTitle.Margin = new Thickness(0, 14, 0, 6); side.Children.Add(eventsTitle);
+        processHint.TextWrapping = TextWrapping.Wrap; processHint.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); processHint.Margin = new Thickness(0, 4, 0, 0);
+        side.Children.Add(processHint); processes.Name = "HistoryProcesses"; processes.Margin = new Thickness(0, 6, 0, 0); side.Children.Add(processes);
+        var eventsTitle = Ui.Text("События", 13, true); eventsTitle.Margin = new Thickness(0, 18, 0, 6); side.Children.Add(eventsTitle);
         eventList.Name = "HistoryEvents"; side.Children.Add(eventList);
-        var sideScroll = new ScrollViewer { Content = side, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        DockPanel.SetDock(sideScroll, Dock.Right); root.Children.Add(sideScroll);
+        var sideColumn = new Border { Width = 300, BorderThickness = new Thickness(1, 0, 0, 0), Child = new ScrollViewer { Content = side, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } };
+        sideColumn.SetResourceReference(Border.BorderBrushProperty, "Edge");
+        DockPanel.SetDock(sideColumn, Dock.Right); root.Children.Add(sideColumn);
+        charts.Margin = new Thickness(14, 4, 10, 14);
         root.Children.Add(new ScrollViewer { Content = charts, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         Content = root;
 
@@ -246,7 +271,16 @@ public sealed class HistoryView : UserControl, IDisposable
         if (disposed) return;
         lastAutoLoad = DateTimeOffset.UtcNow;
         if (live is { } span) { to = DateTimeOffset.UtcNow; from = to - span; }
-        foreach (var b in rangePanel.Children.OfType<Button>()) b.FontWeight = b.Tag is TimeSpan s && s == live ? FontWeights.SemiBold : FontWeights.Normal;
+        foreach (var b in rangePanel.Children.OfType<Button>())
+        {
+            bool current = b.Tag is TimeSpan s && s == live || b.Name == "HistoryPeriod" && live is null && back.Count == 0;
+            b.FontWeight = current ? FontWeights.SemiBold : FontWeights.Normal;
+            if (current) b.SetResourceReference(BackgroundProperty, "Selected"); else b.ClearValue(BackgroundProperty);
+        }
+        backButton.Visibility = back.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        var compareName = compareServer is { } cs ? App.Store.Profiles.FirstOrDefault(p => p.Id == cs)?.Name ?? "другой сервер" : comparePrevious ? "прошлый период" : null;
+        compareChip.Content = compareName is null ? "" : "Сравнение: " + compareName + "  ✕";
+        compareChip.Visibility = compareName is null ? Visibility.Collapsed : Visibility.Visible;
         var version = ++loadVersion;
         var (start, end) = (from, to);
         var resolution = MetricsStore.ResolutionFor(end - start);
@@ -280,7 +314,7 @@ public sealed class HistoryView : UserControl, IDisposable
         BuildGroupToggles(groups);
         var otherName = compareServer is { } o ? App.Store.Profiles.FirstOrDefault(p => p.Id == o)?.Name ?? "другой сервер" : null;
         string detail = resolution switch { MetricResolution.Raw => "каждый замер", MetricResolution.FiveMinutes => "средние за 5 минут, полоса — мин–макс", _ => "средние за час, полоса — мин–макс" };
-        periodText.Text = $"{start.ToLocalTime():dd.MM.yyyy HH:mm} — {end.ToLocalTime():dd.MM.yyyy HH:mm} · {detail}" + (otherName is not null ? $" · пунктир — «{otherName}»" : comparePrevious ? " · пунктир — прошлый период" : "") + ". Выделите участок графика мышью, чтобы увеличить.";
+        periodText.Text = $"{start.ToLocalTime():dd.MM.yyyy HH:mm} — {end.ToLocalTime():dd.MM.yyyy HH:mm} · {detail} · выделите участок графика, чтобы увеличить";
         charts.Children.Clear();
         foreach (var g in groups.Where(g => Shown(g, selected, hidden)))
         {
@@ -307,9 +341,8 @@ public sealed class HistoryView : UserControl, IDisposable
             empty.TextWrapping = TextWrapping.Wrap; empty.Margin = new Thickness(0, 24, 0, 0); empty.MaxWidth = 640; empty.HorizontalAlignment = HorizontalAlignment.Left;
             charts.Children.Add(empty);
         }
-        eventList.Items.Clear();
-        foreach (var e in Enumerable.Reverse(marks)) eventList.Items.Add($"{e.Time.ToLocalTime():dd.MM HH:mm} — {e.Text}");
-        if (eventList.Items.Count == 0) eventList.Items.Add("Событий за период нет");
+        var eventLines = Enumerable.Reverse(marks).Select(e => $"{e.Time.ToLocalTime():dd.MM HH:mm} — {e.Text}").ToList();
+        SetLines(eventList, eventLines.Count > 0 ? eventLines : ["Событий за период нет"]);
         UpdateStatus();
     }
 
@@ -339,16 +372,15 @@ public sealed class HistoryView : UserControl, IDisposable
         var resolution = MetricsStore.ResolutionFor(to - from);
         var tolerance = TimeSpan.FromSeconds(Math.Max(120, StepOf(resolution).TotalSeconds));
         var top = MetricsHub.Store.ProcessesAt(server, time, tolerance);
-        processes.Items.Clear();
+        processHint.Visibility = Visibility.Collapsed;
         if (top is null)
         {
             processTitle.Text = $"Процессы в {time.ToLocalTime():dd.MM HH:mm}";
-            processes.Items.Add("Нет записи процессов рядом с этой минутой.");
+            SetLines(processes, ["Нет записи процессов рядом с этой минутой."]);
             return;
         }
         processTitle.Text = $"Процессы в {top.Time.ToLocalTime():dd.MM HH:mm}";
-        foreach (var p in top.Processes.OrderByDescending(p => p.Cpu ?? -1))
-            processes.Items.Add($"{p.Name} ({p.Pid}) — ЦП {(p.Cpu is { } c ? MetricSeries.Format(c, MetricSeries.Percent) : "—")}, память {(p.Memory is { } m ? MetricSeries.Format(m, MetricSeries.Bytes) : "—")}" + (p.User.Length > 0 ? ", " + p.User : ""));
+        SetLines(processes, top.Processes.OrderByDescending(p => p.Cpu ?? -1).Select(p => $"{p.Name} ({p.Pid}) — ЦП {(p.Cpu is { } c ? MetricSeries.Format(c, MetricSeries.Percent) : "—")}, память {(p.Memory is { } m ? MetricSeries.Format(m, MetricSeries.Bytes) : "—")}" + (p.User.Length > 0 ? ", " + p.User : "")));
     }
 
     public void Dispose() { disposed = true; MetricsHub.Updated -= updated; }

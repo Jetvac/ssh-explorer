@@ -112,7 +112,7 @@ public sealed partial class MainWindow : Window
         servers.Margin = new Thickness(12, 4, 12, 0); servers.SelectionMode = DataGridSelectionMode.Single;
         servers.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(HomeViewModel.VisibleProfiles)));
         servers.SetBinding(DataGrid.SelectedItemProperty, new Binding(nameof(HomeViewModel.SelectedProfile)) { Mode = BindingMode.TwoWay });
-        servers.Columns.Add(ProtocolColumn()); AddColumn(servers, "Название", "Name", 240); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); servers.Columns.Add(LoadColumn()); AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+        servers.Columns.Add(ProtocolColumn()); AddColumn(servers, "Название", "Name", 240); AddColumn(servers, "Адрес", "Endpoint", 280); AddColumn(servers, "Пользователь", "Username", 180); servers.Columns.Add(loadColumn = LoadColumn()); loadColumn.Visibility = HomeMetrics.Any ? Visibility.Visible : Visibility.Collapsed; AddColumn(servers, "Состояние", "Status", 240); servers.Columns[^1].MinWidth = 240; servers.Columns[^1].Width = new DataGridLength(1, DataGridLengthUnitType.Star);
         TableSorting.Attach(servers, "home.servers", [new("Name", r => ((ServerProfileViewModel)r).Name, true), new("Endpoint", r => ((ServerProfileViewModel)r).Endpoint, true), new("Username", r => ((ServerProfileViewModel)r).Username, true), new("Status", r => ((ServerProfileViewModel)r).StatusRank), new("Load", r => ((ServerProfileViewModel)r).LoadRank)], "Name",
             group: new("Group", r => ((ServerProfileViewModel)r).GroupKey, true));
         HomeGrouping.Attach(servers, () => viewModel.HasGroups);
@@ -133,6 +133,7 @@ public sealed partial class MainWindow : Window
     {
         if (refreshingHome) return;
         refreshingHome = true;
+        if (loadColumn is not null) loadColumn.Visibility = HomeMetrics.Any ? Visibility.Visible : Visibility.Collapsed;
         try { viewModel.Refresh(App.Store.Profiles, sessions.Values.Select(v => (v.Session.Profile.Id, v.Session.State)).Concat(desktops.Values.Select(d => (d.Profile.Id, d.State)))); }
         finally { refreshingHome = false; }
     }
@@ -489,6 +490,7 @@ public sealed partial class MainWindow : Window
     }
     /// <summary>Test hook: answers «удалить и историю?» after a profile is deleted.</summary>
     internal Func<bool>? DeleteHistoryOverride;
+    DataGridTemplateColumn? loadColumn;
     /// <summary>Test hook: receives the history window instead of showing it.</summary>
     internal Action<HistoryWindow>? HistoryWindowOverride;
     internal void ShowHistory(ServerProfile? profile)
@@ -514,7 +516,7 @@ public sealed partial class MainWindow : Window
         text.SetValue(TextBlock.FontSizeProperty, 12d);
         text.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         panel.AppendChild(text);
-        return new DataGridTemplateColumn { Header = "Нагрузка", Width = 250, SortMemberPath = "Load", CellTemplate = new DataTemplate { VisualTree = panel } };
+        return new DataGridTemplateColumn { Header = "Нагрузка", Width = 220, SortMemberPath = "Load", CellTemplate = new DataTemplate { VisualTree = panel } };
     }
     static DataGridTemplateColumn ProtocolColumn()
     {
@@ -524,7 +526,7 @@ public sealed partial class MainWindow : Window
         icon.SetBinding(System.Windows.Automation.AutomationProperties.NameProperty, new Binding(nameof(ServerProfileViewModel.ProtocolName)));
         icon.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         icon.SetValue(Control.IsTabStopProperty, false);
-        return new DataGridTemplateColumn { Header = "", Width = 34, CanUserResize = false, CanUserSort = false, CellTemplate = new DataTemplate { VisualTree = icon } };
+        return new DataGridTemplateColumn { Header = "", Width = 46, CanUserResize = false, CanUserSort = false, CellTemplate = new DataTemplate { VisualTree = icon } };
     }
     sealed class GlyphIconConverter : IValueConverter
     {

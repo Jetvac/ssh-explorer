@@ -18,6 +18,8 @@ internal static class HomeMetrics
     static bool busy;
     public static event Action? Changed;
 
+    /// <summary>Some server has recorded history (the «Нагрузка» column is shown only then).</summary>
+    public static bool Any { get { lock (sync) return cache.Count > 0; } }
     public static Summary? Get(Guid server) { lock (sync) return cache.TryGetValue(server, out var s) ? s : null; }
 
     /// <summary>Recomputes in the background unless that happened during the last minute (or <paramref name="force"/>).</summary>

@@ -120,7 +120,9 @@ public sealed class HistoryChart : FrameworkElement
         // Title and legend.
         double x0 = 0;
         var title = Label(Title, ink, 12, bold); dc.DrawText(title, new Point(0, 2)); x0 = title.Width + 14;
-        foreach (var s in series)
+        // A legend only when it says more than the title (several lines, or a line named differently).
+        bool legend = series.Count > 1 || series.Count == 1 && series[0].Label != Title;
+        foreach (var s in legend ? series : [])
         {
             var brush = new SolidColorBrush(s.Color); brush.Freeze();
             var text = Label(s.Label, muted);
@@ -152,6 +154,23 @@ public sealed class HistoryChart : FrameworkElement
 
         double Y(double v) => plot.Bottom - (Math.Clamp(v, low, high) - low) / (high - low) * plot.Height;
         dc.PushClip(new RectangleGeometry(plot));
+        // Before the first recorded point there is no data: say so instead of leaving a blank that looks broken.
+        var own = series.Where(x => x.Shift == TimeSpan.Zero && !x.Dashed).SelectMany(x => x.Points).Select(x => x.Time).DefaultIfEmpty().Min();
+        var hatch = new SolidColorBrush(Color.FromArgb(SystemParameters.HighContrast ? (byte)0 : (byte)70, 128, 128, 128)); hatch.Freeze();
+        if (series.All(x => x.Points.Count == 0))
+        {
+            var t = Label(NoDataText, muted, 12);
+            dc.DrawText(t, new Point(Math.Max(0, (plot.Width - t.Width) / 2), plot.Top + (plot.Height - t.Height) / 2));
+        }
+        else if (own != default && XOf(own) > plot.Width * 0.04)
+        {
+            double edgeX = Math.Min(plot.Width, XOf(own));
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(18, 128, 128, 128)), null, new Rect(plot.Left, plot.Top, edgeX, plot.Height));
+            var t = Label("нет записи", muted, 11);
+            if (edgeX > t.Width + 16) dc.DrawText(t, new Point((edgeX - t.Width) / 2, plot.Top + (plot.Height - t.Height) / 2));
+            var edgePen = new Pen(hatch, 1) { DashStyle = DashStyles.Dot }; edgePen.Freeze();
+            dc.DrawLine(edgePen, new Point(edgeX, plot.Top), new Point(edgeX, plot.Bottom));
+        }
         bool contrast = SystemParameters.HighContrast;
         foreach (var s in series)
         {
@@ -179,11 +198,13 @@ public sealed class HistoryChart : FrameworkElement
         }
         dc.Pop();
 
-        // Event marks above the plot.
-        foreach (var e in events)
+        // Event marks above the plot; marks closer than 8 px become one mark with their count.
+        foreach (var cluster in Clusters(events.Where(e => XOf(e.Time) >= 0 && XOf(e.Time) <= plot.Width).ToArray(), e => XOf(e.Time), 8))
         {
-            double x = XOf(e.Time); if (x < 0 || x > plot.Width) continue;
-            var brush = e.Kind is "alert" or "offline" ? danger : e.Kind is "reboot" ? accent : muted;
+            var e = cluster[^1];
+            double x = XOf(e.Time);
+            var brush = cluster.Any(c => c.Kind is "alert" or "offline") ? danger : cluster.Any(c => c.Kind is "reboot") ? accent : muted;
+            if (cluster.Count > 1) { var n = Label(cluster.Count.ToString(CultureInfo.CurrentCulture), muted, 10); dc.DrawText(n, new Point(Math.Min(plot.Right - n.Width, x + 6), Header - 1)); }
             var mark = new StreamGeometry();
             using (var c = mark.Open()) { c.BeginFigure(new Point(x - 4, Header + 1), true, true); c.LineTo(new Point(x + 4, Header + 1), true, false); c.LineTo(new Point(x, Header + Marks - 1), true, false); }
             mark.Freeze(); dc.DrawGeometry(brush, null, mark);
@@ -217,6 +238,20 @@ public sealed class HistoryChart : FrameworkElement
             dc.DrawRoundedRectangle(paper, new Pen(edge, 1), new Rect(bx, by, w, h), 4, 4);
             dc.DrawText(caption, new Point(bx + 6, by + 4));
         }
+    }
+
+    internal const string NoDataText = "Нет записанных значений за этот период";
+
+    /// <summary>Groups items whose positions are closer than <paramref name="distance"/> (sorted by position).</summary>
+    internal static List<List<T>> Clusters<T>(IReadOnlyList<T> items, Func<T, double> position, double distance)
+    {
+        var result = new List<List<T>>();
+        foreach (var item in items.OrderBy(position))
+        {
+            if (result.Count > 0 && position(item) - position(result[^1][^1]) < distance) result[^1].Add(item);
+            else result.Add([item]);
+        }
+        return result;
     }
 
     /// <summary>The recorded point nearest to a moment, if one is within 1.5 steps.</summary>
